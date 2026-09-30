@@ -18,7 +18,7 @@ The app is built in the order listed in [project.md](project.md). One step is on
 
 ## Tests
 
-- JavaScript: Vitest, in `tests/`. New visualizer plugins are picked up automatically by `tests/plugin-contract.test.js` when placed in `web/visuals/`.
+- JavaScript: Vitest, in `tests/`. New visualizer plugins are picked up automatically by `tests/plugin-contract.test.js` when placed in `IdleViz/web/visuals/`.
 - Swift: XCTest. Keep logic in a Swift package target so `swift test` can run it in CI. Linting is SwiftLint (`.swiftlint.yml`).
 
 ## Code style

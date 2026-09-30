@@ -1,6 +1,6 @@
 # Writing a custom visualizer
 
-A custom visualizer is a single `.js` file. Drop it in the presets folder (`~/Library/Application Support/IdleViz/Presets/`, subfolders allowed) and it shows up in the preset list, tagged "custom". `aurora.js` in the repo is a complete working example, and `aurora-demo.html` is a test page you can load it into.
+A custom visualizer is a single `.js` file. Drop it in the presets folder (`~/Library/Application Support/IdleViz/Presets/`, subfolders allowed) and it shows up in the preset list, tagged "custom". `IdleViz/web/visuals/aurora.js` in the repo is a complete working example, and `aurora-demo.html` is a test page you can load it into.
 
 ## The contract
 

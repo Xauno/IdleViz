@@ -27,6 +27,18 @@ body {
   inset: 0;
 }
 
+/* Butterchurn renders below full resolution on large displays; the GPU scales the canvas up. */
+#viz canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#dim {
+  position: fixed;
+  inset: 0;
+}
+
 /* Stand-in for the visualizer until Butterchurn arrives (step 7a). Only the transform
    animates, so the compositor does the work instead of repainting a fullscreen gradient. */
 #viz {
