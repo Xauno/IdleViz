@@ -202,6 +202,8 @@ IdleViz/
 
 ## Build order
 
+Each step is one pull request. At the end of each step, update the README (Roadmap table, Features, Installation, Usage) and add tests for the step, as described in `CONTRIBUTING.md`.
+
 1. **Open/close shell:** menu-bar app (Settings… + hotkey row, settings window stubbed), hotkey, fullscreen black window on the main display, dismiss on any input. Compare the feel side by side with a real macOS screensaver.
 2. **SpotifyInfo:** launch/quit tracking, notification + AppleScript, content type and ad context, printed to the console. Confirm it never launches Spotify. Test songs, paused, podcasts, music ads, podcast ads.
 3. **Open rules + icon flash** wired to the hotkey.

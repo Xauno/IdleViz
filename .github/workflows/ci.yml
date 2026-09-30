@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  web:
+    name: Web (lint, typecheck, test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Check formatting
+        run: npm run format:check
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+
+  swift:
+    name: Swift (lint, build, test)
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Swift package arrives with build step 1. Until then this job passes without doing anything.
+      - name: Detect Swift package
+        id: detect
+        run: |
+          if [ -f Package.swift ]; then echo "found=true" >> "$GITHUB_OUTPUT"; else echo "found=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Install SwiftLint
+        if: steps.detect.outputs.found == 'true'
+        run: brew install swiftlint
+
+      - name: Lint
+        if: steps.detect.outputs.found == 'true'
+        run: swiftlint lint --strict
+
+      - name: Build
+        if: steps.detect.outputs.found == 'true'
+        run: swift build
+
+      - name: Test
+        if: steps.detect.outputs.found == 'true'
+        run: swift test
+
+  # One stable check name for branch protection, so adding or renaming jobs never needs a settings change.
+  ci-passed:
+    name: CI passed
+    if: always()
+    needs: [web, swift]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job to succeed
+        run: |
+          echo '${{ toJSON(needs) }}'
+          test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "false"
