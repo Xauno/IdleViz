@@ -73,9 +73,28 @@ final class SpotifyTrackerTests: XCTestCase {
         XCTAssertEqual(updates.count, 1)
     }
 
-    func testFailedQueryMeansNoTrack() async {
+    func testFailedQueryKeepsLastTrack() async {
+        let runner = FakeRunner([reply("playing", "spotify:track:a"), nil])
+        let tracker = SpotifyTracker(runner: runner, isRunning: true)
+        var updates = 0
+        tracker.onUpdate = { _ in updates += 1 }
+        await tracker.refresh()
+        await tracker.refresh()
+        XCTAssertEqual(tracker.current?.nowPlaying.spotifyURL, "spotify:track:a")
+        XCTAssertEqual(updates, 1)
+    }
+
+    func testFailedFirstQueryMeansNoTrack() async {
         let runner = FakeRunner([nil])
         let tracker = SpotifyTracker(runner: runner, isRunning: true)
+        await tracker.refresh()
+        XCTAssertNil(tracker.current)
+    }
+
+    func testStoppedReplyStillClears() async {
+        let runner = FakeRunner([reply("playing", "spotify:track:a"), "stopped"])
+        let tracker = SpotifyTracker(runner: runner, isRunning: true)
+        await tracker.refresh()
         await tracker.refresh()
         XCTAssertNil(tracker.current)
     }

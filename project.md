@@ -181,7 +181,8 @@ end tell
 - Fields are joined with ASCII unit separator (`character id 31`), which can't appear in a title, unlike a printable separator such as `||`. The query lives in `SpotifyQuery` in `IdleVizCore`.
 - Units: `duration` in **milliseconds**, `player position` in **seconds**. AppleScript turns numbers into text with the system locale, so the position can have a decimal comma.
 - Podcast episodes report an empty artist (the show is in `album`), and a duration of 0 for a moment right after they start.
-- "No current track" = state `stopped`, an error, or an empty name/URL. Ads may have an empty name; they still count as a track.
+- "No current track" = state `stopped`, a `Stopped` notification, Spotify quitting, or an empty name/URL. Ads may have an empty name; they still count as a track.
+- A failed query (a timeout or other AppleScript error) keeps the last known track instead of clearing it, so one slow answer from Spotify doesn't stop the visualizer from opening. Before any query has succeeded, there is no track.
 - The first query after installing a new build can time out (error -1712) while macOS shows the Automation prompt, because the prompt counts against the 2 s timeout. The next notification queries again.
 - **Artwork:** Swift downloads the artwork URL with `URLSession`, keeps a few recent images in memory, and passes the image to the page as a `data:` URL inside the `nowPlaying` JSON. The page itself never uses the network. Local files (`local:`) have no artwork, so the overlay shows a placeholder, designed against the reference screenshots.
 - **Spotify Connect:** when Spotify plays on another device, AppleScript still reports the track, so the window opens as usual. The tap finds no local audio, so the visuals get silence. No special detection needed.

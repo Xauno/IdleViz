@@ -27,7 +27,7 @@ public struct SpotifySnapshot: Sendable, Equatable {
 public final class SpotifyTracker {
     public private(set) var isRunning: Bool
     public private(set) var current: SpotifySnapshot?
-    /// Called after every refresh and on quit, with the new snapshot (nil = no current track).
+    /// Called after every answered query, on stop and on quit, with the new snapshot (nil = no current track).
     public var onUpdate: ((SpotifySnapshot?) -> Void)?
 
     private let runner: any SpotifyQueryRunning
@@ -72,7 +72,10 @@ public final class SpotifyTracker {
             let reply = await runner.run()
             // Spotify may have quit while the query ran.
             guard isRunning else { return }
-            publish(reply.flatMap(SpotifyQuery.parse).map { nowPlaying in
+            // A failed query (timeout, busy Spotify) says nothing about the track, so keep the last one.
+            // Quitting and stopping are reported separately and still clear it.
+            guard let reply else { continue }
+            publish(SpotifyQuery.parse(reply).map { nowPlaying in
                 SpotifySnapshot(nowPlaying: nowPlaying, content: adContext.content(for: nowPlaying.kind))
             })
         } while pending && isRunning
