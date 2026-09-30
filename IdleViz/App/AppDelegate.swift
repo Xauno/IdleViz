@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var spotify: SpotifyInfo?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UserDefaults.standard.register(defaults: [IdleTimeoutSetting.key: IdleTimeoutSetting.defaultMinutes])
         let spotify = SpotifyInfo()
         self.spotify = spotify
         spotify.onOverlay = { [weak self] payload in self?.windowController.page.show(payload) }
@@ -37,16 +38,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func open(from source: TriggerSource) {
-        // With dismiss turned off (debug switch), a second trigger is the only way to close.
+        // With dismiss turned off (debug switch), a second manual trigger is the only way to close.
         if windowController.isOpen {
-            if !windowController.dismissEnabled { windowController.close() }
+            if source.isManual && !windowController.dismissEnabled { windowController.close() }
+            return
+        }
+        // Manual triggers mean someone is at the Mac, so only the idle trigger checks these.
+        if !source.isManual, let skip = IdleWatcher.skip() {
+            log.notice("Not opening on idle: \(String(describing: skip), privacy: .public)")
             return
         }
         guard let spotify else { return }
         Task {
             if let refusal = await spotify.openRefusal() {
                 log.notice("Not opening via \(source.rawValue, privacy: .public): \(refusal.rawValue, privacy: .public)")
-                menuBarIcon.flash()
+                if source.isManual { menuBarIcon.flash() }
                 return
             }
             // Another trigger may have opened it while Spotify was being asked.

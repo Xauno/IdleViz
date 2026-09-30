@@ -5,6 +5,11 @@ public enum TriggerSource: String, Sendable, Equatable {
     case hotkey
     case urlScheme
     case settings
+    case idle
+
+    /// Manual triggers mean someone is at the Mac: they skip the idle skip rules
+    /// and flash the menu-bar icon when the open is refused.
+    public var isManual: Bool { self != .idle }
 }
 
 /// Commands accepted on the external `idleviz://` URL scheme.

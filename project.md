@@ -96,10 +96,11 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 - Settings in `UserDefaults`. The window writes them and the helper applies changes live.
 
 ### Triggers
-- **Idle:** `CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)` (any input). Instead of polling on a fixed interval, schedule the next check for `timeout − idleTime` (the earliest it could fire).
+- **Idle:** `CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)` (any input). Instead of polling on a fixed interval, schedule the next check for `timeout − idleTime` (the earliest it could fire). Setting `idleTimeout` in minutes (5/10/15/30, 0 = Off), default 5. Also recheck after wake and unlock.
+- **One attempt per idle period.** When the idle trigger fires and the open is blocked (by a skip rule below or by the open rules), it doesn't retry until there has been new input. While still idle, the next check is a full timeout later, the earliest a new idle period could fire.
 - **Idle skip rules** (idle trigger only):
   - The screen is locked (`CGSessionCopyCurrentDictionary`, `CGSSessionScreenIsLocked`), or the session isn't on the console (fast user switching).
-  - Another process, not Spotify or IdleViz itself, holds a `PreventUserIdleDisplaySleep` / `NoDisplaySleepAssertion` power assertion (`IOPMCopyAssertionsByProcess`). This covers fullscreen video, calls and presentations, whether or not they're frontmost.
+  - Another process, not Spotify or IdleViz itself, holds a `PreventUserIdleDisplaySleep` / `NoDisplaySleepAssertion` power assertion (`IOPMCopyAssertionsByProcess`). This covers fullscreen video, calls and presentations, whether or not they're frontmost. Assertions a daemon holds on behalf of Spotify or IdleViz (`AssertionOnBehalfOfPID`) don't count either.
   - After the keep-awake limit closed the visualizer, don't reopen until there has been new input. Otherwise it would reopen at once, since the Mac is still idle.
 - **Hotkey:** `KeyboardShortcuts` Swift package.
 - **Terminal:** URL scheme, so `open idleviz://open` works.

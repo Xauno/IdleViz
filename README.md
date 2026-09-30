@@ -9,7 +9,7 @@ A macOS menu-bar app that turns your Mac into a music display. When the Mac goes
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: in development.** The menu-bar app opens a fullscreen black window from a hotkey or a URL, but only while Spotify has a track loaded, and closes it on any input. It shows what Spotify is playing in an overlay styled after the Spotify TV app, over an animated placeholder gradient. The real visualizer isn't built yet. See [Roadmap](#roadmap) for progress.
+> **Status: in development.** The menu-bar app opens a fullscreen window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input. It shows what Spotify is playing in an overlay styled after the Spotify TV app, over an animated placeholder gradient. The real visualizer isn't built yet. See [Roadmap](#roadmap) for progress.
 
 ## Contents
 
@@ -33,6 +33,7 @@ Working now:
 - Menu-bar app with a small glass popup: **Settings…** and the current open hotkey.
 - Opens a fullscreen black window on the main display from a global hotkey (⌃⌥V by default), with `open idleviz://open`, or from **Open now** in settings.
 - Only opens while Spotify is running and has a track loaded (playing or paused). Otherwise the menu-bar icon flashes and nothing opens.
+- Opens by itself after 5 idle minutes (or 10, 15, 30, or never, set in settings). It doesn't open on idle while the screen is locked or while another app keeps the display awake, such as a video or a call. After a blocked attempt it waits until you've used the Mac again.
 - Closes on any input (mouse movement, click, scroll, key, modifier key, trackpad gesture), then returns focus to the app you were using. The cursor is hidden while it's open.
 - Settings window with a hotkey recorder and an **Open now** button.
 - Now-playing overlay styled after the Spotify TV app: album art, title, artist, progress bar and times, in the Figtree font. When paused, only the progress bar stays. Music ads show an "Advertisement" label with the progress bar, and podcasts show no overlay. If Spotify quits or the track goes away, the overlay fades out and the window stays open. For now it sits over an animated placeholder gradient.
@@ -40,7 +41,6 @@ Working now:
 
 Planned:
 
-- Opens after a set idle time too.
 - Reacts to Spotify's audio only, through a Core Audio process tap. The visuals never hear the microphone or other system audio.
 - Butterchurn (WebGL Milkdrop) visualizer with hundreds of bundled presets, shuffle, blend time and a blocklist.
 - Bring your own presets: drop Butterchurn `.json` or Milkdrop `.milk` files, or custom `.js` visual plugins, into a folder.
@@ -63,7 +63,7 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | 3    | Spotify now-playing: launch/quit tracking, track info, artwork, content type, ads | Done    |
 | 4    | Open rules and menu-bar icon flash                                                | Done    |
 | 5    | Overlay page matched to the Spotify TV app, all states                            | Done    |
-| 6    | Idle trigger, with skip rules (locked screen, video or call playing)              | Planned |
+| 6    | Idle trigger, with skip rules (locked screen, video or call playing)              | Done    |
 | 7a   | Visualizer: Butterchurn with bundled presets                                      | Planned |
 | 7b   | Visualizer: real Spotify audio through the process tap                            | Planned |
 | 7c   | Visualizer: preset controls                                                       | Planned |
@@ -110,7 +110,8 @@ The app is built from source for personal use. There is no download.
 - **Menu bar:** click the waveform icon for a small popup with **Settings…** (⌘,) and the current open hotkey.
 - **Open:** press the hotkey (⌃⌥V by default), run `open idleviz://open` in Terminal, or click **Open now** in settings. Spotify has to be running with a track loaded, playing or paused. If it isn't, the menu-bar icon flashes a few times instead.
 - **Close:** move the mouse, click, scroll, press any key or use a trackpad gesture. Input in the first 0.4 s after opening is ignored, so the hotkey itself doesn't close it. Keys you're still holding after that are ignored until you let go; pressing one again closes it.
-- **Settings:** change the hotkey. Close the window with its red button; ⌘Q quits the app while settings is focused.
+- **Idle:** after the **Start after idle** time with no input (5 minutes by default), it opens by itself, with the same Spotify check. It skips that while the screen is locked or another app keeps the display awake (a video, a call, a presentation), and then waits until you use the Mac again before trying again.
+- **Settings:** change the idle time or turn it off, and change the hotkey. Close the window with its red button; ⌘Q quits the app while settings is focused.
 
 - **Now playing:** the overlay updates whenever Spotify's track or state changes, and re-syncs the progress bar every 5 s while the window is open. The app also logs each change:
 
@@ -118,7 +119,7 @@ The app is built from source for personal use. There is no download.
   log stream --predicate 'subsystem == "com.xauno.IdleViz" AND category == "spotify"'
   ```
 
-Idle opening and the visualizer are not built yet.
+The visualizer is not built yet.
 
 ## Custom visualizers
 
@@ -162,7 +163,7 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
 ├─ Package.swift           IdleVizCore Swift package (testable logic)
-├─ Sources/IdleVizCore/    Dismiss rules, open rules, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking
+├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking
 ├─ IdleViz.xcodeproj       App target: bundle, Info.plist, entitlements, signing
 ├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, Spotify info, web view
 ├─ IdleViz/web/            The page: overlay HTML, CSS and JS, Figtree font (served from idleviz-app://)
