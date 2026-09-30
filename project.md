@@ -34,7 +34,7 @@ A menu-bar app that opens a fullscreen music visualizer with a Spotify now-playi
 - **Minimum macOS 26**, for both the app and the package (`platforms: [.macOS(.v26)]`).
 - **Xcode project + Swift package.** `IdleViz.xcodeproj` holds the app target: the `.app` bundle, `Info.plist`, entitlements, the `idleviz://` URL scheme and signing. All logic that can be tested without a screen lives in a local Swift package, `IdleVizCore` (`Package.swift` at the repo root), which the app target depends on. The app target stays a thin AppKit/SwiftUI layer. Building needs full Xcode, not just the Command Line Tools.
 - **Testability.** Put anything that touches the system behind a small protocol (AppleScript runner, idle-time source, clock, power assertions, Spotify running state) so `IdleVizCore` logic runs against fakes in `swift test`. CI can't test permissions, Spotify or audio, so those are checked by hand and written up in each PR's Verification section.
-- **CI.** `swift test` for the package, `xcodebuild build` for the app with `CODE_SIGNING_ALLOWED=NO`, and SwiftLint. This needs a runner with Xcode 26 (for example `macos-26`); switch the workflow's Swift job over in step 1.
+- **CI.** `swift test` for the package, `xcodebuild build` for the app with `CODE_SIGNING_ALLOWED=NO`, and SwiftLint. It runs on the `macos-26` runner.
 - **Signing.** Sign every local build with the same free Apple Development certificate (Xcode's personal team). macOS ties the Automation and System Audio Recording permissions to the signature, so ad-hoc or changing signatures make the prompts come back or silently return all-zero audio.
 - **Hardened Runtime** on, with the `com.apple.security.automation.apple-events` entitlement, and `com.apple.security.device.audio-input` for the delay detector's microphone use.
 - **Not sandboxed.** The sandbox would need a temporary-exception entitlement for Apple Events to Spotify and would move the presets folder into a container.
@@ -107,7 +107,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 
 ### Dismiss
 - Make the window key (subclass `NSWindow`, override `canBecomeKey` → `true`) so a **local** `NSEvent` monitor receives keys without needing Accessibility/Input Monitoring permission. Add a global monitor for mouse events as a backstop.
-- **Activation may be refused.** On current macOS activation is cooperative, so `NSApp.activate()` can be denied for an idle open (another app is active and there was no user action). Then the window isn't key and the local monitor gets no keys. The backup below still closes the window, but the key that woke it goes to the app behind (for example, a letter typed into a document). `NSCursor.hide()` also only works while the app is active, so the cursor may stay visible. Check in step 1 how often this happens.
+- **Activation may be refused.** On current macOS activation is cooperative, so `NSApp.activate()` can be denied for an idle open (another app is active and there was no user action). Then the window isn't key and the local monitor gets no keys. The backup below still closes the window, but the key that woke it goes to the app behind (for example, a letter typed into a document). `NSCursor.hide()` also only works while the app is active, so the cursor may stay visible. Each open logs whether activation was granted, with a running count (`log stream --predicate 'subsystem == "com.xauno.IdleViz"'`), so this can be measured once the idle trigger exists.
 - Remember the frontmost app when opening and reactivate it on close, so focus returns where it was.
 - Events: `.mouseMoved`, `.leftMouseDown`, `.rightMouseDown`, `.otherMouseDown`, `.scrollWheel`, `.keyDown`, `.flagsChanged`, `.gesture`, `.magnify`, `.swipe`.
 - Threshold ≈ 0: close on the first `.mouseMoved` with any nonzero delta (≥ 1 px if the trackpad sends phantom zero-delta events).
@@ -311,10 +311,11 @@ The tap hears Spotify's audio before it reaches the speakers. With built-in spea
 ## File layout
 
 ```
-IdleViz.xcodeproj                # app target: bundle, Info.plist, entitlements, URL scheme, signing
+IdleViz.xcodeproj                # app target (bundle ID com.xauno.IdleViz), synchronized with IdleViz/
+Config/                          # IdleViz.xcconfig; Local.xcconfig (gitignored) holds DEVELOPMENT_TEAM
 Package.swift                    # IdleVizCore package (testable logic)
 Sources/IdleVizCore/             # open rules, idle/skip rules, keep-awake + battery timing, Spotify parsing, content type, FFT/bands, delay detection
-Tests/IdleVizCoreTests/          # XCTest, runs in CI with swift test
+tests/IdleVizCoreTests/          # XCTest, runs in CI with swift test (shares tests/ with the JS suite; Package.swift names the path)
 IdleViz/
 ├─ App/
 │  ├─ AppDelegate.swift          # menu bar (Settings… + hotkey row + error rows), icon flash, yellow icon
