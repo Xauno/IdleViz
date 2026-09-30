@@ -59,7 +59,7 @@ final class WindowController {
         if dismissEnabled {
             NSCursor.hide()
             cursorHidden = true
-            let watcher = DismissWatcher(rules: DismissRules()) { [weak self] in self?.close() }
+            let watcher = DismissWatcher(tracker: DismissTracker()) { [weak self] in self?.close() }
             watcher.start()
             dismissWatcher = watcher
         }

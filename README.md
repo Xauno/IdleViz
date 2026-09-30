@@ -105,7 +105,7 @@ The app is built from source for personal use. There is no download.
 
 - **Menu bar:** click the waveform icon for a small popup with **Settings…** (⌘,) and the current open hotkey.
 - **Open:** press the hotkey (⌃⌥V by default), run `open idleviz://open` in Terminal, or click **Open now** in settings.
-- **Close:** move the mouse, click, scroll, press any key or use a trackpad gesture. Input in the first 0.4 s after opening is ignored, so the hotkey itself doesn't close it.
+- **Close:** move the mouse, click, scroll, press any key or use a trackpad gesture. Input in the first 0.4 s after opening is ignored, so the hotkey itself doesn't close it. Keys you're still holding after that are ignored until you let go; pressing one again closes it.
 - **Settings:** change the hotkey. Close the window with its red button; ⌘Q quits the app while settings is focused.
 
 Idle opening, the Spotify check, the visualizer and the overlay are not built yet.
