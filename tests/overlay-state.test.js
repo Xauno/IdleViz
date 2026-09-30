@@ -1,0 +1,97 @@
+import { describe, expect, it } from "vitest";
+import { formatTime, fraction, layoutFor, parseNowPlaying, positionAt } from "../IdleViz/web/overlay-state.js";
+
+const song = {
+  id: "spotify:track:a",
+  state: "playing",
+  content: "song",
+  title: "Riot",
+  artist: "Hollywood Undead",
+  artwork: null,
+  artworkPending: false,
+  durationMs: 228000,
+  position: 17,
+};
+
+describe("layoutFor", () => {
+  it("matches the state table in project.md", () => {
+    expect(layoutFor(song)).toBe("full");
+    expect(layoutFor({ ...song, state: "paused" })).toBe("progress");
+    expect(layoutFor({ ...song, content: "musicAd" })).toBe("ad");
+    expect(layoutFor({ ...song, content: "musicAd", state: "paused" })).toBe("ad");
+    expect(layoutFor({ ...song, content: "podcast" })).toBe("none");
+    expect(layoutFor({ ...song, content: "podcastAd" })).toBe("none");
+    expect(layoutFor(null)).toBe("none");
+  });
+});
+
+describe("positionAt", () => {
+  it("advances while playing", () => {
+    expect(positionAt(song, 1000, 3500)).toBeCloseTo(19.5);
+  });
+
+  it("stands still while paused", () => {
+    expect(positionAt({ ...song, state: "paused" }, 1000, 60000)).toBe(17);
+  });
+
+  it("stops at the end of the track", () => {
+    expect(positionAt(song, 0, 10_000_000)).toBe(228);
+  });
+
+  it("keeps counting when the length is unknown", () => {
+    expect(positionAt({ ...song, durationMs: 0 }, 0, 5000)).toBe(22);
+  });
+});
+
+describe("fraction", () => {
+  it("is the played share, clamped", () => {
+    expect(fraction(57, 228000)).toBeCloseTo(0.25);
+    expect(fraction(500, 228000)).toBe(1);
+    expect(fraction(-1, 228000)).toBe(0);
+  });
+
+  it("is 0 for a zero length", () => {
+    expect(fraction(10, 0)).toBe(0);
+  });
+});
+
+describe("formatTime", () => {
+  it("formats like the TV app", () => {
+    expect(formatTime(17)).toBe("00:17");
+    expect(formatTime(228)).toBe("03:48");
+    expect(formatTime(3723.9)).toBe("1:02:03");
+    expect(formatTime(-5)).toBe("00:00");
+    expect(formatTime(NaN)).toBe("00:00");
+  });
+});
+
+describe("parseNowPlaying", () => {
+  it("accepts a well-formed payload", () => {
+    expect(parseNowPlaying(song)).toEqual(song);
+  });
+
+  it("rejects anything that isn't a known item", () => {
+    expect(parseNowPlaying(null)).toBeNull();
+    expect(parseNowPlaying("text")).toBeNull();
+    expect(parseNowPlaying({ ...song, content: "video" })).toBeNull();
+  });
+
+  it("only takes image data URLs as artwork", () => {
+    expect(parseNowPlaying({ ...song, artwork: "https://i.scdn.co/x" }).artwork).toBeNull();
+    expect(parseNowPlaying({ ...song, artwork: "data:text/html,<b>" }).artwork).toBeNull();
+    expect(parseNowPlaying({ ...song, artwork: "data:image/jpeg;base64,AAAA" }).artwork).toBe(
+      "data:image/jpeg;base64,AAAA",
+    );
+  });
+
+  it("fills bad fields with safe values", () => {
+    const item = parseNowPlaying({ ...song, title: 5, durationMs: "x", position: Infinity, state: "stopped" });
+    expect(item).toMatchObject({ title: "", durationMs: 0, position: 0, state: "playing" });
+  });
+
+  it("drops the pending flag once artwork is there", () => {
+    expect(parseNowPlaying({ ...song, artwork: "data:image/png;base64,AA", artworkPending: true }).artworkPending).toBe(
+      false,
+    );
+  });
+});

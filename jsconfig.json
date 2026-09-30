@@ -9,5 +9,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["aurora.js", "web/visuals/**/*.js"]
+  "include": ["aurora.js", "web/visuals/**/*.js", "IdleViz/web/**/*.js"]
 }

@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.register(defaults: [IdleTimeoutSetting.key: IdleTimeoutSetting.defaultMinutes])
         let spotify = SpotifyInfo()
         self.spotify = spotify
+        spotify.onOverlay = { [weak self] payload in self?.windowController.page.show(payload) }
         windowController.onOpen = { spotify.startResync() }
         windowController.onClose = { spotify.stopResync() }
         triggers = Triggers(onTrigger: { [weak self] source in self?.open(from: source) })
