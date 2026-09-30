@@ -1,9 +1,10 @@
 import AppKit
+import IdleVizCore
 import KeyboardShortcuts
 import SwiftUI
 
-/// Separate settings window, per mockups.html section 2. Step 1 only has the
-/// hotkey and Open now; the other rows arrive with the features they control.
+/// Separate settings window, per mockups.html section 2. So far it has the idle
+/// timeout, the hotkey and Open now; the other rows arrive with the features they control.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let openNow: () -> Void
@@ -49,10 +50,18 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
 struct SettingsView: View {
     let openNow: () -> Void
+    @AppStorage(IdleTimeoutSetting.key) private var idleTimeout = IdleTimeoutSetting.defaultMinutes
 
     var body: some View {
         Form {
             Section("General") {
+                Picker(selection: $idleTimeout) {
+                    ForEach(IdleTimeoutSetting.choices, id: \.self) { Text("\($0) min").tag($0) }
+                    Text("Off").tag(0)
+                } label: {
+                    Text("Start after idle")
+                    Text("Needs a Spotify track")
+                }
                 KeyboardShortcuts.Recorder("Open hotkey", name: .openVisualizer)
                 LabeledContent("Open now") {
                     Button("Open", action: openNow)
