@@ -6,7 +6,7 @@ import os
 ///
 /// Launch/quit notifications keep the running state, Spotify's own playback notification
 /// triggers one AppleScript query for the full state, and artwork is downloaded here so
-/// the page never touches the network. Step 3 only logs the result; the overlay uses it later.
+/// the page never touches the network. Each change goes to the overlay through `onOverlay`.
 @MainActor
 final class SpotifyInfo {
     nonisolated static let bundleID = "com.spotify.client"
@@ -18,6 +18,9 @@ final class SpotifyInfo {
     private var artworkURL: String?
     private var resync: Task<Void, Never>?
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
+
+    /// Called with what the overlay should show: on every snapshot, and again when its artwork arrives.
+    var onOverlay: ((OverlayPayload?) -> Void)?
 
     var current: SpotifySnapshot? { tracker.current }
     var isRunning: Bool { tracker.isRunning }
@@ -99,6 +102,7 @@ final class SpotifyInfo {
         guard let snapshot else {
             log.notice("Now playing: nothing")
             loadArtwork(for: nil)
+            onOverlay?(nil)
             return
         }
         let item = snapshot.nowPlaying
@@ -111,16 +115,22 @@ final class SpotifyInfo {
             \(item.spotifyURL, privacy: .public)
             """)
         loadArtwork(for: item.artworkURL.isEmpty ? nil : item.artworkURL)
+        publishOverlay()
+    }
+
+    private func publishOverlay() {
+        guard let snapshot = tracker.current else { return }
+        let url = snapshot.nowPlaying.artworkURL
+        let image = url.isEmpty ? nil : artwork.image(for: url)
+        onOverlay?(OverlayPayload(snapshot: snapshot, artwork: image, artworkPending: artworkTask != nil && image == nil))
     }
 
     private func loadArtwork(for url: String?) {
         guard url != artworkURL else { return }
         artworkURL = url
         artworkTask?.cancel()
-        guard let url else {
-            artworkTask = nil
-            return
-        }
+        artworkTask = nil
+        guard let url else { return }
         if let data = artwork.image(for: url) {
             log.notice("Artwork: \(data.count / 1024, privacy: .public) KB (cached)")
             return
@@ -133,15 +143,19 @@ final class SpotifyInfo {
             do {
                 let (data, response) = try await URLSession.shared.data(from: remote)
                 guard let self, !Task.isCancelled else { return }
-                guard (response as? HTTPURLResponse)?.statusCode == 200, NSImage(data: data) != nil else {
+                self.artworkTask = nil
+                if (response as? HTTPURLResponse)?.statusCode == 200, NSImage(data: data) != nil {
+                    self.artwork.insert(data, for: url)
+                    self.log.notice("Artwork: \(data.count / 1024, privacy: .public) KB (downloaded)")
+                } else {
                     self.log.error("Artwork: bad response for \(url, privacy: .public)")
-                    return
                 }
-                self.artwork.insert(data, for: url)
-                self.log.notice("Artwork: \(data.count / 1024, privacy: .public) KB (downloaded)")
+                self.publishOverlay()
             } catch {
                 guard let self, !Task.isCancelled else { return }
                 self.log.error("Artwork: \(error.localizedDescription, privacy: .public)")
+                self.artworkTask = nil
+                self.publishOverlay()
             }
         }
     }

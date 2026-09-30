@@ -33,6 +33,9 @@
 			exceptions = (
 				1D0000000000000000000601 /* Exceptions for "IdleViz" folder in "IdleViz" target */,
 			);
+			explicitFolders = (
+				web,
+			);
 			path = IdleViz;
 			sourceTree = "<group>";
 		};

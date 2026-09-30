@@ -195,14 +195,19 @@ end tell
 
 ## Overlay design (Spotify TV app look)
 
-Match the Spotify TV app's now-playing screen exactly; the only change is the visualizer background.
+Match the Spotify TV app's now-playing screen, with these changes: the visualizer replaces the artist image in the background, and the overlay shows only the album art, title, artist, progress bar and times.
 
-- Save reference screenshots (1920×1080 and 4K) in `design/reference/`. The folder is in `.gitignore`: the repo is public and the screenshots are Spotify's copyrighted images, so they stay local. During development, lay a screenshot over the page at 50% opacity to match positions and sizes.
-- Match album art (size, radius, shadow), title, artist, progress bar (height, played/unplayed colors, knob), time labels, the playback control row if present (static, reflecting play/pause state; not clickable), and any logo or "Playing on" line.
-- Build on a fixed 1920×1080 stage scaled with `transform: scale()` so proportions match the TV on any display.
+- **Left out on purpose:** the Spotify logo and "Playing from" header in the top left (the app doesn't know the playlist or album being played from), and the row under the progress bar (heart, shuffle, previous, play/pause, next, repeat). The progress row sits lower than on the TV (at y 884 on the stage instead of about 840), taking some of the space the control row used.
+- The reference is a photo of the TV app (`design/reference/tv-now-playing-photo.jpg`). The folder is in `.gitignore`: the repo is public and the image shows Spotify's copyrighted design, so it stays local. Positions on the 1920×1080 stage were measured from it: art 176 × 176 at (136, 608), text 48 px right of the art, progress row from x 136 to 1784.
+- Build on a fixed 1920×1080 stage scaled with `transform: scale()` so proportions match the TV on any display. Scale to the window width and pin the stage to the bottom, where all of the overlay sits. On a 16:10 Mac screen that keeps the TV's bottom margins instead of adding empty space below.
+- A soft black gradient (the scrim) rises from the bottom of the screen so white text stays readable over a bright visualizer.
 - Paused: fade out everything except the progress bar (and its time labels), which stays exactly where it is.
+- Music ad: an "Advertisement" label just above the progress row, at the art's left edge.
+- No track (or Spotify quit): wait 1.5 s, since a context switch reports "no track" for a moment, then fade the overlay out. The visualizer keeps running.
+- Missing artwork (local files): a grey square with a music note. While artwork is still downloading, the square stays empty instead of flashing the placeholder.
 - Track change: crossfade art and text.
-- **Font:** Figtree (SIL Open Font License), bundled locally in `web/fonts/` with its license file; don't load it from a CDN. Use the variable font. Starting weights: title 700–800, artist 500, times 400; titles slightly tight (`letter-spacing: -0.01em` to `-0.02em`). Tune against the screenshots. Don't copy Spotify's font files from the Spotify app.
+- The page logic that doesn't touch the DOM (layout per state, progress interpolation, time format, payload checks) lives in `web/overlay-state.js` and is tested with Vitest.
+- **Font:** Figtree (SIL Open Font License), bundled locally in `web/fonts/` with its license file; don't load it from a CDN. Use the variable font. Weights tuned against the reference: title 800 at 72 px (`letter-spacing: -0.02em`), artist 600 at 26 px, times 400 at 24 px with tabular figures. Don't copy Spotify's font files from the Spotify app.
 - **Brightness:** a black dim layer between the visualizer and the overlay. This is cheaper than a CSS `filter` on a WebGL canvas.
 
 ```css
@@ -352,7 +357,7 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
 ## File layout
 
 ```
-IdleViz.xcodeproj                # app target (bundle ID com.xauno.IdleViz), synchronized with IdleViz/
+IdleViz.xcodeproj                # app target (bundle ID com.xauno.IdleViz), synchronized with IdleViz/; web/ is an explicit folder so it's copied with its subfolders
 Config/                          # IdleViz.xcconfig; Local.xcconfig (gitignored) holds DEVELOPMENT_TEAM
 Package.swift                    # IdleVizCore package (testable logic)
 Sources/IdleVizCore/             # open rules, idle/skip rules, keep-awake + battery timing, Spotify parsing, content type, FFT/bands, delay detection
@@ -367,7 +372,9 @@ IdleViz/
 │  ├─ DismissWatcher.swift
 │  ├─ KeepAwake.swift            # display-sleep assertion + time limit
 │  ├─ PowerSource.swift          # plugged in / battery, change notifications
-│  ├─ WindowController.swift     # key-capable borderless window + WKWebView + scheme handler
+│  ├─ WindowController.swift     # key-capable borderless window
+│  ├─ PageView.swift             # WKWebView, nowPlaying calls, media capture denied
+│  ├─ AppSchemeHandler.swift     # serves idleviz-app://app/ with the CSP header
 │  ├─ SpotifyInfo.swift          # launch/quit tracking, notifications, AppleScript, artwork
 │  ├─ SpotifyAudioTap.swift      # process tap → IdleVizCore analysis
 │  ├─ AudioDelay.swift           # per-device delay line, Detect delay (mic, ~5 s)
@@ -378,9 +385,10 @@ IdleViz/
 │  ├─ index.html
 │  ├─ plugin-host.html           # sandboxed frame that runs one custom JS plugin
 │  ├─ overlay.css / overlay.js   # nowPlaying(), progress interpolation, states
+│  ├─ overlay-state.js           # DOM-free overlay logic (tested with Vitest)
 │  ├─ fonts/                     # Figtree + OFL license
 │  └─ visuals/                   # Butterchurn wrapper, preset manager, bundled plugin modules (aurora.js)
-└─ design/reference/             # Spotify TV app screenshots (gitignored, local only)
+└─ design/reference/             # Spotify TV app reference photo (gitignored, local only)
 ```
 
 ## Build order

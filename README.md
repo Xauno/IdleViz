@@ -9,7 +9,7 @@ A macOS menu-bar app that turns your Mac into a music display. When the Mac goes
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: in development.** The menu-bar app opens a fullscreen black window from a hotkey or a URL, but only while Spotify has a track loaded, and closes it on any input. It reads what Spotify is playing and writes it to the system log, but doesn't show it yet. There is no visualizer or overlay yet. See [Roadmap](#roadmap) for progress.
+> **Status: in development.** The menu-bar app opens a fullscreen black window from a hotkey or a URL, but only while Spotify has a track loaded, and closes it on any input. It shows what Spotify is playing in an overlay styled after the Spotify TV app, over an animated placeholder gradient. The real visualizer isn't built yet. See [Roadmap](#roadmap) for progress.
 
 ## Contents
 
@@ -35,16 +35,15 @@ Working now:
 - Only opens while Spotify is running and has a track loaded (playing or paused). Otherwise the menu-bar icon flashes and nothing opens.
 - Closes on any input (mouse movement, click, scroll, key, modifier key, trackpad gesture), then returns focus to the app you were using. The cursor is hidden while it's open.
 - Settings window with a hotkey recorder and an **Open now** button.
-- Reads what Spotify is playing (title, artist, album, playing or paused, position, length) and whether it's a song, a podcast or an ad, and downloads the album art. For now this only goes to the system log. It never launches Spotify: it only asks while Spotify is running, and updates when Spotify says something changed rather than polling.
+- Now-playing overlay styled after the Spotify TV app: album art, title, artist, progress bar and times, in the Figtree font. When paused, only the progress bar stays. Music ads show an "Advertisement" label with the progress bar, and podcasts show no overlay. If Spotify quits or the track goes away, the overlay fades out and the window stays open. For now it sits over an animated placeholder gradient.
+- Reads what Spotify is playing (title, artist, album, playing or paused, position, length) and whether it's a song, a podcast or an ad, and downloads the album art. It never launches Spotify: it only asks while Spotify is running, and updates when Spotify says something changed rather than polling.
 
 Planned:
 
 - Opens after a set idle time too.
-- Shows the now-playing info on screen (it's only logged for now).
 - Reacts to Spotify's audio only, through a Core Audio process tap. The visuals never hear the microphone or other system audio.
 - Butterchurn (WebGL Milkdrop) visualizer with hundreds of bundled presets, shuffle, blend time and a blocklist.
 - Bring your own presets: drop Butterchurn `.json` or Milkdrop `.milk` files, or custom `.js` visual plugins, into a folder.
-- Now-playing overlay with album art, title, artist and progress bar. Songs, paused songs and ads each get their own layout. Podcasts show no overlay.
 - Keeps the screen awake while it's showing, up to a limit you set (1 hour by default). After that the Mac sleeps and locks as usual.
 - Optional separate idle and keep-awake times for when the Mac is on battery.
 - Audio delay for Bluetooth and AirPlay speakers, set by hand or measured with a quick microphone check, saved per device.
@@ -63,7 +62,7 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | 2    | Audio spike: prove Spotify audio can drive Butterchurn (findings only)            | Done    |
 | 3    | Spotify now-playing: launch/quit tracking, track info, artwork, content type, ads | Done    |
 | 4    | Open rules and menu-bar icon flash                                                | Done    |
-| 5    | Overlay page matched to the Spotify TV app, all states                            | Planned |
+| 5    | Overlay page matched to the Spotify TV app, all states                            | Done    |
 | 6    | Idle trigger, with skip rules (locked screen, video or call playing)              | Planned |
 | 7a   | Visualizer: Butterchurn with bundled presets                                      | Planned |
 | 7b   | Visualizer: real Spotify audio through the process tap                            | Planned |
@@ -113,13 +112,13 @@ The app is built from source for personal use. There is no download.
 - **Close:** move the mouse, click, scroll, press any key or use a trackpad gesture. Input in the first 0.4 s after opening is ignored, so the hotkey itself doesn't close it. Keys you're still holding after that are ignored until you let go; pressing one again closes it.
 - **Settings:** change the hotkey. Close the window with its red button; ⌘Q quits the app while settings is focused.
 
-- **Now playing:** the app logs what Spotify is playing whenever it changes, and every 5 s while the window is open. Watch it with:
+- **Now playing:** the overlay updates whenever Spotify's track or state changes, and re-syncs the progress bar every 5 s while the window is open. The app also logs each change:
 
   ```bash
   log stream --predicate 'subsystem == "com.xauno.IdleViz" AND category == "spotify"'
   ```
 
-Idle opening, the visualizer and the overlay are not built yet.
+Idle opening and the visualizer are not built yet.
 
 ## Custom visualizers
 
@@ -147,7 +146,7 @@ swift build && swift test
 swiftlint lint --strict
 ```
 
-In Debug builds, the launch argument `-IdleVizNoDismiss YES` keeps the window open so it can be inspected; trigger it again to close. The scheme has this argument ready to tick. Each open logs whether macOS let the app activate:
+In Debug builds, the launch argument `-IdleVizNoDismiss YES` keeps the window open so it can be inspected; trigger it again to close. The page is inspectable in Debug builds: with the window open, attach Safari's Web Inspector from **Develop → [your Mac] → IdleViz**. The scheme has this argument ready to tick. Each open logs whether macOS let the app activate:
 
 ```bash
 log stream --predicate 'subsystem == "com.xauno.IdleViz"'
@@ -163,9 +162,10 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
 ├─ Package.swift           IdleVizCore Swift package (testable logic)
-├─ Sources/IdleVizCore/    Dismiss rules, open rules, URL commands, activation stats, Spotify query parsing and tracking
+├─ Sources/IdleVizCore/    Dismiss rules, open rules, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking
 ├─ IdleViz.xcodeproj       App target: bundle, Info.plist, entitlements, signing
-├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, Spotify info
+├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, Spotify info, web view
+├─ IdleViz/web/            The page: overlay HTML, CSS and JS, Figtree font (served from idleviz-app://)
 ├─ Config/                 Build settings; your signing team goes in Local.xcconfig
 ├─ aurora.js               Example visualizer plugin
 ├─ aurora-demo.html        Test page that feeds a plugin audio from a file or microphone

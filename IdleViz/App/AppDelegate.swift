@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let spotify = SpotifyInfo()
         self.spotify = spotify
+        spotify.onOverlay = { [weak self] payload in self?.windowController.page.show(payload) }
         windowController.onOpen = { spotify.startResync() }
         windowController.onClose = { spotify.stopResync() }
         triggers = Triggers(onTrigger: { [weak self] source in self?.open(from: source) })

@@ -8,7 +8,7 @@ final class VisualizerWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
 
-    static func make(on screen: NSScreen) -> VisualizerWindow {
+    static func make(on screen: NSScreen, content: NSView) -> VisualizerWindow {
         let window = VisualizerWindow(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         window.level = .screenSaver
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
@@ -17,6 +17,7 @@ final class VisualizerWindow: NSWindow {
         window.hasShadow = false
         window.isReleasedWhenClosed = false
         window.acceptsMouseMovedEvents = true
+        window.contentView = content
         window.setFrame(screen.frame, display: false)
         return window
     }
@@ -27,6 +28,8 @@ final class WindowController {
     private let log = Logger(subsystem: "com.xauno.IdleViz", category: "window")
     // Kept between opens (hidden, not destroyed) so opening is instant.
     private var window: VisualizerWindow?
+    // Created at launch and kept loaded, so the page is ready the first time the window opens.
+    let page = PageView()
     private var dismissWatcher: DismissWatcher?
     private var previousApp: NSRunningApplication?
     private var cursorHidden = false
@@ -47,7 +50,7 @@ final class WindowController {
 
     func open(on screen: NSScreen, source: TriggerSource) {
         guard !isOpen else { return }
-        let window = window ?? VisualizerWindow.make(on: screen)
+        let window = window ?? VisualizerWindow.make(on: screen, content: page.webView)
         self.window = window
         window.setFrame(screen.frame, display: false)
 
