@@ -84,7 +84,8 @@ function compile(gl, type, src) {
   return s;
 }
 
-let gl, prog, vao, buf, tex, canvasRef, loc = {};
+let gl, prog, vao, buf, tex, canvasRef;
+const loc = {};
 const texData = new Uint8Array(64);
 
 export function init(canvas) {
@@ -93,9 +94,13 @@ export function init(canvas) {
   if (!gl) throw new Error("WebGL2 not available");
 
   prog = gl.createProgram();
-  gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
-  gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, FRAG));
+  const vs = compile(gl, gl.VERTEX_SHADER, VERT);
+  const fs = compile(gl, gl.FRAGMENT_SHADER, FRAG);
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
   gl.linkProgram(prog);
+  gl.deleteShader(vs); // the linked program keeps what it needs
+  gl.deleteShader(fs);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
     throw new Error("Program link failed: " + gl.getProgramInfoLog(prog));
   }
