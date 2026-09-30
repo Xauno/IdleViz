@@ -37,33 +37,36 @@ jobs:
         run: npm test
 
   swift:
-    name: Swift (lint, build, test)
-    runs-on: macos-15
-    timeout-minutes: 20
+    name: Swift (lint, test, build app)
+    runs-on: macos-26
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
-      # The Swift package arrives with build step 1. Until then this job passes without doing anything.
-      - name: Detect Swift package
-        id: detect
-        run: |
-          if [ -f Package.swift ]; then echo "found=true" >> "$GITHUB_OUTPUT"; else echo "found=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Show toolchain
+        run: xcodebuild -version && swift --version
 
       - name: Install SwiftLint
-        if: steps.detect.outputs.found == 'true'
         run: brew install swiftlint
 
       - name: Lint
-        if: steps.detect.outputs.found == 'true'
         run: swiftlint lint --strict
 
-      - name: Build
-        if: steps.detect.outputs.found == 'true'
+      - name: Build package
         run: swift build
 
-      - name: Test
-        if: steps.detect.outputs.found == 'true'
+      - name: Test package
         run: swift test
+
+      # CI has no signing certificate. Local builds sign with the team in Config/Local.xcconfig.
+      - name: Build app
+        run: >
+          xcodebuild build
+          -project IdleViz.xcodeproj
+          -scheme IdleViz
+          -configuration Debug
+          -derivedDataPath .build/xcode
+          CODE_SIGNING_ALLOWED=NO
 
   # One stable check name for branch protection, so adding or renaming jobs never needs a settings change.
   ci-passed:

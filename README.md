@@ -3,13 +3,13 @@
 [![CI](https://github.com/Xauno/Spotify-Music-Visualizer/actions/workflows/ci.yml/badge.svg)](https://github.com/Xauno/Spotify-Music-Visualizer/actions/workflows/ci.yml)
 ![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-![Status: planning](https://img.shields.io/badge/status-planning-orange)
+![Status: in development](https://img.shields.io/badge/status-in%20development-orange)
 
 A macOS menu-bar app that turns your Mac into a music display. When the Mac goes idle, or when you press a hotkey, it opens a fullscreen [Butterchurn](https://github.com/jberg/butterchurn) visualizer that reacts to Spotify's audio, with a now-playing overlay styled after the Spotify TV app. Any mouse, key or trackpad input closes it.
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: planning.** The design is written and the repo tooling is in place, but none of the app is built yet. See [Roadmap](#roadmap) for progress.
+> **Status: in development.** The menu-bar app opens a fullscreen black window from a hotkey or a URL and closes it on any input. There is no visualizer, overlay or Spotify integration yet. See [Roadmap](#roadmap) for progress.
 
 ## Contents
 
@@ -28,10 +28,16 @@ It is not a real screensaver, just a fullscreen window on top of everything.
 
 ## Features
 
-Planned (nothing below is implemented yet):
+Working now:
 
-- Opens after a set idle time, from a global hotkey, or with `open idleviz://open`, and only when Spotify is running with a track loaded.
-- Closes on any input, as sensitive as a macOS screensaver.
+- Menu-bar app with a small glass popup: **Settings…** and the current open hotkey.
+- Opens a fullscreen black window on the main display from a global hotkey (⌃⌥V by default), with `open idleviz://open`, or from **Open now** in settings.
+- Closes on any input (mouse movement, click, scroll, key, modifier key, trackpad gesture), then returns focus to the app you were using. The cursor is hidden while it's open.
+- Settings window with a hotkey recorder and an **Open now** button.
+
+Planned:
+
+- Opens after a set idle time too, and only when Spotify is running with a track loaded.
 - Reacts to Spotify's audio only, through a Core Audio process tap. The visuals never hear the microphone or other system audio.
 - Butterchurn (WebGL Milkdrop) visualizer with hundreds of bundled presets, shuffle, blend time and a blocklist.
 - Bring your own presets: drop Butterchurn `.json` or Milkdrop `.milk` files, or custom `.js` visual plugins, into a folder.
@@ -50,7 +56,7 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | Step | What                                                                              | Status  |
 | ---- | --------------------------------------------------------------------------------- | ------- |
 | 0    | Repo tooling: CI, tests, PR workflow, plugin guide, Aurora example plugin         | Done    |
-| 1    | Open/close shell: Xcode project, menu-bar app, hotkey, fullscreen window, dismiss | Planned |
+| 1    | Open/close shell: Xcode project, menu-bar app, hotkey, fullscreen window, dismiss | Done    |
 | 2    | Audio spike: prove Spotify audio can drive Butterchurn (findings only)            | Planned |
 | 3    | Spotify now-playing: launch/quit tracking, track info, artwork, content type, ads | Planned |
 | 4    | Open rules and menu-bar icon flash                                                | Planned |
@@ -67,19 +73,42 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 
 - macOS 26 or later
 - The Spotify desktop app
+- To build: full Xcode 26 or later (not just the Command Line Tools) and a free Apple Development certificate (Xcode's personal team)
 
 ## Installation
 
-There is nothing to install yet. Once step 1 lands, this section will explain how to build and run the app from source.
+The app is built from source for personal use. There is no download.
+
+1. Clone the repo and create your local signing config:
+
+   ```bash
+   cp Config/Local.example.xcconfig Config/Local.xcconfig
+   ```
+
+   Set `DEVELOPMENT_TEAM` in `Config/Local.xcconfig` to your team ID. It's the `OU=` value printed by:
+
+   ```bash
+   security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject
+   ```
+
+   Always sign with the same certificate. macOS ties the app's permissions to its signature, so a changing signature makes permission prompts come back.
+
+2. Open `IdleViz.xcodeproj` in Xcode and run the **IdleViz** scheme, or build from Terminal:
+
+   ```bash
+   xcodebuild build -project IdleViz.xcodeproj -scheme IdleViz -configuration Release -derivedDataPath .build/xcode
+   ```
+
+3. Copy `.build/xcode/Build/Products/Release/IdleViz.app` to `/Applications` and open it. The app has no Dock icon; it lives in the menu bar.
 
 ## Usage
 
-Planned behavior:
+- **Menu bar:** click the waveform icon for a small popup with **Settings…** (⌘,) and the current open hotkey.
+- **Open:** press the hotkey (⌃⌥V by default), run `open idleviz://open` in Terminal, or click **Open now** in settings.
+- **Close:** move the mouse, click, scroll, press any key or use a trackpad gesture. Input in the first 0.4 s after opening is ignored, so the hotkey itself doesn't close it. Keys you're still holding after that are ignored until you let go; pressing one again closes it.
+- **Settings:** change the hotkey. Close the window with its red button; ⌘Q quits the app while settings is focused.
 
-- **Menu bar:** a small menu with a **Settings...** button and the current hotkey shown below it.
-- **Open now:** press the hotkey, or run `open idleviz://open` in Terminal.
-- **Idle:** set the idle timeout in Settings (5, 10, 15 or 30 minutes, or off).
-- **Close:** move the mouse, click, scroll or press any key.
+Idle opening, the Spotify check, the visualizer and the overlay are not built yet.
 
 ## Custom visualizers
 
@@ -100,9 +129,20 @@ npm run check
 
 `npm run check` runs ESLint, Prettier, a TypeScript typecheck over the plugin files, and the Vitest suite. The test suite loads every visualizer plugin against a fake WebGL2 context and checks it against the plugin guide: required exports, canvas sizing, no NaN values sent to the GPU, everything freed on dispose, and no forbidden APIs.
 
-Swift code, once it exists, is built and tested with `swift build` and `swift test`, and linted with SwiftLint.
+The Swift side is split in two. `IdleVizCore` (`Package.swift`, `Sources/`, `tests/IdleVizCoreTests/`) holds logic that runs without a screen, such as the dismiss rules. The app target in `IdleViz.xcodeproj` (`IdleViz/App/`) is a thin AppKit and SwiftUI layer on top.
 
-CI runs all of this on every pull request.
+```bash
+swift build && swift test
+swiftlint lint --strict
+```
+
+In Debug builds, the launch argument `-IdleVizNoDismiss YES` keeps the window open so it can be inspected; trigger it again to close. The scheme has this argument ready to tick. Each open logs whether macOS let the app activate:
+
+```bash
+log stream --predicate 'subsystem == "com.xauno.IdleViz"'
+```
+
+CI runs all of this on every pull request, and builds the app unsigned with `xcodebuild` on a `macos-26` runner.
 
 ## Project layout
 
@@ -111,10 +151,15 @@ CI runs all of this on every pull request.
 ├─ project.md              Design and build order
 ├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
+├─ Package.swift           IdleVizCore Swift package (testable logic)
+├─ Sources/IdleVizCore/    Dismiss rules, URL commands, activation stats
+├─ IdleViz.xcodeproj       App target: bundle, Info.plist, entitlements, signing
+├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss
+├─ Config/                 Build settings; your signing team goes in Local.xcconfig
 ├─ aurora.js               Example visualizer plugin
 ├─ aurora-demo.html        Test page that feeds a plugin audio from a file or microphone
 ├─ docs/                   Guides, including the custom visualizer guide
-├─ tests/                  Vitest suite and fake WebGL helpers
+├─ tests/                  Vitest suite, fake WebGL helpers, and the Swift tests (IdleVizCoreTests)
 └─ .github/                CI workflow, PR template, Dependabot
 ```
 

@@ -1,0 +1,3 @@
+// Shared build settings for the IdleViz app target.
+// Your signing team goes in Local.xcconfig (gitignored). Copy Local.example.xcconfig to start.
+#include? "Local.xcconfig"

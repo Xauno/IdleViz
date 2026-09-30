@@ -8,3 +8,6 @@ xcuserdata/
 
 # Spotify TV app reference screenshots (copyrighted, kept local)
 design/reference/
+
+# Local signing team (see Config/Local.example.xcconfig)
+Config/Local.xcconfig
