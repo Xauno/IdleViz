@@ -31,6 +31,8 @@ final class WindowController {
     private var previousApp: NSRunningApplication?
     private var cursorHidden = false
     private var stats = ActivationStats()
+    var onOpen: (() -> Void)?
+    var onClose: (() -> Void)?
 
     let dismissEnabled: Bool = {
         #if DEBUG
@@ -55,6 +57,7 @@ final class WindowController {
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
+        onOpen?()
 
         if dismissEnabled {
             NSCursor.hide()
@@ -88,5 +91,6 @@ final class WindowController {
         }
         previousApp?.activate()
         previousApp = nil
+        onClose?()
     }
 }

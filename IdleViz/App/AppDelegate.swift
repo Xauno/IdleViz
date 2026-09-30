@@ -8,8 +8,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let windowController = WindowController()
     private lazy var settings = SettingsWindowController(openNow: { [weak self] in self?.open(from: .settings) })
     private var triggers: Triggers?
+    private var spotify: SpotifyInfo?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let spotify = SpotifyInfo()
+        self.spotify = spotify
+        windowController.onOpen = { spotify.startResync() }
+        windowController.onClose = { spotify.stopResync() }
         triggers = Triggers(onTrigger: { [weak self] source in self?.open(from: source) })
     }
 

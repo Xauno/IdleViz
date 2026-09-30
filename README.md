@@ -9,7 +9,7 @@ A macOS menu-bar app that turns your Mac into a music display. When the Mac goes
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: in development.** The menu-bar app opens a fullscreen black window from a hotkey or a URL and closes it on any input. There is no visualizer, overlay or Spotify integration yet. See [Roadmap](#roadmap) for progress.
+> **Status: in development.** The menu-bar app opens a fullscreen black window from a hotkey or a URL and closes it on any input. It reads what Spotify is playing and writes it to the system log, but doesn't show it yet. There is no visualizer or overlay yet. See [Roadmap](#roadmap) for progress.
 
 ## Contents
 
@@ -34,10 +34,12 @@ Working now:
 - Opens a fullscreen black window on the main display from a global hotkey (⌃⌥V by default), with `open idleviz://open`, or from **Open now** in settings.
 - Closes on any input (mouse movement, click, scroll, key, modifier key, trackpad gesture), then returns focus to the app you were using. The cursor is hidden while it's open.
 - Settings window with a hotkey recorder and an **Open now** button.
+- Reads what Spotify is playing (title, artist, album, playing or paused, position, length) and whether it's a song, a podcast or an ad, and downloads the album art. For now this only goes to the system log. It never launches Spotify: it only asks while Spotify is running, and updates when Spotify says something changed rather than polling.
 
 Planned:
 
 - Opens after a set idle time too, and only when Spotify is running with a track loaded.
+- Shows the now-playing info on screen (it's only logged for now).
 - Reacts to Spotify's audio only, through a Core Audio process tap. The visuals never hear the microphone or other system audio.
 - Butterchurn (WebGL Milkdrop) visualizer with hundreds of bundled presets, shuffle, blend time and a blocklist.
 - Bring your own presets: drop Butterchurn `.json` or Milkdrop `.milk` files, or custom `.js` visual plugins, into a folder.
@@ -58,7 +60,7 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | 0    | Repo tooling: CI, tests, PR workflow, plugin guide, Aurora example plugin         | Done    |
 | 1    | Open/close shell: Xcode project, menu-bar app, hotkey, fullscreen window, dismiss | Done    |
 | 2    | Audio spike: prove Spotify audio can drive Butterchurn (findings only)            | Done    |
-| 3    | Spotify now-playing: launch/quit tracking, track info, artwork, content type, ads | Planned |
+| 3    | Spotify now-playing: launch/quit tracking, track info, artwork, content type, ads | Done    |
 | 4    | Open rules and menu-bar icon flash                                                | Planned |
 | 5    | Overlay page matched to the Spotify TV app, all states                            | Planned |
 | 6    | Idle trigger, with skip rules (locked screen, video or call playing)              | Planned |
@@ -101,6 +103,8 @@ The app is built from source for personal use. There is no download.
 
 3. Copy `.build/xcode/Build/Products/Release/IdleViz.app` to `/Applications` and open it. The app has no Dock icon; it lives in the menu bar.
 
+4. With Spotify running, macOS asks whether IdleViz may control Spotify. Click **OK**; the app uses this only to read what's playing. If you clicked **Don't Allow**, turn it on in System Settings → Privacy & Security → Automation.
+
 ## Usage
 
 - **Menu bar:** click the waveform icon for a small popup with **Settings…** (⌘,) and the current open hotkey.
@@ -108,7 +112,13 @@ The app is built from source for personal use. There is no download.
 - **Close:** move the mouse, click, scroll, press any key or use a trackpad gesture. Input in the first 0.4 s after opening is ignored, so the hotkey itself doesn't close it. Keys you're still holding after that are ignored until you let go; pressing one again closes it.
 - **Settings:** change the hotkey. Close the window with its red button; ⌘Q quits the app while settings is focused.
 
-Idle opening, the Spotify check, the visualizer and the overlay are not built yet.
+- **Now playing:** the app logs what Spotify is playing whenever it changes, and every 5 s while the window is open. Watch it with:
+
+  ```bash
+  log stream --predicate 'subsystem == "com.xauno.IdleViz" AND category == "spotify"'
+  ```
+
+Idle opening, the Spotify check before opening, the visualizer and the overlay are not built yet.
 
 ## Custom visualizers
 
@@ -129,7 +139,7 @@ npm run check
 
 `npm run check` runs ESLint, Prettier, a TypeScript typecheck over the plugin files, and the Vitest suite. The test suite loads every visualizer plugin against a fake WebGL2 context and checks it against the plugin guide: required exports, canvas sizing, no NaN values sent to the GPU, everything freed on dispose, and no forbidden APIs.
 
-The Swift side is split in two. `IdleVizCore` (`Package.swift`, `Sources/`, `tests/IdleVizCoreTests/`) holds logic that runs without a screen, such as the dismiss rules. The app target in `IdleViz.xcodeproj` (`IdleViz/App/`) is a thin AppKit and SwiftUI layer on top.
+The Swift side is split in two. `IdleVizCore` (`Package.swift`, `Sources/`, `tests/IdleVizCoreTests/`) holds logic that runs without a screen, such as the dismiss rules and parsing Spotify's replies. The app target in `IdleViz.xcodeproj` (`IdleViz/App/`) is a thin AppKit and SwiftUI layer on top.
 
 ```bash
 swift build && swift test
@@ -152,9 +162,9 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
 ├─ Package.swift           IdleVizCore Swift package (testable logic)
-├─ Sources/IdleVizCore/    Dismiss rules, URL commands, activation stats
+├─ Sources/IdleVizCore/    Dismiss rules, URL commands, activation stats, Spotify query parsing and tracking
 ├─ IdleViz.xcodeproj       App target: bundle, Info.plist, entitlements, signing
-├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss
+├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, Spotify info
 ├─ Config/                 Build settings; your signing team goes in Local.xcconfig
 ├─ aurora.js               Example visualizer plugin
 ├─ aurora-demo.html        Test page that feeds a plugin audio from a file or microphone

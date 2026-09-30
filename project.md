@@ -152,7 +152,8 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 - Track running state with `NSWorkspace` `didLaunchApplicationNotification` / `didTerminateApplicationNotification` (bundle ID `com.spotify.client`), seeded once from `runningApplications`. No polling.
 
 **Getting track info without constant polling:**
-- Spotify posts a distributed notification, `com.spotify.client.PlaybackStateChanged`, on play/pause/track change. Observe it with `DistributedNotificationCenter` and use it as the trigger for updates. (Verify which fields it includes; it has historically carried name, artist, album, duration, position, player state and track ID, but not artwork.)
+- Spotify posts a distributed notification, `com.spotify.client.PlaybackStateChanged`, on play/pause/track change. Observe it with `DistributedNotificationCenter` and use it as the trigger for updates. Checked in step 3: it carries name, artist, album, album artist, duration, playback position, player state and track ID, but not the artwork URL. When playback switches to a new context (playing an album or playlist by URL), Spotify first posts `Player State = Stopped` with no track ID, then `Playing`. Skipping with next/previous doesn't. So "no track" can last a fraction of a second during a normal switch; anything that closes the window on it should wait a moment first.
+- On a `Stopped` notification, don't query: Spotify may be quitting, and an Apple Event then could launch it again.
 - On each notification (and once when the window opens), run one AppleScript query for the full state, including artwork URL:
 
 ```applescript
@@ -161,15 +162,28 @@ tell application "Spotify"
         set s to player state as string
         if s is "stopped" then return "stopped"
         set t to current track
-        return s & "||" & (name of t) & "||" & (artist of t) & "||" & (album of t) & "||" & (artwork url of t) & "||" & (duration of t) & "||" & (player position) & "||" & (spotify url of t)
+        set d to character id 31
+        set a to ""
+        try
+            set a to artwork url of t
+        end try
+        set u to ""
+        try
+            set u to spotify url of t
+        end try
+        return s & d & (name of t) & d & (artist of t) & d & (album of t) & d & a & d & (duration of t) & d & (player position) & d & u
     end timeout
 end tell
 ```
 
 - The page advances the progress bar locally from position + timestamp, minus the current audio delay so it matches what you hear; no per-second polling. While the window is open, do a light re-sync every ~5 s to correct drift and catch seeks.
 - Run via `NSAppleScript`, compiled once, on one dedicated background thread (`NSAppleScript` isn't thread-safe, and a hung Spotify must never block the main thread). Needs `NSAppleEventsUsageDescription`.
-- Units: `duration` in **milliseconds**, `player position` in **seconds**.
-- "No current track" = state `stopped`, an error, or an empty name/URL.
+- Fields are joined with ASCII unit separator (`character id 31`), which can't appear in a title, unlike a printable separator such as `||`. The query lives in `SpotifyQuery` in `IdleVizCore`.
+- Units: `duration` in **milliseconds**, `player position` in **seconds**. AppleScript turns numbers into text with the system locale, so the position can have a decimal comma.
+- Podcast episodes report an empty artist (the show is in `album`), and a duration of 0 for a moment right after they start.
+- "No current track" = state `stopped`, a `Stopped` notification, Spotify quitting, or an empty name/URL. Ads may have an empty name; they still count as a track.
+- A failed query (a timeout or other AppleScript error) keeps the last known track instead of clearing it, so one slow answer from Spotify doesn't stop the visualizer from opening. Before any query has succeeded, there is no track.
+- The first query after installing a new build can time out (error -1712) while macOS shows the Automation prompt, because the prompt counts against the 2 s timeout. The next notification queries again.
 - **Artwork:** Swift downloads the artwork URL with `URLSession`, keeps a few recent images in memory, and passes the image to the page as a `data:` URL inside the `nowPlaying` JSON. The page itself never uses the network. Local files (`local:`) have no artwork, so the overlay shows a placeholder, designed against the reference screenshots.
 - **Spotify Connect:** when Spotify plays on another device, AppleScript still reports the track, so the window opens as usual. The tap finds no local audio, so the visuals get silence. No special detection needed.
 
