@@ -18,3 +18,12 @@ final class TriggerTests: XCTestCase {
         XCTAssertNil(URLCommand(url: try XCTUnwrap(URL(string: "https://open"))))
     }
 }
+
+final class TriggerSourceTests: XCTestCase {
+    func testOnlyIdleIsAutomatic() {
+        XCTAssertTrue(TriggerSource.hotkey.isManual)
+        XCTAssertTrue(TriggerSource.urlScheme.isManual)
+        XCTAssertTrue(TriggerSource.settings.isManual)
+        XCTAssertFalse(TriggerSource.idle.isManual)
+    }
+}

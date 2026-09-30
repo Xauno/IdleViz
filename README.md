@@ -9,7 +9,7 @@ A macOS menu-bar app that turns your Mac into a music display. When the Mac goes
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: in development.** The menu-bar app opens a fullscreen black window from a hotkey or a URL, but only while Spotify has a track loaded, and closes it on any input. It reads what Spotify is playing and writes it to the system log, but doesn't show it yet. There is no visualizer or overlay yet. See [Roadmap](#roadmap) for progress.
+> **Status: in development.** The menu-bar app opens a fullscreen black window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input. It reads what Spotify is playing and writes it to the system log, but doesn't show it yet. There is no visualizer or overlay yet. See [Roadmap](#roadmap) for progress.
 
 ## Contents
 
@@ -33,13 +33,13 @@ Working now:
 - Menu-bar app with a small glass popup: **Settings…** and the current open hotkey.
 - Opens a fullscreen black window on the main display from a global hotkey (⌃⌥V by default), with `open idleviz://open`, or from **Open now** in settings.
 - Only opens while Spotify is running and has a track loaded (playing or paused). Otherwise the menu-bar icon flashes and nothing opens.
+- Opens by itself after 5 idle minutes (or 10, 15, 30, or never, set in settings). It doesn't open on idle while the screen is locked or while another app keeps the display awake, such as a video or a call. After a blocked attempt it waits until you've used the Mac again.
 - Closes on any input (mouse movement, click, scroll, key, modifier key, trackpad gesture), then returns focus to the app you were using. The cursor is hidden while it's open.
 - Settings window with a hotkey recorder and an **Open now** button.
 - Reads what Spotify is playing (title, artist, album, playing or paused, position, length) and whether it's a song, a podcast or an ad, and downloads the album art. For now this only goes to the system log. It never launches Spotify: it only asks while Spotify is running, and updates when Spotify says something changed rather than polling.
 
 Planned:
 
-- Opens after a set idle time too.
 - Shows the now-playing info on screen (it's only logged for now).
 - Reacts to Spotify's audio only, through a Core Audio process tap. The visuals never hear the microphone or other system audio.
 - Butterchurn (WebGL Milkdrop) visualizer with hundreds of bundled presets, shuffle, blend time and a blocklist.
@@ -64,7 +64,7 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | 3    | Spotify now-playing: launch/quit tracking, track info, artwork, content type, ads | Done    |
 | 4    | Open rules and menu-bar icon flash                                                | Done    |
 | 5    | Overlay page matched to the Spotify TV app, all states                            | Planned |
-| 6    | Idle trigger, with skip rules (locked screen, video or call playing)              | Planned |
+| 6    | Idle trigger, with skip rules (locked screen, video or call playing)              | Done    |
 | 7a   | Visualizer: Butterchurn with bundled presets                                      | Planned |
 | 7b   | Visualizer: real Spotify audio through the process tap                            | Planned |
 | 7c   | Visualizer: preset controls                                                       | Planned |
@@ -111,7 +111,8 @@ The app is built from source for personal use. There is no download.
 - **Menu bar:** click the waveform icon for a small popup with **Settings…** (⌘,) and the current open hotkey.
 - **Open:** press the hotkey (⌃⌥V by default), run `open idleviz://open` in Terminal, or click **Open now** in settings. Spotify has to be running with a track loaded, playing or paused. If it isn't, the menu-bar icon flashes a few times instead.
 - **Close:** move the mouse, click, scroll, press any key or use a trackpad gesture. Input in the first 0.4 s after opening is ignored, so the hotkey itself doesn't close it. Keys you're still holding after that are ignored until you let go; pressing one again closes it.
-- **Settings:** change the hotkey. Close the window with its red button; ⌘Q quits the app while settings is focused.
+- **Idle:** after the **Start after idle** time with no input (5 minutes by default), it opens by itself, with the same Spotify check. It skips that while the screen is locked or another app keeps the display awake (a video, a call, a presentation), and then waits until you use the Mac again before trying again.
+- **Settings:** change the idle time or turn it off, and change the hotkey. Close the window with its red button; ⌘Q quits the app while settings is focused.
 
 - **Now playing:** the app logs what Spotify is playing whenever it changes, and every 5 s while the window is open. Watch it with:
 
@@ -119,7 +120,7 @@ The app is built from source for personal use. There is no download.
   log stream --predicate 'subsystem == "com.xauno.IdleViz" AND category == "spotify"'
   ```
 
-Idle opening, the visualizer and the overlay are not built yet.
+The visualizer and the overlay are not built yet.
 
 ## Custom visualizers
 
@@ -163,7 +164,7 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
 ├─ Package.swift           IdleVizCore Swift package (testable logic)
-├─ Sources/IdleVizCore/    Dismiss rules, open rules, URL commands, activation stats, Spotify query parsing and tracking
+├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, URL commands, activation stats, Spotify query parsing and tracking
 ├─ IdleViz.xcodeproj       App target: bundle, Info.plist, entitlements, signing
 ├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, Spotify info
 ├─ Config/                 Build settings; your signing team goes in Local.xcconfig
