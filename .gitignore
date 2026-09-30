@@ -5,3 +5,6 @@ coverage/
 DerivedData/
 *.xcuserstate
 xcuserdata/
+
+# Spotify TV app reference screenshots (copyrighted, kept local)
+design/reference/

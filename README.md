@@ -36,6 +36,7 @@ Planned (nothing below is implemented yet):
 - Butterchurn (WebGL Milkdrop) visualizer with hundreds of bundled presets, shuffle, blend time and a blocklist.
 - Bring your own presets: drop Butterchurn `.json` or Milkdrop `.milk` files, or custom `.js` visual plugins, into a folder.
 - Now-playing overlay with album art, title, artist and progress bar. Songs, paused songs and ads each get their own layout. Podcasts show no overlay.
+- Keeps the screen awake while it's showing, up to a limit you set (1 hour by default). After that the Mac sleeps and locks as usual.
 - Adjustable visualizer brightness, launch at login, and a small settings window.
 - Never launches Spotify and never uses Spotify's web API or a login.
 
@@ -43,16 +44,20 @@ Planned (nothing below is implemented yet):
 
 Each step from [project.md](project.md) becomes one pull request, and this table is updated as it merges.
 
-| Step | What                                                                          | Status  |
-| ---- | ----------------------------------------------------------------------------- | ------- |
-| 0    | Repo tooling: CI, tests, PR workflow, plugin guide, Aurora example plugin     | Done    |
-| 1    | Open/close shell: menu-bar app, hotkey, fullscreen window, dismiss on input   | Planned |
-| 2    | Spotify now-playing: launch/quit tracking, track info, content type, ad logic | Planned |
-| 3    | Open rules and menu-bar icon flash                                            | Planned |
-| 4    | Overlay page matched to the Spotify TV app, all states                        | Planned |
-| 5    | Idle trigger                                                                  | Planned |
-| 6    | Visualizer: Butterchurn, Spotify audio tap, presets, custom folder and plugins | Planned |
-| 7    | Polish: fades, launch at login, brightness control                            | Planned |
+| Step | What                                                                              | Status  |
+| ---- | --------------------------------------------------------------------------------- | ------- |
+| 0    | Repo tooling: CI, tests, PR workflow, plugin guide, Aurora example plugin         | Done    |
+| 1    | Open/close shell: Xcode project, menu-bar app, hotkey, fullscreen window, dismiss | Planned |
+| 2    | Audio spike: prove Spotify audio can drive Butterchurn (findings only)            | Planned |
+| 3    | Spotify now-playing: launch/quit tracking, track info, artwork, content type, ads | Planned |
+| 4    | Open rules and menu-bar icon flash                                                | Planned |
+| 5    | Overlay page matched to the Spotify TV app, all states                            | Planned |
+| 6    | Idle trigger, with skip rules (locked screen, video or call playing)              | Planned |
+| 7a   | Visualizer: Butterchurn with bundled presets                                      | Planned |
+| 7b   | Visualizer: real Spotify audio through the process tap                            | Planned |
+| 7c   | Visualizer: preset controls                                                       | Planned |
+| 7d   | Visualizer: custom preset folder and sandboxed plugins                            | Planned |
+| 8    | Polish: fades, launch at login, brightness, keep-awake limit, first-launch setup  | Planned |
 
 ## Requirements
 

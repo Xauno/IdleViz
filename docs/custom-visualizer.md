@@ -59,14 +59,14 @@ audio = {
 
 ## What plugins can't do
 
-The app runs plugins in the same web view as everything else but enforces these limits:
+Each plugin runs in its own sandboxed frame, separate from the overlay and the rest of the app, with these limits:
 
 | Not allowed | Why |
 |---|---|
 | Network (`fetch`, XHR, WebSocket, external scripts or images) | A Content-Security-Policy blocks it. Everything must be self-contained. |
 | `getUserMedia` or any audio or video capture | Denied. Plugins only see Spotify's audio, via `audio`. |
 | Keyboard, mouse or touch listeners | Any input closes the visualizer. There's nothing to interact with. |
-| Touching the DOM outside your canvas | The page belongs to the overlay. |
+| Touching the DOM outside your canvas | Your frame holds only your canvas. The overlay and the app are out of reach. |
 | `import` of other files or URLs | Keep it to one file. Inline shaders as template strings. |
 | Persistent storage (`localStorage`, cookies) | Not supported. |
 
