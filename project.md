@@ -31,9 +31,10 @@ A menu-bar app that opens a fullscreen music visualizer with a Spotify now-playi
 
 ## Build and signing
 
+- **Minimum macOS 26**, for both the app and the package (`platforms: [.macOS(.v26)]`).
 - **Xcode project + Swift package.** `IdleViz.xcodeproj` holds the app target: the `.app` bundle, `Info.plist`, entitlements, the `idleviz://` URL scheme and signing. All logic that can be tested without a screen lives in a local Swift package, `IdleVizCore` (`Package.swift` at the repo root), which the app target depends on. The app target stays a thin AppKit/SwiftUI layer. Building needs full Xcode, not just the Command Line Tools.
 - **Testability.** Put anything that touches the system behind a small protocol (AppleScript runner, idle-time source, clock, power assertions, Spotify running state) so `IdleVizCore` logic runs against fakes in `swift test`. CI can't test permissions, Spotify or audio, so those are checked by hand and written up in each PR's Verification section.
-- **CI.** `swift test` for the package, `xcodebuild build` for the app with `CODE_SIGNING_ALLOWED=NO`, and SwiftLint.
+- **CI.** `swift test` for the package, `xcodebuild build` for the app with `CODE_SIGNING_ALLOWED=NO`, and SwiftLint. This needs a runner with Xcode 26 (for example `macos-26`); switch the workflow's Swift job over in step 1.
 - **Signing.** Sign every local build with the same free Apple Development certificate (Xcode's personal team). macOS ties the Automation and System Audio Recording permissions to the signature, so ad-hoc or changing signatures make the prompts come back or silently return all-zero audio.
 - **Hardened Runtime** on, with the `com.apple.security.automation.apple-events` entitlement, and `com.apple.security.device.audio-input` for the delay detector's microphone use.
 - **Not sandboxed.** The sandbox would need a temporary-exception entitlement for Apple Events to Spotify and would move the presets folder into a container.
@@ -45,7 +46,7 @@ A menu-bar app that opens a fullscreen music visualizer with a Spotify now-playi
 
 The app needs two permissions: **Automation** (to ask Spotify what's playing) and **System Audio Recording** (the process tap). A third, **Microphone**, is optional and only used by **Detect delay** (see "Audio delay").
 
-- On first launch, a small welcome window explains the two required ones and triggers the prompts on purpose: one AppleScript query (if Spotify is running) and a short tap. That way a prompt never pops up during an idle open while nobody is at the Mac. The microphone prompt only appears the first time you press **Detect delay**.
+- On first launch, a small welcome window explains the two required ones and triggers the prompts on purpose: one AppleScript query (if Spotify is running) and a short tap. That way a prompt never pops up during an idle open while nobody is at the Mac. Both prompts need Spotify running, so if it isn't, the window asks you to open Spotify and continues by itself once it launches. The microphone prompt only appears the first time you press **Detect delay**.
 - Check Automation without prompting with `AEDeterminePermissionToAutomateTarget(..., askUserIfNeeded: false)`.
 - There's no public API to check the audio permission. Treat several seconds of exact-zero buffers while Spotify reports "playing" as "probably denied" and log it.
 - No camera permission, ever.
@@ -55,7 +56,7 @@ The app needs two permissions: **Automation** (to ask Spotify what's playing) an
 - **Error rows in the popup**, below the "Open visualizer" row, one per missing permission: "Spotify control not allowed" or "Spotify audio blocked". Clicking one opens the matching System Settings privacy page:
   - Automation: `x-apple.systempreferences:com.apple.preference.security?Privacy_Automation`
   - System Audio Recording: `x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture` (the "Screen & System Audio Recording" page)
-  - Verify these URLs on current macOS. They have changed between versions.
+  - Check once on macOS 26 that each link lands on the right page. If one doesn't, System Settings just opens on a nearby page, so nothing breaks.
 - Re-check each time the popup opens, when the app becomes active, and whenever an AppleScript call fails with a permission error (`-1743`).
 - The microphone is optional, so a missing microphone permission doesn't turn the icon yellow. It only shows as a hint next to **Detect delay** in settings.
 
@@ -83,7 +84,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 **UI reference:** build the menu-bar popup and the settings window to match [mockups.html](mockups.html) (layout, grouping, row order, sizes, and build notes). Open it in a browser.
 
 - `LSUIElement = YES`, launch at login (`SMAppService.mainApp.register()`).
-- The menu-bar popup is a small glass-style popover (SwiftUI `MenuBarExtra` with `.window` style, or `NSPopover`), not a plain `NSMenu`. The background is real Liquid Glass (`glassEffect`) on macOS 26+ and a system blur material on older versions, in one small view chosen with `#available(macOS 26, *)`; the minimum stays 14.2. It is deliberately tiny, with two rows:
+- The menu-bar popup is a small glass-style popover (SwiftUI `MenuBarExtra` with `.window` style, or `NSPopover`), not a plain `NSMenu`. The background is real Liquid Glass (`glassEffect`). The app requires macOS 26, so there's no fallback look. It is deliberately tiny, with two rows:
   1. **Settings…** opens the separate settings window.
   2. Below it, a disabled, informational row showing the current open hotkey (e.g. "Open visualizer: ⌃⌥V"), read from `KeyboardShortcuts` so it updates if the shortcut changes.
   3. Only while a required permission is missing: one error row per missing permission, each opening its System Settings page (see "When a permission is missing").
@@ -98,7 +99,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 - **Idle:** `CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)` (any input). Instead of polling on a fixed interval, schedule the next check for `timeout − idleTime` (the earliest it could fire).
 - **Idle skip rules** (idle trigger only):
   - The screen is locked (`CGSessionCopyCurrentDictionary`, `CGSSessionScreenIsLocked`), or the session isn't on the console (fast user switching).
-  - Another process, not Spotify, holds a `PreventUserIdleDisplaySleep` / `NoDisplaySleepAssertion` power assertion (`IOPMCopyAssertionsByProcess`). This covers fullscreen video, calls and presentations, whether or not they're frontmost.
+  - Another process, not Spotify or IdleViz itself, holds a `PreventUserIdleDisplaySleep` / `NoDisplaySleepAssertion` power assertion (`IOPMCopyAssertionsByProcess`). This covers fullscreen video, calls and presentations, whether or not they're frontmost.
   - After the keep-awake limit closed the visualizer, don't reopen until there has been new input. Otherwise it would reopen at once, since the Mac is still idle.
 - **Hotkey:** `KeyboardShortcuts` Swift package.
 - **Terminal:** URL scheme, so `open idleviz://open` works.
@@ -106,7 +107,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 
 ### Dismiss
 - Make the window key (subclass `NSWindow`, override `canBecomeKey` → `true`) so a **local** `NSEvent` monitor receives keys without needing Accessibility/Input Monitoring permission. Add a global monitor for mouse events as a backstop.
-- **Activation may be refused.** On macOS 14+ activation is cooperative, so `NSApp.activate()` can be denied for an idle open (another app is active and there was no user action). Then the window isn't key and the local monitor gets no keys. The backup below still closes the window, but the key that woke it goes to the app behind (for example, a letter typed into a document). Check in step 1 how often this happens.
+- **Activation may be refused.** On current macOS activation is cooperative, so `NSApp.activate()` can be denied for an idle open (another app is active and there was no user action). Then the window isn't key and the local monitor gets no keys. The backup below still closes the window, but the key that woke it goes to the app behind (for example, a letter typed into a document). `NSCursor.hide()` also only works while the app is active, so the cursor may stay visible. Check in step 1 how often this happens.
 - Remember the frontmost app when opening and reactivate it on close, so focus returns where it was.
 - Events: `.mouseMoved`, `.leftMouseDown`, `.rightMouseDown`, `.otherMouseDown`, `.scrollWheel`, `.keyDown`, `.flagsChanged`, `.gesture`, `.magnify`, `.swipe`.
 - Threshold ≈ 0: close on the first `.mouseMoved` with any nonzero delta (≥ 1 px if the trackpad sends phantom zero-delta events).
@@ -137,6 +138,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 - Keep the window and web view alive between opens (hide instead of destroying it) so opening is instant.
 - **Recovery:**
   - Reload the page and re-send state on `webViewWebContentProcessDidTerminate`.
+  - Reload the page if the once-a-second status check gets no reply for ~3 s (see "Loading and failure" under Presets).
   - Rebuild Butterchurn on `webglcontextlost`, which can happen after sleep and wake.
   - Close the visualizer on `NSWorkspace.willSleepNotification` and `NSApplication.didChangeScreenParametersNotification`, since the main display may have changed.
 - Set `isInspectable = true` in Debug builds so Safari's Web Inspector can attach.
@@ -227,12 +229,12 @@ frame-src 'self';
 The only visualizer is **Butterchurn** (WebGL port of Milkdrop), chosen because the goal is a big, browsable library rather than hand-written scenes. There is no external-app mode.
 
 ### Audio
-- Core Audio process tap (macOS 14.2+) on Spotify only.
+- Core Audio process tap on Spotify only.
   - Find Spotify's audio process objects via `kAudioHardwarePropertyProcessObjectList`. Match every process whose bundle ID starts with `com.spotify.client`, which includes its helper processes, and tap them all.
   - A process only appears in that list once it starts playing audio. Listen for changes to `kAudioHardwarePropertyProcessObjectList` and rebuild the tap when Spotify's processes come or go, not just when Spotify relaunches.
   - `CATapDescription(stereoMixdownOfProcesses:)` with `muteBehavior = .unmuted` → `AudioHardwareCreateProcessTap` → private aggregate device → `AudioDeviceCreateIOProcIDWithBlock`.
   - Needs `NSAudioCaptureUsageDescription`; macOS prompts once (see "Permissions and first launch"). Builds with a changing signature may get all-zero buffers until permission is granted to the right binary.
-  - Run it only while the window is open.
+  - Run it only while the window is open, plus briefly for the first-launch permission prompt and during Detect delay.
 - **Analysis happens in Swift** (vDSP). Each frame, Swift computes everything the page needs, so JS only unpacks numbers:
   - the plugin audio object: 64 bands (noise-floored, smoothed), `bass`/`mid`/`treble`, `rms`, and a 1024-sample waveform;
   - Butterchurn's input: 1024-sample 8-bit time-domain data, mono plus left and right.
@@ -243,7 +245,7 @@ The only visualizer is **Butterchurn** (WebGL port of Milkdrop), chosen because 
   - The only audio source for the visuals is the Spotify process tap above. Never feed them from a global/system tap, an input device, or the microphone. Always build the tap with `CATapDescription(stereoMixdownOfProcesses:)` containing Spotify's process objects only. If none are found, send silence.
   - The one exception to "no microphone" is **Detect delay** (below). It runs only in Swift, only after you press the button, for about 5 s, and the mic audio is never sent to the page, stored, or used for anything but measuring the delay.
   - Audio reaches JS only through `window.audioFrame(data)`, then a single host wrapper hands each visual its frame. A plugin never gets an `AudioContext`, `MediaStream` or node it could wire to something else.
-  - The web view denies all media capture: implement `WKUIDelegate`'s `requestMediaCapturePermissionFor` to always return `.deny`, and add no microphone/camera entitlements or usage strings. This stops a plugin from calling `getUserMedia` to get mic or other audio.
+  - The web view denies all media capture: implement `WKUIDelegate`'s `requestMediaCapturePermissionFor` to always return `.deny`. The app has the microphone entitlement and usage string only for Detect delay, so this delegate is what stops page or plugin code from calling `getUserMedia` to get mic or other audio. No camera entitlement or usage string.
   - If Spotify quits, plays on another device, or the track is an ad or podcast with no audio source, the frame is silence (zeros), not a fallback to anything else.
   - Test: play other audio (a YouTube tab, system sounds) while Spotify is paused and confirm the visualizer stays flat.
 
@@ -251,7 +253,7 @@ The only visualizer is **Butterchurn** (WebGL port of Milkdrop), chosen because 
 The tap hears Spotify's audio before it reaches the speakers. With built-in speakers the gap is tiny, but Bluetooth adds about 150–300 ms and AirPlay about 2 s, so the visuals run ahead of the sound.
 
 - **Delay line in Swift.** Keep the analysed frames in a small ring buffer and send each one to the page `delay` ms after it was captured. The page and plugins don't know about it. The progress bar subtracts the same delay (see "Spotify now-playing").
-- **Per output device.** Store the delay by the default output device's UID (`kAudioHardwarePropertyDefaultOutputDevice` → `kAudioDevicePropertyDeviceUID`) in a dictionary setting, `audioDelayByDevice`. Listen for default-device changes and switch to that device's value. A device with no saved value starts at 0.
+- **Per output device.** Store the delay by the default output device's UID (`kAudioHardwarePropertyDefaultOutputDevice` → `kAudioDevicePropertyDeviceUID`) in a dictionary setting, `audioDelayByDevice`. Listen for default-device changes and switch to that device's value. A device with no saved value starts at the latency macOS reports for it: the output device's `kAudioDevicePropertyLatency` + `kAudioDevicePropertySafetyOffset` + its stream's `kAudioStreamPropertyLatency`. That's roughly right for AirPlay and often a bit low for Bluetooth, so it's a starting point, not a replacement for Detect delay.
 - **Manual:** the Audio delay slider in settings, 0–2.5 s in 10 ms steps, for the current device. The hint under it names the device.
 - **Detect delay button:**
   1. Only works while Spotify is playing out loud. Otherwise the hint explains why and nothing happens.
@@ -279,7 +281,7 @@ The tap hears Spotify's audio before it reaches the speakers. With built-in spea
     - **Open Presets Folder** reveals it in Finder.
     - **Reload Presets** rescans it.
   - `PresetLibrary.swift` scans the folder and watches it for changes (`DispatchSource` file-system events or FSEvents), so dropping files in updates the library without a restart. It sends the list to the page with `window.setCustomPresets(json)`.
-  - Each preset is validated (parse, compile its shaders) in a `try/catch` when first loaded. Bad ones are skipped, added to the blocklist, and reported in the settings window ("3 presets failed to load").
+  - Each preset is validated (parse, compile its shaders) in a `try/catch` when first loaded. Bad ones are skipped and listed under "Failed to load" in settings ("3 presets failed to load"). They are not added to the blocklist, which only holds presets you chose to hide. When a failed file changes or is replaced, it's tried again.
   - Presets are tagged by source (bundled / custom) so the settings can shuffle all, bundled only, or custom only.
   - Check each pack's license before sharing the app. User-imported presets stay on the user's machine and are never bundled.
 - **Preset control** (in the settings window, since any input closes the visualizer): mode (single visualizer or shuffle), seconds per preset, blend time, shuffle-from filter (all/bundled/custom/favorites), favorites, and a blocklist for presets you dislike.
@@ -287,16 +289,17 @@ The tap hears Spotify's audio before it reaches the speakers. With built-in spea
   - Each file is an ES module with named exports `init(canvas)`, `frame(audio, time)` and `dispose()`, plus an optional `meta = { name }`. The same interface is used for plugins bundled in `web/visuals/*.js` (see `aurora.js` for an example; it moves to `web/visuals/` in step 7a). The full author guide is in `docs/custom-visualizer.md`.
   - `audio` is a plain object: `{ bands: Float32Array(64), bass, mid, treble, waveform: Float32Array(1024), rms }`, built from the Spotify-only frame (see the audio guarantee above). Bands are 0..1 and log-spaced (about 40 Hz to 16 kHz), already noise-floored and smoothed (fast attack, slow release); `bass`/`mid`/`treble` average bands 0-7, 8-29 and 30-63. The arrays are reused every frame. It is the only audio data a plugin ever sees.
   - Plugins draw only into the canvas they are given. Each `init` gets a fresh canvas, so a plugin picks its own context type (WebGL2 or 2D).
-  - **Isolation: each plugin runs in its own sandboxed frame.**
+  - **Isolation: each plugin runs in its own sandboxed frame.** Bundled plugins in `web/visuals/` use the same frame, so there's only one way plugins are run.
     - The host page creates `<iframe sandbox="allow-scripts">` (no `allow-same-origin`, so it gets an opaque origin) loading `idleviz-app://app/plugin-host.html`, which holds the plugin's canvas.
     - The frame's own CSP: `default-src 'none'; script-src idleviz-app:; img-src data: blob:`. No network, no storage.
     - Each frame, the host posts the audio object to the frame with `postMessage`. A small runner inside the frame copies it into reused arrays and calls the plugin's `frame(audio, time)`.
     - The frame can't reach the overlay DOM, the host's JS, or Swift.
-  - **The Swift bridge stays out of reach.** Register the `WKScriptMessageHandler`s in a named `WKContentWorld`, with the host bridge script running in that world, so neither page code nor plugin code can call into Swift. Validate every message anyway.
+  - **The page has no way to call into Swift.** Don't register any `WKScriptMessageHandler`. Swift talks to the page with `evaluateJavaScript`, and finds out how the page is doing by asking it (see "Loading and failure"). That way neither plugins nor custom presets can reach the app.
   - **Loading and failure:**
     - The runner imports the file with `import()` inside `try/catch` and calls `init`.
     - It wraps `frame` so that a throw, or a frame that takes over ~50 ms for several seconds in a row, reports a failure to the host. The host then removes the frame and moves on to the next preset.
-    - WebKit may run the frame on the same thread as the host, so a plugin stuck in an endless loop freezes the whole page. The page tells Swift which plugin is starting and sends a heartbeat; if the heartbeat stops for ~3 s, Swift reloads the web view and blocklists that plugin.
+    - **Status check.** About once a second while the window is open, Swift calls `evaluateJavaScript("window.idlevizStatus()")`. It returns the current preset and any new load failures (name + error message), which Swift shows in settings. Treat the reply as untrusted: check its shape and cap string lengths.
+    - WebKit may run the frame on the same thread as the host, so a plugin stuck in an endless loop freezes the whole page. If the status check gets no reply for ~3 s, Swift reloads the web view and marks the preset that was last reported as failed.
   - The regex check in `tests/plugin-contract.test.js` is a lint for plugins in the repo, not a security boundary. The sandboxed frame and CSP are what enforce the limits.
   - The settings window still shows a one-time warning that custom plugins (and custom presets, see "Page security") are code and should only come from sources the user trusts.
   - Same license caveat as presets: imported plugins stay on the user's machine and are never bundled.
@@ -347,14 +350,14 @@ Each step is one pull request. At the end of each step, update the README (Roadm
 3. **SpotifyInfo:** launch/quit tracking, notification + AppleScript (on its own thread, with a timeout), artwork download, content type and ad context, printed to the console. Confirm it never launches Spotify. Test songs, paused, podcasts, music ads, podcast ads, local files and Spotify Connect.
 4. **Open rules + icon flash** wired to the hotkey.
 5. **Overlay page** matched to the reference screenshots, served from `idleviz-app://` with the CSP, over a placeholder animated gradient (no audio needed yet), covering every state in the table plus the missing-artwork placeholder.
-6. **Idle trigger**, with the skip rules (locked screen, another app keeping the display awake, wait for input after the keep-awake limit).
+6. **Idle trigger**, with the skip rules (locked screen, another app keeping the display awake).
 7. **Visualizer**, split into four PRs:
    - **7a.** Butterchurn in the page with bundled presets and fake audio. Move `aurora.js` to `web/visuals/`.
    - **7b.** Real audio: process tap (with process-list changes), analysis in Swift, automatic gain, silence rules, web view recovery.
    - **7c.** Preset controls (mode, shuffle, timing, blend, favorites, blocklist).
-   - **7d.** Custom preset folder: `.json` loading, folder watching, `.js` plugins in sandboxed frames (with the audio, CSP and heartbeat rules), Import/Open/Reload controls in settings, then `.milk` conversion with caching and failure handling.
+   - **7d.** Custom preset folder: `.json` loading, folder watching, `.js` plugins in sandboxed frames (with the audio, CSP and status-check rules), Import/Open/Reload controls in settings, then `.milk` conversion with caching and failure handling.
    - **7e.** Audio delay: per-device delay line, the settings slider, and **Detect delay** with the microphone. Test with built-in speakers, Bluetooth headphones and speakers, and AirPlay if available.
-8. **Polish:** fades, launch at login, brightness slider in settings, keep awake with its time limit setting, different times on battery, first-launch welcome window for permissions, yellow icon and popup error rows for missing permissions.
+8. **Polish:** fades, launch at login, brightness slider in settings, keep awake with its time limit setting (and the idle rule to wait for input after the limit), different times on battery, first-launch welcome window for permissions, yellow icon and popup error rows for missing permissions.
 
 ## Later
 
@@ -362,6 +365,6 @@ Each step is one pull request. At the end of each step, update the README (Roadm
 
 ## Requirements
 
-- macOS 14.2+ (process tap)
+- macOS 26 or later. The app is only built for the macOS it runs on (personal use), which avoids fallbacks for older versions.
 - Spotify desktop app
 - To build: full Xcode (not just the Command Line Tools) and a free Apple Development certificate (Xcode's personal team)

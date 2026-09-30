@@ -438,10 +438,8 @@
               have a rounded highlight on hover.
             </li>
             <li>
-              Older macOS: the app still supports 14.2 and later. Put the background in one small view that uses the
-              real Liquid Glass (<code>glassEffect</code>) on macOS 26 and later, and a system blur material
-              (<code>.regularMaterial</code>, or <code>NSVisualEffectView</code> with the popover material) before that,
-              chosen with <code>#available(macOS 26, *)</code>. Nothing else in the popup changes. Test both.
+              The app requires macOS 26, so the background is always the real Liquid Glass (<code>glassEffect</code>).
+              No fallback for older versions.
             </li>
             <li>Width about 260 pt. Height fits the rows.</li>
             <li>
@@ -682,7 +680,8 @@
             </li>
             <li>
               Audio delay is saved separately for each output device. The hint under the label names the current device,
-              and the slider moves when you switch speakers or headphones.
+              and the slider moves when you switch speakers or headphones. A device used for the first time starts at
+              the delay macOS reports for it.
             </li>
             <li>
               Detect delay: press it while Spotify plays out loud. The button shows "Listening…" for about 5 s, then the

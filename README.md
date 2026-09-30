@@ -1,7 +1,7 @@
 # Spotify Music Visualizer
 
 [![CI](https://github.com/Xauno/Spotify-Music-Visualizer/actions/workflows/ci.yml/badge.svg)](https://github.com/Xauno/Spotify-Music-Visualizer/actions/workflows/ci.yml)
-![Platform: macOS 14.2+](https://img.shields.io/badge/platform-macOS%2014.2%2B-lightgrey)
+![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 ![Status: planning](https://img.shields.io/badge/status-planning-orange)
 
@@ -65,7 +65,7 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 
 ## Requirements
 
-- macOS 14.2 or later (needed for the Core Audio process tap)
+- macOS 26 or later
 - The Spotify desktop app
 
 ## Installation
