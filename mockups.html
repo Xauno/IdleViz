@@ -407,6 +407,12 @@
               Glass look: translucent fill, strong blur, thin light edge, about 22 pt corner radius, soft shadow. Rows
               have a rounded highlight on hover.
             </li>
+            <li>
+              Older macOS: the app still supports 14.2 and later. Put the background in one small view that uses the
+              real Liquid Glass (<code>glassEffect</code>) on macOS 26 and later, and a system blur material
+              (<code>.regularMaterial</code>, or <code>NSVisualEffectView</code> with the popover material) before that,
+              chosen with <code>#available(macOS 26, *)</code>. Nothing else in the popup changes. Test both.
+            </li>
             <li>Width about 260 pt. Height is just the two rows.</li>
             <li>
               The menu-bar icon still flashes (alt icon 2 to 3 times over about 1 s) when a manual open is refused.
@@ -616,10 +622,6 @@
       <div class="note">
         <strong>Still to decide (ask before building):</strong>
         <ul>
-          <li>
-            How the glass effect works on macOS older than 26, since the app targets 14.2 and later. Use a plain blur
-            material as a fallback, or raise the minimum version?
-          </li>
           <li>Whether Favorites and Blocklist stay as Manage sheets, or become an inline searchable list.</li>
         </ul>
       </div>

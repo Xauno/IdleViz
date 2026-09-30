@@ -42,7 +42,7 @@ Page layers (bottom → top): Butterchurn canvas → dim layer → overlay
 **UI reference:** build the menu-bar popup and the settings window to match [mockups.html](mockups.html) (layout, grouping, row order, sizes, and build notes). Open it in a browser.
 
 - `LSUIElement = YES`, launch at login (`SMAppService.mainApp.register()`).
-- The menu-bar popup is a small glass-style popover (SwiftUI `MenuBarExtra` with `.window` style, or `NSPopover`), not a plain `NSMenu`. It is deliberately tiny, with two rows:
+- The menu-bar popup is a small glass-style popover (SwiftUI `MenuBarExtra` with `.window` style, or `NSPopover`), not a plain `NSMenu`. The background is real Liquid Glass (`glassEffect`) on macOS 26+ and a system blur material on older versions, in one small view chosen with `#available(macOS 26, *)`; the minimum stays 14.2. It is deliberately tiny, with two rows:
   1. **Settings…** (the only clickable item) opens the separate settings window.
   2. Below it, a disabled, informational row showing the current open hotkey (e.g. "Open visualizer: ⌃⌥V"), read from `KeyboardShortcuts` so it updates if the shortcut changes.
 - There is no Quit item in the menu or in settings. The red close button closes the settings window, and ⌘Q (while the window is focused) quits the app.
