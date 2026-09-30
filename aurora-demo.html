@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visualizer test page</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, "Figtree", sans-serif; }
+  #viz { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #ui { position: fixed; left: 16px; bottom: 16px; display: flex; gap: 8px; align-items: center;
+        color: #fff; font-size: 13px; transition: opacity .4s; }
+  #ui.hidden { opacity: 0; pointer-events: none; }
+  button { font: inherit; color: #fff; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25);
+           border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+  button:hover { background: rgba(255,255,255,.24); }
+  #msg { opacity: .7; }
+</style>
+</head>
+<body>
+<canvas id="viz"></canvas>
+<div id="ui">
+  <button id="btnSynth">Play demo beat</button>
+  <button id="btnMic">Use microphone</button>
+  <button id="btnHide">Hide controls</button>
+  <span id="msg"></span>
+</div>
+
+<script type="module">
+const plugin = (() => {
+// Aurora Ring: a flowing, audio-reactive colour field with a mirrored radial spectrum.
+// Plugin interface (see project.md): init(canvas), frame(audio, time), dispose()
+//   audio = { bands: Float32Array(64) in 0..1, bass, mid, treble in 0..1 }
+
+const VERT = `#version 300 es
+in vec2 aPos;
+void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+const FRAG = `#version 300 es
+precision highp float;
+uniform vec2 uRes;
+uniform float uTime;
+uniform vec3 uLevels;        // bass, mid, treble
+uniform sampler2D uBands;    // 64x1, R8
+out vec4 outColor;
+
+float hash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float noise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x),
+             mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.03 + 11.7; a *= 0.5; }
+  return v;
+}
+vec3 palette(float t) {
+  return 0.5 + 0.5 * cos(6.28318 * (t + vec3(0.00, 0.33, 0.67)));
+}
+
+void main() {
+  vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  float t = uTime * 0.10;
+
+  // Flowing background: domain-warped noise, pushed around by the bass.
+  vec2 p = uv * 1.7;
+  vec2 q = vec2(fbm(p + t), fbm(p + vec2(5.2, 1.3) - t));
+  vec2 r = vec2(fbm(p + 3.0 * q + vec2(1.7, 9.2) + t * 1.5 + uLevels.x * 0.5),
+                fbm(p + 3.0 * q + vec2(8.3, 2.8) - t));
+  float f = fbm(p + 3.5 * r);
+  vec3 col = palette(f * 0.8 + t + uLevels.z * 0.25) * (0.15 + f * f * 1.5);
+  col *= 0.55 + uLevels.x * 0.9;
+
+  // Radial spectrum: 64 bars mirrored left/right.
+  float ang = atan(uv.y, uv.x);
+  float a = abs(ang) / 3.14159265;               // 0..1, mirrored
+  float cell = a * 64.0;
+  float idx = floor(cell);
+  float within = fract(cell);
+  float b = texture(uBands, vec2((idx + 0.5) / 64.0, 0.5)).r;
+
+  float rad = length(uv);
+  float baseR = 0.20 + uLevels.x * 0.045;
+  float d = rad - baseR;
+  float barLen = 0.012 + b * 0.30;
+  float inGap = smoothstep(0.10, 0.22, within) * smoothstep(0.90, 0.78, within);
+  float bar = inGap * smoothstep(-0.002, 0.003, d) * smoothstep(barLen + 0.003, barLen - 0.003, d);
+  vec3 barCol = palette(a * 0.9 + t * 2.0 + b * 0.3);
+  col = mix(col, barCol * (0.8 + b), bar);
+  col += barCol * inGap * exp(-abs(d - barLen * 0.5) * 18.0) * b * 0.25;   // soft glow
+
+  // Ring on the bass.
+  col += palette(t * 3.0 + 0.5) * exp(-abs(d) * 55.0) * (0.25 + uLevels.x * 0.9);
+
+  // Vignette.
+  col *= 1.0 - smoothstep(0.55, 1.15, rad);
+
+  outColor = vec4(pow(col, vec3(0.92)), 1.0);
+}`;
+
+function compile(gl, type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    throw new Error("Shader compile failed: " + gl.getShaderInfoLog(s));
+  }
+  return s;
+}
+
+let gl, prog, vao, buf, tex, canvasRef, loc = {};
+const texData = new Uint8Array(64);
+
+function init(canvas) {
+  canvasRef = canvas;
+  gl = canvas.getContext("webgl2", { antialias: false, alpha: false });
+  if (!gl) throw new Error("WebGL2 not available");
+
+  prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
+  gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, FRAG));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    throw new Error("Program link failed: " + gl.getProgramInfoLog(prog));
+  }
+  gl.useProgram(prog);
+
+  vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW); // one big triangle
+  const aPos = gl.getAttribLocation(prog, "aPos");
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 64, 1, 0, gl.RED, gl.UNSIGNED_BYTE, texData);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  for (const n of ["uRes", "uTime", "uLevels", "uBands"]) loc[n] = gl.getUniformLocation(prog, n);
+  gl.uniform1i(loc.uBands, 0);
+}
+
+function frame(audio, time) {
+  const w = canvasRef.clientWidth * Math.min(window.devicePixelRatio || 1, 2);
+  const h = canvasRef.clientHeight * Math.min(window.devicePixelRatio || 1, 2);
+  if (canvasRef.width !== w || canvasRef.height !== h) {
+    canvasRef.width = w;
+    canvasRef.height = h;
+  }
+  gl.viewport(0, 0, w, h);
+
+  for (let i = 0; i < 64; i++) texData[i] = Math.max(0, Math.min(255, audio.bands[i] * 255));
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 1, gl.RED, gl.UNSIGNED_BYTE, texData);
+
+  gl.uniform2f(loc.uRes, w, h);
+  gl.uniform1f(loc.uTime, time);
+  gl.uniform3f(loc.uLevels, audio.bass, audio.mid, audio.treble);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+function dispose() {
+  if (!gl) return;
+  gl.deleteTexture(tex);
+  gl.deleteBuffer(buf);
+  gl.deleteVertexArray(vao);
+  gl.deleteProgram(prog);
+  gl = null;
+}
+
+return { init, frame, dispose };
+})();
+
+const NB = 64;
+const audio = { bands: new Float32Array(NB), bass: 0, mid: 0, treble: 0 };
+const msg = document.getElementById("msg");
+
+// ---- Audio analysis (test harness; the real app feeds bands from Swift via IdleViz.setBands) ----
+let ctx, analyser, freq, source = "none";
+let edges;   // FFT bin edges for 64 log-spaced bands
+
+function setupAnalyser() {
+  analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.75;
+  freq = new Uint8Array(analyser.frequencyBinCount);
+  const binHz = ctx.sampleRate / analyser.fftSize, lo = 40, hi = 16000;
+  edges = [];
+  for (let i = 0; i <= NB; i++) edges.push(Math.round(lo * Math.pow(hi / lo, i / NB) / binHz));
+  for (let i = 1; i <= NB; i++) if (edges[i] <= edges[i - 1]) edges[i] = edges[i - 1] + 1;
+}
+
+function readBands() {
+  analyser.getByteFrequencyData(freq);
+  for (let i = 0; i < NB; i++) {
+    let m = 0;
+    for (let k = edges[i]; k < edges[i + 1]; k++) m = Math.max(m, freq[k]);
+    let v = (m / 255 - 0.38) / 0.62;                       // noise floor -> 0
+    v = Math.max(0, Math.min(1, v)) * (0.85 + 0.6 * i / NB); // treble tilt
+    setBand(i, v);
+  }
+}
+
+function setBand(i, v) {
+  const cur = audio.bands[i];
+  audio.bands[i] = v > cur ? v : cur * 0.88 + v * 0.12;   // fast attack, slow release
+}
+
+function updateLevels() {
+  const avg = (a, b) => { let s = 0; for (let i = a; i < b; i++) s += audio.bands[i]; return s / (b - a); };
+  const target = [avg(0, 8), avg(8, 30), avg(30, 64)];
+  const keys = ["bass", "mid", "treble"];
+  keys.forEach((k, j) => { audio[k] = target[j] > audio[k] ? target[j] : audio[k] * 0.9 + target[j] * 0.1; });
+}
+
+// ---- Sources ----
+async function startMic() {
+  ctx ??= new AudioContext();
+  await ctx.resume();
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  setupAnalyser();
+  ctx.createMediaStreamSource(stream).connect(analyser);
+  source = "mic"; msg.textContent = "Listening to microphone";
+}
+
+function startSynth() {
+  ctx ??= new AudioContext();
+  ctx.resume();
+  setupAnalyser();
+  const master = ctx.createGain(); master.gain.value = 0.35;
+  master.connect(analyser); analyser.connect(ctx.destination);
+  const bpm = 118, beat = 60 / bpm;
+  const chords = [[220, 261.6, 329.6], [196, 246.9, 293.7], [174.6, 220, 261.6], [196, 246.9, 329.6]];
+  let step = 0, next = ctx.currentTime + 0.05;
+  const noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+  noiseBuf.getChannelData(0).forEach((_, i, a) => a[i] = Math.random() * 2 - 1);
+
+  function schedule() {
+    while (next < ctx.currentTime + 0.3) {
+      const t = next;
+      if (step % 2 === 0) {                                  // kick
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+        g.gain.setValueAtTime(1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+        o.connect(g).connect(master); o.start(t); o.stop(t + 0.3);
+      }
+      if (step % 4 === 2) {                                  // snare
+        const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+        n.buffer = noiseBuf; f.type = "bandpass"; f.frequency.value = 1800;
+        g.gain.setValueAtTime(0.7, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.2);
+      }
+      {                                                      // hat
+        const n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+        n.buffer = noiseBuf; f.type = "highpass"; f.frequency.value = 7000;
+        g.gain.setValueAtTime(step % 2 ? 0.25 : 0.12, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+        n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + 0.06);
+      }
+      if (step % 16 === 0) {                                 // pad chord
+        chords[(step / 16) % chords.length].forEach(fq => {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = "sawtooth"; o.frequency.value = fq;
+          g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.09, t + 0.3);
+          g.gain.linearRampToValueAtTime(0.0001, t + beat * 8);
+          o.connect(g).connect(master); o.start(t); o.stop(t + beat * 8 + 0.1);
+        });
+      }
+      if (step % 8 === 3 || step % 8 === 6) {                // bass note
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = "square"; o.frequency.value = [55, 49, 43.65, 49][(Math.floor(step / 16)) % 4];
+        g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+        o.connect(g).connect(master); o.start(t); o.stop(t + 0.3);
+      }
+      next += beat / 2; step++;
+    }
+  }
+  setInterval(schedule, 50); schedule();
+  source = "synth"; msg.textContent = "Playing demo beat";
+}
+
+// Hook for the native app: IdleViz.setBands(Float32Array/Array of 64 values in 0..1)
+window.IdleViz = {
+  setBands(arr) { source = "native"; for (let i = 0; i < NB; i++) setBand(i, arr[i] || 0); }
+};
+
+// ---- Main loop ----
+plugin.init(document.getElementById("viz"));
+const t0 = performance.now();
+function loop() {
+  if (source === "mic" || source === "synth") readBands();
+  else if (source === "none") for (let i = 0; i < NB; i++) setBand(i, 0);
+  updateLevels();
+  plugin.frame(audio, (performance.now() - t0) / 1000);
+  requestAnimationFrame(loop);
+}
+loop();
+
+// ---- UI ----
+const params = new URLSearchParams(location.search);
+document.getElementById("btnSynth").onclick = startSynth;
+document.getElementById("btnMic").onclick = () => startMic().catch(e => msg.textContent = "Mic unavailable: " + e.message);
+document.getElementById("btnHide").onclick = () => document.getElementById("ui").classList.add("hidden");
+if (params.get("autostart") === "synth") startSynth();
+window.__ready = true;
+</script>
+</body>
+</html>
