@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/Xauno/Spotify-Music-Visualizer/actions/workflows/ci.yml/badge.svg)](https://github.com/Xauno/Spotify-Music-Visualizer/actions/workflows/ci.yml)
 ![Platform: macOS 14.2+](https://img.shields.io/badge/platform-macOS%2014.2%2B-lightgrey)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 ![Status: planning](https://img.shields.io/badge/status-planning-orange)
 
 A macOS menu-bar app that turns your Mac into a music display. When the Mac goes idle, or when you press a hotkey, it opens a fullscreen [Butterchurn](https://github.com/jberg/butterchurn) visualizer that reacts to Spotify's audio, with a now-playing overlay styled after the Spotify TV app. Any mouse, key or trackpad input closes it.
@@ -99,6 +100,7 @@ CI runs all of this on every pull request.
 ```
 .
 ├─ project.md              Design and build order
+├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
 ├─ aurora.js               Example visualizer plugin
 ├─ aurora-demo.html        Test page that feeds a plugin audio from a file or microphone
@@ -113,7 +115,7 @@ CI runs all of this on every pull request.
 
 ## License
 
-No license has been chosen yet, so all rights are reserved by default.
+[MIT](LICENSE). Milkdrop presets and plugins that you import yourself keep their own licenses.
 
 ## Acknowledgments
 
