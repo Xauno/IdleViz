@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>IdleViz audio spike</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+      canvas {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+      }
+      #hud {
+        position: fixed;
+        left: 12px;
+        bottom: 12px;
+        font:
+          12px/1.4 ui-monospace,
+          monospace;
+        color: #fff;
+        background: rgb(0 0 0 / 50%);
+        padding: 6px 8px;
+        border-radius: 6px;
+        white-space: pre;
+      }
+      #meter {
+        position: fixed;
+        left: 12px;
+        bottom: 90px;
+        height: 10px;
+        width: 0;
+        background: #1ed760;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="hud">waiting for audio…</div>
+    <div id="meter"></div>
+    <script src="butterchurn.min.js"></script>
+    <script src="spike-preset.js"></script>
+    <script src="spike.js"></script>
+  </body>
+</html>

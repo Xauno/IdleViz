@@ -4,3 +4,5 @@ package-lock.json
 aurora-demo.html
 .build/
 *.md
+IdleViz/web/butterchurn.min.js
+IdleViz/web/spike-preset.js
