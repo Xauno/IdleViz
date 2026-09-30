@@ -89,7 +89,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
   3. Only while a required permission is missing: one error row per missing permission, each opening its System Settings page (see "When a permission is missing").
 - There is no Quit item in the menu or in settings. The red close button closes the settings window, and ⌘Q (while the window is focused) quits the app.
 - **Settings window** (separate native window, a normal `NSWindow` with SwiftUI content that follows the macOS light/dark appearance automatically, with no setting; the app switches to `.regular` activation policy while it's open so it can take focus, then back to accessory on close). It is small, portrait and fixed-size (about 340 × 560 pt): no `.resizable` in the style mask, `collectionBehavior = [.fullScreenNone]`, zoom button disabled. It is one scrolling page (no sidebar or tabs) with three sections, in this order:
-  - **General:** idle timeout (5/10/15/30 min, Off), keep screen awake for (30 min, 1 hour, 2 hours, 4 hours; default 1 hour), **Different times on battery** switch (off by default; when on, it reveals "On battery: start after idle" and "On battery: keep screen awake", with the same choices, starting as copies of the values above), open hotkey recorder (`KeyboardShortcuts.Recorder`), an "Open now" button, launch at login.
+  - **General:** idle timeout (5/10/15/30 min, Off), keep screen awake for (30 min, 1 hour, 2 hours, 4 hours; default 1 hour), **Different times on battery** switch (only on Macs with a battery; off by default; when on, it reveals "On battery: start after idle" and "On battery: keep screen awake", with the same choices, starting as copies of the values above), open hotkey recorder (`KeyboardShortcuts.Recorder`), an "Open now" button, launch at login.
   - **Visualizer:** Show Spotify overlay toggle, brightness slider (50–100%), audio delay slider (0–2.5 s, for the current output device) with a **Detect delay** button, mode (Single or Shuffle). Single: a picker for the one visualizer to show. Shuffle: shuffle-from filter (all/bundled/custom/favorites), seconds per preset, blend time. Then favorites and blocklist management.
   - **Presets:** plugin trust warning, Import Presets…, Open Presets Folder, Reload Presets, and the list of presets that failed to load.
 - Settings in `UserDefaults`. The window writes them and the helper applies changes live.
@@ -125,7 +125,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 - Settings `useBatteryTimes` (default off), `idleTimeoutBattery` and `keepAwakeLimitBattery`. While `useBatteryTimes` is on and the Mac is on battery, those two replace `idleTimeout` and `keepAwakeLimit`.
 - Read the power source with `IOPSGetProvidingPowerSourceType(nil)` and watch for changes with `IOPSNotificationCreateRunLoopSource`. No polling.
 - On a power-source change: reschedule the next idle check with the new timeout. If the window is open, apply the new limit, still counted from when it opened (close right away if it's already past).
-- On a Mac with no battery, the battery values never take effect.
+- On a Mac with no battery (Mac mini, iMac, Mac Studio, Mac Pro), hide the **Different times on battery** switch and its two rows entirely. Detect this by checking `IOPSCopyPowerSourcesInfo` for an internal battery (`kIOPSInternalBatteryType`).
 
 ### Window
 - One borderless `NSWindow` on `NSScreen.screens.first` (the menu-bar display). Create it via a function that takes an `NSScreen`, so multi-display is easy later.

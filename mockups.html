@@ -624,9 +624,9 @@
               <td>General</td>
               <td>
                 Idle timeout (5, 10, 15, 30 min, Off), keep screen awake for (30 min, 1 hour, 2 hours, 4 hours; default
-                1 hour), Different times on battery (off by default; when on, two more rows: idle timeout and keep
-                screen awake on battery), hotkey recorder (<code>KeyboardShortcuts.Recorder</code>), Open now, Launch at
-                login
+                1 hour), Different times on battery (only on Macs with a battery; off by default; when on, two more
+                rows: idle timeout and keep screen awake on battery), hotkey recorder
+                (<code>KeyboardShortcuts.Recorder</code>), Open now, Launch at login
               </td>
             </tr>
             <tr>
@@ -677,7 +677,8 @@
             <li>The failed-to-load section is hidden when nothing has failed.</li>
             <li>
               Different times on battery: the two "On battery" rows are hidden while the switch is off. The first time
-              it's turned on, they start with the same values as the rows above.
+              it's turned on, they start with the same values as the rows above. On a Mac with no battery (Mac mini,
+              iMac, Mac Studio, Mac Pro), the switch and both rows are hidden entirely.
             </li>
             <li>
               Audio delay is saved separately for each output device. The hint under the label names the current device,
