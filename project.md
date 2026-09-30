@@ -6,7 +6,7 @@ A menu-bar app that opens a fullscreen music visualizer with a Spotify now-playi
 
 - **Opens** after N idle minutes, or from a global hotkey / terminal command, but only if Spotify is running and has a current track (playing or paused). Otherwise it doesn't open, and a manual trigger flashes the menu-bar icon.
 - **Closes** on any input (mouse/trackpad movement, click, scroll, key, gesture), as sensitive as a macOS screensaver. It also fades out if Spotify quits or the track disappears.
-- **Overlay** is Spotify-only and looks like the Spotify TV app's now-playing screen, with the visualizer as the background. Font: Figtree.
+- **Overlay** is Spotify-only and looks like the Spotify TV app's now-playing screen, with the visualizer as the background. It can be turned off in settings, leaving only the visualizer. Font: Figtree.
 - **Visualizer** reacts to Spotify's audio and runs at 70% brightness (adjustable). It is built in: Butterchurn (WebGL Milkdrop) with a bundled preset library plus your own presets imported from a folder.
 - **Main display only** for now.
 
@@ -48,7 +48,7 @@ Page layers (bottom → top): Butterchurn canvas → dim layer → overlay
 - There is no Quit item in the menu or in settings. The red close button closes the settings window, and ⌘Q (while the window is focused) quits the app.
 - **Settings window** (separate native window, a normal `NSWindow` with SwiftUI content; the app switches to `.regular` activation policy while it's open so it can take focus, then back to accessory on close). It is small, portrait and fixed-size (about 340 × 560 pt): no `.resizable` in the style mask, `collectionBehavior = [.fullScreenNone]`, zoom button disabled. It is one scrolling page (no sidebar or tabs) with three sections, in this order:
   - **General:** idle timeout (5/10/15/30 min, Off), open hotkey recorder (`KeyboardShortcuts.Recorder`), an "Open now" button, launch at login.
-  - **Visualizer:** brightness slider (50–100%), shuffle on/off, seconds per preset, blend time, source filter (all/bundled/custom), favorites and blocklist management.
+  - **Visualizer:** Show Spotify overlay toggle, brightness slider (50–100%), mode (Single or Shuffle). Single: a picker for the one visualizer to show. Shuffle: shuffle-from filter (all/bundled/custom/favorites), seconds per preset, blend time. Then favorites and blocklist management.
   - **Presets:** plugin trust warning, Import Presets…, Open Presets Folder, Reload Presets, and the list of presets that failed to load.
 - Settings in `UserDefaults`. The window writes them and the helper applies changes live.
 
@@ -167,7 +167,7 @@ The only visualizer is **Butterchurn** (WebGL port of Milkdrop), chosen because 
   - Each preset is validated (parse, compile its shaders) in a `try/catch` when first loaded. Bad ones are skipped, added to the blocklist, and reported in the settings window ("3 presets failed to load").
   - Presets are tagged by source (bundled / custom) so the settings can shuffle all, bundled only, or custom only.
   - Check each pack's license before sharing the app. User-imported presets stay on the user's machine and are never bundled.
-- **Preset control** (in the settings window, since any input closes the visualizer): shuffle on/off, seconds per preset, blend time, source filter (all/bundled/custom), favorites, and a blocklist for presets you dislike.
+- **Preset control** (in the settings window, since any input closes the visualizer): mode (single visualizer or shuffle), seconds per preset, blend time, shuffle-from filter (all/bundled/custom/favorites), favorites, and a blocklist for presets you dislike.
 - **Custom JS plugins:** users can drop `.js` files into the presets folder (subfolders allowed) and they appear in the preset list next to Butterchurn presets, tagged "custom".
   - Each file is an ES module with named exports `init(canvas)`, `frame(audio, time)` and `dispose()`, plus an optional `meta = { name }`. The same interface is used for plugins bundled in `web/visuals/*.js` (see `aurora.js` for an example). The full author guide is in `docs/custom-visualizer.md`.
   - `audio` is a plain object: `{ bands: Float32Array(64), bass, mid, treble, waveform: Float32Array(1024), rms }`, built from the Spotify-only frame (see the audio guarantee above). Bands are 0..1 and log-spaced (about 40 Hz to 16 kHz), already noise-floored and smoothed (fast attack, slow release); `bass`/`mid`/`treble` average bands 0-7, 8-29 and 30-63. The arrays are reused every frame. It is the only audio data a plugin ever sees.

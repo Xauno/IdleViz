@@ -417,6 +417,10 @@
               <div class="h">Visualizer</div>
               <div class="card">
                 <div class="r">
+                  <div>Show Spotify overlay</div>
+                  <div class="sw on"></div>
+                </div>
+                <div class="r">
                   <div>Brightness</div>
                   <div style="display: flex; gap: 8px; align-items: center">
                     <div class="track"></div>
@@ -424,8 +428,12 @@
                   </div>
                 </div>
                 <div class="r">
-                  <div>Shuffle</div>
-                  <div class="sw on"></div>
+                  <div>Mode</div>
+                  <span class="ctl">Shuffle ▾</span>
+                </div>
+                <div class="r">
+                  <div>Shuffle from</div>
+                  <span class="ctl">All ▾</span>
                 </div>
                 <div class="r">
                   <div>Seconds per preset</div>
@@ -434,10 +442,6 @@
                 <div class="r">
                   <div>Blend time</div>
                   <span class="ctl">2.7 s ▾</span>
-                </div>
-                <div class="r">
-                  <div>Source</div>
-                  <span class="ctl">All ▾</span>
                 </div>
                 <div class="r">
                   <div>Favorites</div>
@@ -522,8 +526,8 @@
             <tr>
               <td>Visualizer</td>
               <td>
-                Brightness (50 to 100%), Shuffle, Seconds per preset, Blend time, Source (All, Bundled, Custom),
-                Favorites, Blocklist
+                Show Spotify overlay, Brightness (50 to 100%), Mode (Single or Shuffle), then the rows for that mode
+                (see below), Favorites, Blocklist
               </td>
             </tr>
             <tr>
@@ -549,6 +553,16 @@
             <li>
               Settings are stored in <code>UserDefaults</code>. Controls write them and the helper applies changes live
               (for example, brightness updates the open window immediately).
+            </li>
+            <li>
+              Mode is Single or Shuffle. The mockup shows Shuffle, which has three rows: Shuffle from (All, Bundled,
+              Custom, Favorites), Seconds per preset and Blend time. In Single, those three rows are replaced by one
+              row, Visualizer, a picker listing every preset and plugin (bundled and custom), and the current preset
+              stays on screen until changed.
+            </li>
+            <li>
+              Show Spotify overlay off means the page shows only the visualizer and dim layer: no now-playing layout in
+              any state, not even the paused progress bar. Brightness, mode and the rest behave the same.
             </li>
             <li>Favorites and Blocklist open a sheet listing presets.</li>
             <li>The failed-to-load section is hidden when nothing has failed.</li>
