@@ -6,6 +6,7 @@ import os
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let log = Logger(subsystem: "com.xauno.IdleViz", category: "app")
     private let windowController = WindowController()
+    let menuBarIcon = MenuBarIcon()
     private lazy var settings = SettingsWindowController(openNow: { [weak self] in self?.open(from: .settings) })
     private var triggers: Triggers?
     private var spotify: SpotifyInfo?
@@ -40,7 +41,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !windowController.dismissEnabled { windowController.close() }
             return
         }
-        guard let screen = NSScreen.screens.first else { return }
-        windowController.open(on: screen, source: source)
+        guard let spotify else { return }
+        Task {
+            if let refusal = await spotify.openRefusal() {
+                log.notice("Not opening via \(source.rawValue, privacy: .public): \(refusal.rawValue, privacy: .public)")
+                menuBarIcon.flash()
+                return
+            }
+            // Another trigger may have opened it while Spotify was being asked.
+            guard !windowController.isOpen, let screen = NSScreen.screens.first else { return }
+            windowController.open(on: screen, source: source)
+        }
     }
 }

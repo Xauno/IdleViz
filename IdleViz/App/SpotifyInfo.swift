@@ -43,6 +43,12 @@ final class SpotifyInfo {
         }
     }
 
+    /// Why the visualizer may not open right now, or nil if it may.
+    func openRefusal() async -> OpenRefusal? {
+        let snapshot = await tracker.knownSnapshot()
+        return OpenRules.refusal(spotifyRunning: tracker.isRunning, snapshot: snapshot)
+    }
+
     func stopResync() {
         resync?.cancel()
         resync = nil

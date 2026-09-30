@@ -6,7 +6,7 @@ A menu-bar app that opens a fullscreen music visualizer with a Spotify now-playi
 
 - **Opens** after N idle minutes, or from a global hotkey / terminal command, but only if Spotify is running and has a current track (playing or paused). Otherwise it doesn't open, and a manual trigger flashes the menu-bar icon.
 - **Doesn't open on idle** while the screen is locked, or while another app is keeping the display awake (a video, a call, a presentation). Manual triggers skip that second check, since you're clearly there.
-- **Closes** on any input (mouse/trackpad movement, click, scroll, key, gesture), as sensitive as a macOS screensaver. It also fades out if Spotify quits or the track disappears.
+- **Closes** on any input (mouse/trackpad movement, click, scroll, key, gesture), as sensitive as a macOS screensaver. If Spotify quits or the track disappears while it's open, the visualizer stays and only the overlay fades out; it comes back when a track does.
 - **Stays awake, up to a limit.** While it's showing, the display doesn't sleep. After the keep-awake limit (default 1 hour, adjustable in settings) it fades out and the Mac goes back to its normal sleep, screensaver and lock schedule.
 - **Works on battery too.** Optionally, the idle timeout and keep-awake limit can be set differently for when the Mac is on battery.
 - **Audio delay.** With Bluetooth or AirPlay speakers the sound arrives late, so the visuals can be delayed to match. Set it by hand, or press **Detect delay** and the app measures it with the microphone for a few seconds. It's saved for each speaker or pair of headphones.
@@ -103,7 +103,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
   - After the keep-awake limit closed the visualizer, don't reopen until there has been new input. Otherwise it would reopen at once, since the Mac is still idle.
 - **Hotkey:** `KeyboardShortcuts` Swift package.
 - **Terminal:** URL scheme, so `open idleviz://open` works.
-- **Open rules check:** Spotify is running (see below) and AppleScript returns a current track. On failure from a manual trigger, flash the menu-bar icon (alt icon 2–3 times over ~1 s).
+- **Open rules check:** Spotify is running (see below) and has a current track. The check uses the track state the notifications keep up to date, so opening is instant. Only if nothing is known yet (no query has answered since Spotify launched) does it run one AppleScript query and wait for it. On failure from a manual trigger, flash the menu-bar icon (`waveform` ↔ `waveform.slash`, 3 times over ~1 s).
 
 ### Dismiss
 - Make the window key (subclass `NSWindow`, override `canBecomeKey` → `true`) so a **local** `NSEvent` monitor receives keys without needing Accessibility/Input Monitoring permission. Add a global monitor for mouse events as a backstop.
@@ -152,7 +152,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 - Track running state with `NSWorkspace` `didLaunchApplicationNotification` / `didTerminateApplicationNotification` (bundle ID `com.spotify.client`), seeded once from `runningApplications`. No polling.
 
 **Getting track info without constant polling:**
-- Spotify posts a distributed notification, `com.spotify.client.PlaybackStateChanged`, on play/pause/track change. Observe it with `DistributedNotificationCenter` and use it as the trigger for updates. Checked in step 3: it carries name, artist, album, album artist, duration, playback position, player state and track ID, but not the artwork URL. When playback switches to a new context (playing an album or playlist by URL), Spotify first posts `Player State = Stopped` with no track ID, then `Playing`. Skipping with next/previous doesn't. So "no track" can last a fraction of a second during a normal switch; anything that closes the window on it should wait a moment first.
+- Spotify posts a distributed notification, `com.spotify.client.PlaybackStateChanged`, on play/pause/track change. Observe it with `DistributedNotificationCenter` and use it as the trigger for updates. Checked in step 3: it carries name, artist, album, album artist, duration, playback position, player state and track ID, but not the artwork URL. When playback switches to a new context (playing an album or playlist by URL), Spotify first posts `Player State = Stopped` with no track ID, then `Playing`. Skipping with next/previous doesn't. So "no track" can last a fraction of a second during a normal switch; the overlay should wait a moment before hiding on it.
 - On a `Stopped` notification, don't query: Spotify may be quitting, and an Apple Event then could launch it again.
 - On each notification (and once when the window opens), run one AppleScript query for the full state, including artwork URL:
 
