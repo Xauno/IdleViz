@@ -313,10 +313,13 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
 
 ### Performance
 - Cap rendering at 60 fps, including on 120 Hz ProMotion displays (skip every other `requestAnimationFrame`). Skip a frame only when it comes less than ~12 ms after the last one. A strict 16.7 ms threshold drops about a third of the frames on a 60 Hz display because of timestamp jitter (step 2 spike).
-- Render Butterchurn below full device resolution on large displays (for example at most ~2560 px wide) and let the GPU scale it up. Tune by eye and by power use.
+- Render Butterchurn below full device resolution on large displays (at most 2560 px wide for now) and let the GPU scale it up. Tune by eye and by power use.
+- The page only renders while the window is open. WebKit stops `requestAnimationFrame` while the web view is hidden, so a closed window costs nothing (checked in step 7a: the frame count stays still while closed and runs at 60 per second while open).
+- Butterchurn is created when the page loads, so its shaders are compiled before the window first opens.
 
 ### Presets
-- **Bundled:** `butterchurn-presets` (hundreds), shipped in the app.
+- **Bundled:** `butterchurn-presets` 2.4.7, shipped in the app: the base, Extra, Extra2 and MD1 packs, 395 presets once names that appear in more than one pack are dropped. Butterchurn and the packs are copied unchanged from npm into `web/vendor/` and committed, so building the app needs no Node step. A test checks their hashes.
+- **Until the preset controls exist (step 7c):** shuffle all presets, 30 s each, with a 2.7 s blend. Every preset is shown once before any repeats.
 - **Custom (folder import):** any preset you add yourself, loaded alongside the bundled ones.
   - Folder: `~/Library/Application Support/IdleViz/Presets/` (created on first launch; subfolders allowed, so a downloaded pack can be dropped in as-is).
   - Accepted files:
@@ -333,7 +336,7 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
   - Check each pack's license before sharing the app. User-imported presets stay on the user's machine and are never bundled.
 - **Preset control** (in the settings window, since any input closes the visualizer): mode (single visualizer or shuffle), seconds per preset, blend time, shuffle-from filter (all/bundled/custom/favorites), favorites, and a blocklist for presets you dislike.
 - **Custom JS plugins:** users can drop `.js` files into the presets folder (subfolders allowed) and they appear in the preset list next to Butterchurn presets, tagged "custom".
-  - Each file is an ES module with named exports `init(canvas)`, `frame(audio, time)` and `dispose()`, plus an optional `meta = { name }`. The same interface is used for plugins bundled in `web/visuals/*.js` (see `aurora.js` for an example; it moves to `web/visuals/` in step 7a). The full author guide is in `docs/custom-visualizer.md`.
+  - Each file is an ES module with named exports `init(canvas)`, `frame(audio, time)` and `dispose()`, plus an optional `meta = { name }`. The same interface is used for plugins bundled in `web/visuals/*.js` (see `web/visuals/aurora.js` for an example). The full author guide is in `docs/custom-visualizer.md`.
   - `audio` is a plain object: `{ bands: Float32Array(64), bass, mid, treble, waveform: Float32Array(1024), rms }`, built from the Spotify-only frame (see the audio guarantee above). Bands are 0..1 and log-spaced (about 40 Hz to 16 kHz), already noise-floored and smoothed (fast attack, slow release); `bass`/`mid`/`treble` average bands 0-7, 8-29 and 30-63. The arrays are reused every frame. It is the only audio data a plugin ever sees.
   - Plugins draw only into the canvas they are given. Each `init` gets a fresh canvas, so a plugin picks its own context type (WebGL2 or 2D).
   - **Isolation: each plugin runs in its own sandboxed frame.** Bundled plugins in `web/visuals/` use the same frame, so there's only one way plugins are run.
@@ -388,7 +391,11 @@ IdleViz/
 │  ├─ overlay.css / overlay.js   # nowPlaying(), progress interpolation, states
 │  ├─ overlay-state.js           # DOM-free overlay logic (tested with Vitest)
 │  ├─ fonts/                     # Figtree + OFL license
-│  └─ visuals/                   # Butterchurn wrapper, preset manager, bundled plugin modules (aurora.js)
+│  ├─ visualizer.js              # Butterchurn wrapper: canvas, render loop, preset changes, context-loss rebuild
+│  ├─ visualizer-state.js        # DOM-free visualizer logic (preset list, shuffle, timing, render size; tested with Vitest)
+│  ├─ fake-audio.js              # test beat, used until the Spotify tap arrives in step 7b
+│  ├─ vendor/                    # butterchurn.min.js + preset packs from npm, unchanged, with licenses and checksums
+│  └─ visuals/                   # bundled plugin modules only (aurora.js); the plugin contract test loads every file here
 └─ design/reference/             # Spotify TV app reference photo (gitignored, local only)
 ```
 
@@ -402,8 +409,8 @@ Each step is one pull request. At the end of each step, update the README (Roadm
 4. **Open rules + icon flash** wired to the hotkey.
 5. **Overlay page** matched to the reference screenshots, served from `idleviz-app://` with the CSP, over a placeholder animated gradient (no audio needed yet), covering every state in the table plus the missing-artwork placeholder.
 6. **Idle trigger**, with the skip rules (locked screen, another app keeping the display awake).
-7. **Visualizer**, split into four PRs:
-   - **7a.** Butterchurn in the page with bundled presets and fake audio. Move `aurora.js` to `web/visuals/`.
+7. **Visualizer**, split into five PRs:
+   - **7a.** Butterchurn in the page with bundled presets and fake audio. Move `aurora.js` to `web/visuals/`. Done.
    - **7b.** Real audio: process tap (with process-list changes), analysis in Swift, automatic gain, silence rules, web view recovery.
    - **7c.** Preset controls (mode, shuffle, timing, blend, favorites, blocklist).
    - **7d.** Custom preset folder: `.json` loading, folder watching, `.js` plugins in sandboxed frames (with the audio, CSP and status-check rules), Import/Open/Reload controls in settings, then `.milk` conversion with caching and failure handling.

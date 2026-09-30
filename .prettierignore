@@ -4,3 +4,4 @@ package-lock.json
 aurora-demo.html
 .build/
 *.md
+IdleViz/web/vendor/*.min.js

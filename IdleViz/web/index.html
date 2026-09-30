@@ -4,11 +4,18 @@
     <meta charset="utf-8" />
     <title>IdleViz</title>
     <link rel="stylesheet" href="overlay.css" />
+    <!-- Deferred scripts and modules run in document order, so the libraries are ready for visualizer.js. -->
+    <script defer src="vendor/butterchurn.min.js"></script>
+    <script defer src="vendor/butterchurnPresets.min.js"></script>
+    <script defer src="vendor/butterchurnPresetsExtra.min.js"></script>
+    <script defer src="vendor/butterchurnPresetsExtra2.min.js"></script>
+    <script defer src="vendor/butterchurnPresetsMD1.min.js"></script>
+    <script type="module" src="visualizer.js"></script>
     <script type="module" src="overlay.js"></script>
   </head>
   <body>
     <!-- Bottom to top: visualizer, dim layer, overlay. -->
-    <div id="viz"><div id="placeholder"></div></div>
+    <div id="viz"></div>
     <div id="dim"></div>
     <div id="stage" class="hidden">
       <div id="scrim"></div>

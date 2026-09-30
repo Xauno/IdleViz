@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,15 +6,10 @@ import { createAudio, createFakeCanvas } from "./helpers/fake-gl.js";
 
 // Every visualizer plugin must satisfy the contract in docs/custom-visualizer.md.
 const root = resolve(import.meta.dirname, "..");
-const visualsDir = join(root, "web", "visuals");
-const pluginFiles = [
-  join(root, "aurora.js"),
-  ...(existsSync(visualsDir)
-    ? readdirSync(visualsDir)
-        .filter((f) => f.endsWith(".js"))
-        .map((f) => join(visualsDir, f))
-    : []),
-];
+const visualsDir = join(root, "IdleViz", "web", "visuals");
+const pluginFiles = readdirSync(visualsDir)
+  .filter((f) => f.endsWith(".js"))
+  .map((f) => join(visualsDir, f));
 
 // Things plugins must not use (see "What plugins can't do" in the guide).
 const FORBIDDEN = [
