@@ -126,7 +126,7 @@ export function dispose() {
 
 ## Testing
 
-1. Open `aurora-demo.html` in a browser. It is a test harness that can feed your plugin audio from a file or the microphone (the real app never uses the microphone) and shows the same `audio` object the app provides. Swap in your file to try it.
+1. Open `aurora-demo.html` in a browser. It is a test harness that can feed your plugin audio from a file or the microphone (in the real app, visuals never get microphone audio) and shows the same `audio` object the app provides. Swap in your file to try it.
 2. Test with **silence** (all zeros), a quiet track and a loud one.
 3. Test at both a small window and a large one (resize the window, and try a 4K display if you have one).
 4. Switch away and back, or reload the page, several times and watch the memory and GPU usage to make sure `dispose` really frees things.

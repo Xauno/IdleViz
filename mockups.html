@@ -197,6 +197,25 @@
         border-radius: 6px;
         padding: 2px 8px;
       }
+      .gerr {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 14px;
+        font-size: 13px;
+      }
+      .gerr:hover {
+        background: rgba(255, 255, 255, 0.22);
+      }
+      .gerr b {
+        color: #ffd60a;
+      }
+      .gerr small {
+        display: block;
+        font-size: 11px;
+        opacity: 0.75;
+      }
       .sep {
         height: 0.5px;
         background: rgba(255, 255, 255, 0.35);
@@ -376,24 +395,35 @@
             <i style="width: 200px; height: 200px; background: #4fb3c9; right: 40px; bottom: -100px"></i>
             <div class="menubar">
               <span>Wi-Fi</span><span>Battery</span
-              ><span style="background: rgba(255, 255, 255, 0.3); border-radius: 4px; padding: 0 6px">IdleViz</span
+              ><span style="background: rgba(255, 255, 255, 0.3); border-radius: 4px; padding: 0 6px; color: #ffd60a"
+                >IdleViz</span
               ><span>Tue 9:41</span>
             </div>
             <div class="glass">
               <div class="grow hl"><span>Settings…</span><small>⌘,</small></div>
               <div class="sep"></div>
               <div class="grow" style="opacity: 0.8"><span>Open visualizer</span><span class="kbdg">⌃⌥V</span></div>
+              <div class="gerr">
+                <b>⚠︎</b>
+                <div>Spotify control not allowed<small>Open System Settings ›</small></div>
+              </div>
             </div>
           </div>
         </div>
         <div>
           <h3>Contents</h3>
           <ul>
-            <li>Exactly two rows. No Quit item here or in settings.</li>
-            <li><strong>Settings…</strong> is the only clickable row. It opens the settings window.</li>
+            <li>Two rows, plus one error row per missing permission. No Quit item here or in settings.</li>
+            <li><strong>Settings…</strong> opens the settings window.</li>
             <li>
               <strong>Open visualizer</strong> is informational and dimmed. It shows the current hotkey, read from
               <code>KeyboardShortcuts</code> so it updates when the shortcut changes.
+            </li>
+            <li>
+              <strong>Error rows</strong> (shown here) appear below Open visualizer only while a required permission is
+              missing: "Spotify control not allowed" (Automation) or "Spotify audio blocked" (System Audio Recording).
+              Clicking one opens the matching System Settings privacy page. While any error row is showing, the menu-bar
+              icon is tinted yellow.
             </li>
           </ul>
           <h3>Build notes</h3>
@@ -413,9 +443,13 @@
               (<code>.regularMaterial</code>, or <code>NSVisualEffectView</code> with the popover material) before that,
               chosen with <code>#available(macOS 26, *)</code>. Nothing else in the popup changes. Test both.
             </li>
-            <li>Width about 260 pt. Height is just the two rows.</li>
+            <li>Width about 260 pt. Height fits the rows.</li>
             <li>
               The menu-bar icon still flashes (alt icon 2 to 3 times over about 1 s) when a manual open is refused.
+            </li>
+            <li>
+              Yellow icon: swap the template image for a non-template copy tinted <code>NSColor.systemYellow</code>, and
+              switch back once every permission is fixed. Re-check permissions each time the popup opens.
             </li>
           </ul>
         </div>
@@ -448,6 +482,18 @@
                   <span class="ctl">1 hour ▾</span>
                 </div>
                 <div class="r">
+                  <div>Different times on battery</div>
+                  <div class="sw on"></div>
+                </div>
+                <div class="r">
+                  <div>On battery: start after idle</div>
+                  <span class="ctl">5 min ▾</span>
+                </div>
+                <div class="r">
+                  <div>On battery: keep screen awake</div>
+                  <span class="ctl">30 min ▾</span>
+                </div>
+                <div class="r">
                   <div>Open hotkey</div>
                   <span class="kbd">⌃⌥V ✕</span>
                 </div>
@@ -473,6 +519,17 @@
                     <div class="track"></div>
                     <span style="font-size: 12px">70%</span>
                   </div>
+                </div>
+                <div class="r">
+                  <div>Audio delay<span class="d">For AirPods Pro</span></div>
+                  <div style="display: flex; gap: 8px; align-items: center">
+                    <div class="track"></div>
+                    <span style="font-size: 12px">180 ms</span>
+                  </div>
+                </div>
+                <div class="r">
+                  <div>Detect delay<span class="d">Listens with the mic for a few seconds</span></div>
+                  <span class="ctl">Detect</span>
                 </div>
                 <div class="r">
                   <div>Mode</div>
@@ -567,14 +624,17 @@
               <td>General</td>
               <td>
                 Idle timeout (5, 10, 15, 30 min, Off), keep screen awake for (30 min, 1 hour, 2 hours, 4 hours; default
-                1 hour), hotkey recorder (<code>KeyboardShortcuts.Recorder</code>), Open now, Launch at login
+                1 hour), Different times on battery (off by default; when on, two more rows: idle timeout and keep
+                screen awake on battery), hotkey recorder (<code>KeyboardShortcuts.Recorder</code>), Open now, Launch at
+                login
               </td>
             </tr>
             <tr>
               <td>Visualizer</td>
               <td>
-                Show Spotify overlay, Brightness (50 to 100%), Mode (Single or Shuffle), then the rows for that mode
-                (see below), Favorites, Blocklist
+                Show Spotify overlay, Brightness (50 to 100%), Audio delay (0 to 2.5 s, for the current speakers or
+                headphones), Detect delay, Mode (Single or Shuffle), then the rows for that mode (see below), Favorites,
+                Blocklist
               </td>
             </tr>
             <tr>
@@ -615,6 +675,20 @@
               Favorites and Blocklist open a sheet listing the presets on that list, where entries can be removed.
             </li>
             <li>The failed-to-load section is hidden when nothing has failed.</li>
+            <li>
+              Different times on battery: the two "On battery" rows are hidden while the switch is off. The first time
+              it's turned on, they start with the same values as the rows above.
+            </li>
+            <li>
+              Audio delay is saved separately for each output device. The hint under the label names the current device,
+              and the slider moves when you switch speakers or headphones.
+            </li>
+            <li>
+              Detect delay: press it while Spotify plays out loud. The button shows "Listening…" for about 5 s, then the
+              slider jumps to the result. If it can't hear the music clearly (too quiet, or headphones), the hint says
+              so and the value doesn't change. If microphone access is denied, the hint says so and links to System
+              Settings.
+            </li>
             <li>
               Dark mode: there is no setting. The window follows the macOS appearance, and native SwiftUI controls and
               system colors (<code>.primary</code>, <code>.secondary</code>, <code>Color(nsColor:)</code> semantic
