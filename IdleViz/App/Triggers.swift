@@ -5,7 +5,7 @@ extension KeyboardShortcuts.Name {
     static let openVisualizer = Self("openVisualizer", initial: .init(.v, modifiers: [.control, .option]))
 }
 
-/// Manual triggers. The idle trigger joins in step 6, the open rules in step 4.
+/// Manual triggers. The idle trigger joins in step 6.
 @MainActor
 final class Triggers {
     init(onTrigger: @escaping @MainActor (TriggerSource) -> Void) {

@@ -172,4 +172,68 @@ final class SpotifyTrackerTests: XCTestCase {
         await tracker.refresh()
         XCTAssertEqual(tracker.current?.content, .musicAd)
     }
+
+    func testKnownSnapshotQueriesOnlyWhenUnknown() async {
+        let runner = FakeRunner([reply("playing", "spotify:track:a"), reply("playing", "spotify:track:b")])
+        let tracker = SpotifyTracker(runner: runner, isRunning: true)
+        XCTAssertFalse(tracker.isKnown)
+        let first = await tracker.knownSnapshot()
+        XCTAssertEqual(first?.nowPlaying.spotifyURL, "spotify:track:a")
+        XCTAssertTrue(tracker.isKnown)
+        _ = await tracker.knownSnapshot()
+        XCTAssertEqual(runner.runs, 1)
+    }
+
+    func testKnownSnapshotTrustsAStop() async {
+        let runner = FakeRunner([reply("playing", "spotify:track:a")])
+        let tracker = SpotifyTracker(runner: runner, isRunning: true)
+        tracker.spotifyStopped()
+        let snapshot = await tracker.knownSnapshot()
+        XCTAssertNil(snapshot)
+        XCTAssertEqual(runner.runs, 0)
+    }
+
+    func testKnownSnapshotAsksAgainAfterAFailedQuery() async {
+        let runner = FakeRunner([nil, reply("playing", "spotify:track:a")])
+        let tracker = SpotifyTracker(runner: runner, isRunning: true)
+        let failed = await tracker.knownSnapshot()
+        XCTAssertNil(failed)
+        XCTAssertFalse(tracker.isKnown)
+        let answered = await tracker.knownSnapshot()
+        XCTAssertNotNil(answered)
+        XCTAssertEqual(runner.runs, 2)
+    }
+
+    func testKnownSnapshotWaitsForARunningQuery() async {
+        let runner = FakeRunner([reply("playing", "spotify:track:a"), reply("playing", "spotify:track:b")])
+        runner.hold()
+        let tracker = SpotifyTracker(runner: runner, isRunning: true)
+        let refresh = Task { await tracker.refresh() }
+        await waitUntil { runner.isWaiting }
+        let known = Task { await tracker.knownSnapshot() }
+        // Let it join the running query before that query answers.
+        try? await Task.sleep(for: .milliseconds(20))
+        runner.release()
+        let snapshot = await known.value
+        await refresh.value
+        XCTAssertNotNil(snapshot)
+        XCTAssertEqual(runner.runs, 2)
+    }
+
+    func testKnownSnapshotIsNilWhileNotRunning() async {
+        let runner = FakeRunner([reply("playing", "spotify:track:a")])
+        let tracker = SpotifyTracker(runner: runner, isRunning: false)
+        let snapshot = await tracker.knownSnapshot()
+        XCTAssertNil(snapshot)
+        XCTAssertEqual(runner.runs, 0)
+    }
+
+    func testRelaunchForgetsWhatWasKnown() async {
+        let runner = FakeRunner([reply("playing", "spotify:track:a")])
+        let tracker = SpotifyTracker(runner: runner, isRunning: true)
+        await tracker.refresh()
+        tracker.spotifyTerminated()
+        tracker.spotifyLaunched()
+        XCTAssertFalse(tracker.isKnown)
+    }
 }

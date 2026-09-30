@@ -27,6 +27,9 @@ public struct SpotifySnapshot: Sendable, Equatable {
 public final class SpotifyTracker {
     public private(set) var isRunning: Bool
     public private(set) var current: SpotifySnapshot?
+    /// Whether `current` comes from Spotify since it last launched: a query answered, or Spotify said it stopped.
+    /// Until then a nil `current` means "don't know yet" rather than "no track".
+    public private(set) var isKnown = false
     /// Called after every answered query, on stop and on quit, with the new snapshot (nil = no current track).
     public var onUpdate: ((SpotifySnapshot?) -> Void)?
 
@@ -34,6 +37,7 @@ public final class SpotifyTracker {
     private var adContext = AdContext()
     private var querying = false
     private var pending = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
 
     public init(runner: any SpotifyQueryRunning, isRunning: Bool) {
         self.runner = runner
@@ -42,10 +46,12 @@ public final class SpotifyTracker {
 
     public func spotifyLaunched() {
         isRunning = true
+        isKnown = false
     }
 
     public func spotifyTerminated() {
         isRunning = false
+        isKnown = false
         pending = false
         adContext = AdContext()
         publish(nil)
@@ -55,7 +61,24 @@ public final class SpotifyTracker {
     /// Spotify may be quitting, and an Apple Event now could launch it again.
     public func spotifyStopped() {
         pending = false
+        isKnown = true
         publish(nil)
+    }
+
+    /// The current snapshot for the open rules. Uses what the notifications already told us,
+    /// and only asks Spotify (waiting for the answer) if nothing is known yet.
+    public func knownSnapshot() async -> SpotifySnapshot? {
+        guard isRunning else { return nil }
+        if !isKnown {
+            if querying {
+                // Join the running query loop instead of starting a second one.
+                pending = true
+                await withCheckedContinuation { waiters.append($0) }
+            } else {
+                await refresh()
+            }
+        }
+        return isRunning ? current : nil
     }
 
     /// Queries Spotify for its full state. Does nothing while Spotify isn't running.
@@ -66,7 +89,12 @@ public final class SpotifyTracker {
             return
         }
         querying = true
-        defer { querying = false }
+        defer {
+            querying = false
+            let waiting = waiters
+            waiters = []
+            waiting.forEach { $0.resume() }
+        }
         repeat {
             pending = false
             let reply = await runner.run()
@@ -75,6 +103,7 @@ public final class SpotifyTracker {
             // A failed query (timeout, busy Spotify) says nothing about the track, so keep the last one.
             // Quitting and stopping are reported separately and still clear it.
             guard let reply else { continue }
+            isKnown = true
             publish(SpotifyQuery.parse(reply).map { nowPlaying in
                 SpotifySnapshot(nowPlaying: nowPlaying, content: adContext.content(for: nowPlaying.kind))
             })
