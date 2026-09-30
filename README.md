@@ -57,7 +57,7 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | ---- | --------------------------------------------------------------------------------- | ------- |
 | 0    | Repo tooling: CI, tests, PR workflow, plugin guide, Aurora example plugin         | Done    |
 | 1    | Open/close shell: Xcode project, menu-bar app, hotkey, fullscreen window, dismiss | Done    |
-| 2    | Audio spike: prove Spotify audio can drive Butterchurn (findings only)            | Planned |
+| 2    | Audio spike: prove Spotify audio can drive Butterchurn (findings only)            | Done    |
 | 3    | Spotify now-playing: launch/quit tracking, track info, artwork, content type, ads | Planned |
 | 4    | Open rules and menu-bar icon flash                                                | Planned |
 | 5    | Overlay page matched to the Spotify TV app, all states                            | Planned |

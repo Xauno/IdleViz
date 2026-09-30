@@ -48,7 +48,7 @@ The app needs two permissions: **Automation** (to ask Spotify what's playing) an
 
 - On first launch, a small welcome window explains the two required ones and triggers the prompts on purpose: one AppleScript query (if Spotify is running) and a short tap. That way a prompt never pops up during an idle open while nobody is at the Mac. Both prompts need Spotify running, so if it isn't, the window asks you to open Spotify and continues by itself once it launches. The microphone prompt only appears the first time you press **Detect delay**.
 - Check Automation without prompting with `AEDeterminePermissionToAutomateTarget(..., askUserIfNeeded: false)`.
-- There's no public API to check the audio permission. Treat several seconds of exact-zero buffers while Spotify reports "playing" as "probably denied" and log it.
+- There's no public API to check the audio permission. Treat several seconds of exact-zero buffers, or no buffers at all, while Spotify reports "playing" as "probably denied" and log it. (A paused Spotify sends exact-zero buffers, and one that hasn't played since launch sends none, so only count time while it's playing.)
 - No camera permission, ever.
 
 ### When a permission is missing
@@ -231,8 +231,10 @@ The only visualizer is **Butterchurn** (WebGL port of Milkdrop), chosen because 
 ### Audio
 - Core Audio process tap on Spotify only.
   - Find Spotify's audio process objects via `kAudioHardwarePropertyProcessObjectList`. Match every process whose bundle ID starts with `com.spotify.client`, which includes its helper processes, and tap them all.
-  - A process only appears in that list once it starts playing audio. Listen for changes to `kAudioHardwarePropertyProcessObjectList` and rebuild the tap when Spotify's processes come or go, not just when Spotify relaunches.
+  - Spotify's process object appears in that list as soon as Spotify launches, before anything plays (checked in the step 2 spike). Listen for changes to `kAudioHardwarePropertyProcessObjectList` and rebuild the tap when Spotify's processes come or go, not just when Spotify relaunches.
   - `CATapDescription(stereoMixdownOfProcesses:)` with `muteBehavior = .unmuted` → `AudioHardwareCreateProcessTap` → private aggregate device → `AudioDeviceCreateIOProcIDWithBlock`.
+  - Create the I/O block in a `nonisolated` function. A closure written inside a `@MainActor` method inherits that isolation, and Swift 6 crashes when Core Audio calls it on its I/O thread.
+  - Clear the sample buffer when the tap is torn down, so that frames built afterwards are silence rather than the last samples repeated.
   - Needs `NSAudioCaptureUsageDescription`; macOS prompts once (see "Permissions and first launch"). Builds with a changing signature may get all-zero buffers until permission is granted to the right binary.
   - Run it only while the window is open, plus briefly for the first-launch permission prompt and during Detect delay.
 - **Analysis happens in Swift** (vDSP). Each frame, Swift computes everything the page needs, so JS only unpacks numbers:
@@ -240,7 +242,7 @@ The only visualizer is **Butterchurn** (WebGL port of Milkdrop), chosen because 
   - Butterchurn's input: 1024-sample 8-bit time-domain data, mono plus left and right.
   - Swift packs this into one binary frame and sends it ~60×/s with `evaluateJavaScript`, base64-encoded.
 - **Automatic gain.** The tap captures after Spotify's own volume slider (but before the system volume), so a low Spotify volume would mean weak visuals. Normalize with a slow automatic gain on the RMS level, with a gate so real silence stays silent.
-- **Feeding Butterchurn.** Prefer passing the levels straight to `visualizer.render({ audioLevels: { timeByteArray, timeByteArrayL, timeByteArrayR } })`, which skips Web Audio entirely. Verify that the version you use supports this. Fallback: an `AudioWorklet` source feeding Butterchurn's analyser, connected through a zero-gain node to the destination, since WebKit may not process nodes that aren't connected to the output.
+- **Feeding Butterchurn.** Pass the levels straight to `visualizer.render({ audioLevels: { timeByteArray, timeByteArrayL, timeByteArrayR } })`, which skips Web Audio entirely. The step 2 spike confirmed this works in `butterchurn` 2.6.7 (the current stable release; 3.0 is still in beta), so no `AudioWorklet` fallback is needed. `createVisualizer` still takes an `AudioContext`, but it can stay suspended and unconnected. Butterchurn reads that context's `sampleRate` to place its bass/mid/treble ranges, so create it with the tap's rate (`new AudioContext({ sampleRate })`).
 - **Spotify-only audio guarantee: the visuals only ever see Spotify's audio** (applies to Butterchurn and to every custom plugin):
   - The only audio source for the visuals is the Spotify process tap above. Never feed them from a global/system tap, an input device, or the microphone. Always build the tap with `CATapDescription(stereoMixdownOfProcesses:)` containing Spotify's process objects only. If none are found, send silence.
   - The one exception to "no microphone" is **Detect delay** (below). It runs only in Swift, only after you press the button, for about 5 s, and the mic audio is never sent to the page, stored, or used for anything but measuring the delay.
@@ -264,8 +266,33 @@ The tap hears Spotify's audio before it reaches the speakers. With built-in spea
   6. Stop the mic immediately after. The mic audio is only held in memory during those few seconds.
 - The correlation math lives in `IdleVizCore` and is tested with synthetic signals (a known delay plus noise).
 
+### Audio spike findings (step 2)
+Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024 × 1964 built-in display, built-in speakers) with macOS 26 and the Spotify desktop app. The spike used a Spotify process tap, a vDSP analysis in Swift, one packed frame per display frame sent with `evaluateJavaScript`, and Butterchurn 2.6.7 in a `WKWebView` loaded with `loadFileURL` (no custom scheme or CSP yet).
+
+**What worked**
+- **Permission.** macOS showed the System Audio Recording prompt when the tap first started, and after Allow the audio was real (not all-zero). The build was signed with the Apple Development team.
+- **Tap.** The tap delivers 48 kHz, 2-channel, interleaved Float32. Setting up the tap and the aggregate device (default output as the main sub-device, the tap with drift compensation, `TapAutoStart`) took 20–25 ms.
+- **Process list.** Spotify had exactly one audio process object with a `com.spotify.client` bundle ID, and its helpers never showed up. The list listener fired when Spotify launched and when it quit, and the tap rebuilt and tore down cleanly each time.
+- **Spotify only.** With Spotify paused, system sounds (`afplay`) left the tap at exact zero.
+- **Swift analysis.** Building a frame (a 1024-point vDSP FFT, 64 log bands, RMS and packing) took 50–75 µs in an optimized build (about 1 ms unoptimized).
+- **Transport.** One frame is 7,448 bytes: a 24-byte header, 64 bands as `f32`, a 1024-sample `f32` waveform, and 3 × 1024 bytes for Butterchurn. Sent base64-encoded with `evaluateJavaScript` 60 times a second, the round trip averaged about 0.5 ms and the page decoded a frame in 0.02–0.1 ms. No frames were dropped.
+- **Butterchurn.** `render({ audioLevels })` works (see "Feeding Butterchurn"). Its `bass` value ranged about 0–2.4 each second, a normal Milkdrop range, and the visuals clearly followed the beat. Rendering held 60 fps at 2560 × 1663, with `render()` taking 1.5–2 ms of JS per frame. `requestAnimationFrame` ran at 60 Hz on the 120 Hz display.
+- **Cost while playing** (`top`, percent of one core): IdleViz about 5.5%, WebKit WebContent 13–15%, WebKit GPU process 5–7%, `coreaudiod` 7–9%, WindowServer about 19% (including compositing the fullscreen window). The GPU's "Device Utilization" was about 22% at 2560 px wide and 0–12% at 1512 px and below. That counter is noisy at low load, so tune the resolution cap by power use in step 7b.
+
+**What had to change** (already written into the sections above)
+- Spotify's process object appears when Spotify launches, not when it first plays. Before the first play the I/O block gets no buffers at all; once paused, it gets exact-zero buffers. This changes the permission check under "Permissions and first launch".
+- The I/O block has to be created outside the main actor, or Swift 6 crashes on the first buffer.
+- The sample buffer has to be cleared on teardown.
+- The 60 fps cap needs a tolerant threshold.
+- Frames sent before the page has loaded throw a JavaScript exception. Swift should only start sending after the page finishes loading, or call `window.audioFrame?.(…)`.
+- Presets differ a lot in how reactive they look. The first one tried ("Flexi + Martin - cascading decay swing") looked disconnected from the music, while beat-driven ones ("Flexi, martin + geiss - dedicated to the sherwin maxawow", "Zylot - Paint Spill (Music Reactive Paint Mix)") clearly followed it. Keep this in mind when picking the default preset and the shuffle list in 7a/7c.
+
+**Development notes**
+- LaunchServices sends `idleviz://open` to whichever registered copy of `com.xauno.IdleViz` it picks, so several builds on disk (Debug, Release, other derived-data folders) can make the URL open a stale copy. Keep one build around, or unregister the others with `lsregister -u`.
+- `loadFileURL` drops query strings. This won't matter once the page is served from `idleviz-app://`.
+
 ### Performance
-- Cap rendering at 60 fps, including on 120 Hz ProMotion displays (skip every other `requestAnimationFrame`).
+- Cap rendering at 60 fps, including on 120 Hz ProMotion displays (skip every other `requestAnimationFrame`). Skip a frame only when it comes less than ~12 ms after the last one. A strict 16.7 ms threshold drops about a third of the frames on a 60 Hz display because of timestamp jitter (step 2 spike).
 - Render Butterchurn below full device resolution on large displays (for example at most ~2560 px wide) and let the GPU scale it up. Tune by eye and by power use.
 
 ### Presets
@@ -347,7 +374,7 @@ IdleViz/
 Each step is one pull request. At the end of each step, update the README (Roadmap table, Features, Installation, Usage) and add tests for the step, as described in `CONTRIBUTING.md`.
 
 1. **Open/close shell:** Xcode project + `IdleVizCore` package, signing, CI building the app with `xcodebuild`. Menu-bar app (Settings… + hotkey row, settings window stubbed), hotkey, fullscreen black window on the main display, dismiss on any input, focus returned to the previous app, the debug no-dismiss switch. Compare the feel side by side with a real macOS screensaver, and note how often activation is refused.
-2. **Audio spike (throwaway):** prove the riskiest part before building on it. A process tap on Spotify gets real audio, Swift turns it into levels, and they reach the page ~60×/s and drive Butterchurn with one preset. Check `render({ audioLevels })`, the permission prompt, and CPU/GPU use. The spike code stays on a branch and isn't merged; this step's PR only writes the findings (what worked, what had to change) into `project.md`.
+2. **Audio spike (throwaway):** prove the riskiest part before building on it. A process tap on Spotify gets real audio, Swift turns it into levels, and they reach the page ~60×/s and drive Butterchurn with one preset. Check `render({ audioLevels })`, the permission prompt, and CPU/GPU use. The spike code stays on a branch and isn't merged; this step's PR only writes the findings (what worked, what had to change) into `project.md`. Done: see "Audio spike findings (step 2)" and the `spike/audio-tap` branch.
 3. **SpotifyInfo:** launch/quit tracking, notification + AppleScript (on its own thread, with a timeout), artwork download, content type and ad context, printed to the console. Confirm it never launches Spotify. Test songs, paused, podcasts, music ads, podcast ads, local files and Spotify Connect.
 4. **Open rules + icon flash** wired to the hotkey.
 5. **Overlay page** matched to the reference screenshots, served from `idleviz-app://` with the CSP, over a placeholder animated gradient (no audio needed yet), covering every state in the table plus the missing-artwork placeholder.
