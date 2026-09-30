@@ -18,7 +18,7 @@
         --code: #ecece8;
       }
       @media (prefers-color-scheme: dark) {
-        :root {
+        :root:not([data-theme="light"]) {
           --bg: #1a1a19;
           --fg: #ececea;
           --muted: #a1a19b;
@@ -30,6 +30,38 @@
           --danger: #ff8a80;
           --code: #2f2f2d;
         }
+      }
+      :root[data-theme="dark"] {
+        --bg: #1a1a19;
+        --fg: #ececea;
+        --muted: #a1a19b;
+        --card: #262625;
+        --line: #3c3c3a;
+        --accent: #6ea2ff;
+        --warn-bg: #3a2f12;
+        --warn-fg: #f0d48a;
+        --danger: #ff8a80;
+        --code: #2f2f2d;
+      }
+      .theme {
+        display: inline-flex;
+        gap: 4px;
+        margin: 4px 0 8px;
+      }
+      .theme button {
+        font: inherit;
+        font-size: 12px;
+        padding: 3px 12px;
+        border: 0.5px solid var(--line);
+        border-radius: 6px;
+        background: var(--card);
+        color: var(--fg);
+        cursor: pointer;
+      }
+      .theme button[aria-pressed="true"] {
+        background: var(--accent);
+        color: var(--card);
+        border-color: var(--accent);
       }
       * {
         box-sizing: border-box;
@@ -385,6 +417,11 @@
 
       <h2>2. Settings window</h2>
       <p class="lead">A small, fixed-size, portrait window. One page that scrolls. No sidebar and no tabs.</p>
+      <div class="theme" role="group" aria-label="Preview appearance">
+        <button type="button" data-t="system" aria-pressed="true">System</button>
+        <button type="button" data-t="light" aria-pressed="false">Light</button>
+        <button type="button" data-t="dark" aria-pressed="false">Dark</button>
+      </div>
 
       <div class="stage">
         <div>
@@ -566,6 +603,12 @@
             </li>
             <li>Favorites and Blocklist open a sheet listing presets.</li>
             <li>The failed-to-load section is hidden when nothing has failed.</li>
+            <li>
+              Dark mode: there is no setting. The window follows the macOS appearance, and native SwiftUI controls and
+              system colors (<code>.primary</code>, <code>.secondary</code>, <code>Color(nsColor:)</code> semantic
+              colors, the accent color) switch on their own. Don't hard-code light colors. The Light, Dark and System
+              buttons above only preview this in the browser.
+            </li>
           </ul>
         </div>
       </div>
@@ -581,5 +624,17 @@
         </ul>
       </div>
     </main>
+    <script>
+      var root = document.documentElement;
+      document.querySelectorAll(".theme button").forEach(function (b) {
+        b.addEventListener("click", function () {
+          if (b.dataset.t === "system") root.removeAttribute("data-theme");
+          else root.setAttribute("data-theme", b.dataset.t);
+          document.querySelectorAll(".theme button").forEach(function (x) {
+            x.setAttribute("aria-pressed", x === b ? "true" : "false");
+          });
+        });
+      });
+    </script>
   </body>
 </html>
