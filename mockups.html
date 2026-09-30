@@ -357,7 +357,7 @@
         <div>
           <h3>Contents</h3>
           <ul>
-            <li>Exactly two rows. No Quit item here.</li>
+            <li>Exactly two rows. No Quit item here or in settings.</li>
             <li><strong>Settings…</strong> is the only clickable row. It opens the settings window.</li>
             <li>
               <strong>Open visualizer</strong> is informational and dimmed. It shows the current hotkey, read from
@@ -480,14 +480,6 @@
                   <span class="ctl">Reveal</span>
                 </div>
               </div>
-
-              <div class="h">App</div>
-              <div class="card">
-                <div class="r">
-                  <div>Quit IdleViz<span class="d">⌘Q when focused</span></div>
-                  <span class="ctl danger">Quit</span>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -504,7 +496,10 @@
               <code>collectionBehavior = [.fullScreenNone]</code>, and disable the zoom (green) button. That also stops
               the ⌃⌘F shortcut.
             </li>
-            <li>Keep close and minimize.</li>
+            <li>
+              Keep close (the red button) and minimize. There is no Quit row: the red button closes the window and ⌘Q
+              quits the app.
+            </li>
             <li>
               The app switches to <code>.regular</code> activation policy while the window is open so it can take focus,
               then back to accessory on close. ⌘Q works while it is focused.
@@ -537,10 +532,6 @@
                 Plugin trust warning, Import…, Open folder, Reload, list of presets and plugins that failed to load
                 (each with its error and a Reveal button)
               </td>
-            </tr>
-            <tr>
-              <td>App</td>
-              <td>Quit</td>
             </tr>
           </table>
 
