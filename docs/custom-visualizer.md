@@ -59,14 +59,14 @@ audio = {
 
 ## What plugins can't do
 
-The app runs plugins in the same web view as everything else but enforces these limits:
+Each plugin runs in its own sandboxed frame, separate from the overlay and the rest of the app, with these limits:
 
 | Not allowed | Why |
 |---|---|
 | Network (`fetch`, XHR, WebSocket, external scripts or images) | A Content-Security-Policy blocks it. Everything must be self-contained. |
 | `getUserMedia` or any audio or video capture | Denied. Plugins only see Spotify's audio, via `audio`. |
 | Keyboard, mouse or touch listeners | Any input closes the visualizer. There's nothing to interact with. |
-| Touching the DOM outside your canvas | The page belongs to the overlay. |
+| Touching the DOM outside your canvas | Your frame holds only your canvas. The overlay and the app are out of reach. |
 | `import` of other files or URLs | Keep it to one file. Inline shaders as template strings. |
 | Persistent storage (`localStorage`, cookies) | Not supported. |
 
@@ -126,7 +126,7 @@ export function dispose() {
 
 ## Testing
 
-1. Open `aurora-demo.html` in a browser. It is a test harness that can feed your plugin audio from a file or the microphone (the real app never uses the microphone) and shows the same `audio` object the app provides. Swap in your file to try it.
+1. Open `aurora-demo.html` in a browser. It is a test harness that can feed your plugin audio from a file or the microphone (in the real app, visuals never get microphone audio) and shows the same `audio` object the app provides. Swap in your file to try it.
 2. Test with **silence** (all zeros), a quiet track and a loud one.
 3. Test at both a small window and a large one (resize the window, and try a 4K display if you have one).
 4. Switch away and back, or reload the page, several times and watch the memory and GPU usage to make sure `dispose` really frees things.
