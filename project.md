@@ -39,15 +39,18 @@ Page layers (bottom → top): Butterchurn canvas → dim layer → overlay
 ```
 
 ### Menu-bar helper
+**UI reference:** build the menu-bar popup and the settings window to match [mockups.html](mockups.html) (layout, grouping, row order, sizes, and build notes). Open it in a browser.
+
 - `LSUIElement = YES`, launch at login (`SMAppService.mainApp.register()`).
-- The menu-bar menu is deliberately tiny, with two rows:
+- The menu-bar popup is a small glass-style popover (SwiftUI `MenuBarExtra` with `.window` style, or `NSPopover`), not a plain `NSMenu`. It is deliberately tiny, with two rows:
   1. **Settings…** (the only clickable item) opens the separate settings window.
   2. Below it, a disabled, informational row showing the current open hotkey (e.g. "Open visualizer: ⌃⌥V"), read from `KeyboardShortcuts` so it updates if the shortcut changes.
 - There is no Quit item in the menu. Quit lives in the settings window (and ⌘Q while it's focused).
-- **Settings window** (separate native window, a normal `NSWindow` with SwiftUI content; the app switches to `.regular` activation policy while it's open so it can take focus, then back to accessory on close). It holds everything that used to be in the menu:
-  - **General:** idle timeout (5/10/15/30 min, Off), open hotkey recorder (`KeyboardShortcuts.Recorder`), launch at login, an "Open now" button, Quit.
+- **Settings window** (separate native window, a normal `NSWindow` with SwiftUI content; the app switches to `.regular` activation policy while it's open so it can take focus, then back to accessory on close). It is small, portrait and fixed-size (about 340 × 560 pt): no `.resizable` in the style mask, `collectionBehavior = [.fullScreenNone]`, zoom button disabled. It is one scrolling page (no sidebar or tabs) with four sections, in this order:
+  - **General:** idle timeout (5/10/15/30 min, Off), open hotkey recorder (`KeyboardShortcuts.Recorder`), an "Open now" button, launch at login.
   - **Visualizer:** brightness slider (50–100%), shuffle on/off, seconds per preset, blend time, source filter (all/bundled/custom), favorites and blocklist management.
-  - **Presets:** Import Presets…, Open Presets Folder, Reload Presets, and the list of presets that failed to load.
+  - **Presets:** plugin trust warning, Import Presets…, Open Presets Folder, Reload Presets, and the list of presets that failed to load.
+  - **App:** Quit.
 - Settings in `UserDefaults`. The window writes them and the helper applies changes live.
 
 ### Triggers
@@ -184,7 +187,7 @@ The only visualizer is **Butterchurn** (WebGL port of Milkdrop), chosen because 
 IdleViz/
 ├─ App/
 │  ├─ AppDelegate.swift          # menu bar (Settings… + hotkey row), icon flash
-│  ├─ SettingsWindow.swift       # separate settings UI (general, visualizer, presets)
+│  ├─ SettingsWindow.swift       # separate settings UI (one scrolling page, per mockups.html)
 │  ├─ Triggers.swift             # idle, hotkey, URL scheme, open rules
 │  ├─ DismissWatcher.swift
 │  ├─ WindowController.swift     # key-capable borderless window + WKWebView

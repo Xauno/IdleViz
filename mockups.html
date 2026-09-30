@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IdleViz UI mockups</title>
+    <style>
+      :root {
+        --bg: #f5f5f3;
+        --fg: #1c1c1a;
+        --muted: #6b6b66;
+        --card: #fff;
+        --line: #d9d9d4;
+        --accent: #2f6fdb;
+        --warn-bg: #fdf1d6;
+        --warn-fg: #6b4b00;
+        --danger: #b3261e;
+        --code: #ecece8;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1a1a19;
+          --fg: #ececea;
+          --muted: #a1a19b;
+          --card: #262625;
+          --line: #3c3c3a;
+          --accent: #6ea2ff;
+          --warn-bg: #3a2f12;
+          --warn-fg: #f0d48a;
+          --danger: #ff8a80;
+          --code: #2f2f2d;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          15px/1.6 -apple-system,
+          system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+      h1 {
+        font-size: 24px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 19px;
+        margin: 40px 0 8px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+      }
+      h3 {
+        font-size: 15px;
+        margin: 20px 0 4px;
+      }
+      p,
+      li {
+        color: var(--fg);
+      }
+      .lead {
+        color: var(--muted);
+        margin: 0 0 8px;
+      }
+      code {
+        background: var(--code);
+        border-radius: 4px;
+        padding: 1px 5px;
+        font-size: 13px;
+      }
+      ul {
+        padding-left: 20px;
+        margin: 6px 0;
+      }
+      .note {
+        background: var(--warn-bg);
+        color: var(--warn-fg);
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin: 16px 0;
+        font-size: 14px;
+      }
+      .note ul {
+        margin: 4px 0 0;
+      }
+      .note li {
+        color: inherit;
+      }
+      .stage {
+        display: flex;
+        gap: 28px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        margin: 16px 0;
+      }
+      .stage > div {
+        flex: 1;
+        min-width: 280px;
+      }
+
+      .desk {
+        position: relative;
+        overflow: hidden;
+        border-radius: 12px;
+        background: #3a4a6b;
+        min-height: 190px;
+        padding: 0;
+      }
+      .desk i {
+        position: absolute;
+        border-radius: 50%;
+      }
+      .menubar {
+        position: relative;
+        height: 22px;
+        background: rgba(0, 0, 0, 0.28);
+        color: #fff;
+        font-size: 12px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 14px;
+        padding: 2px 14px;
+      }
+      .glass {
+        position: relative;
+        width: 260px;
+        margin: 10px 14px 18px auto;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.22);
+        -webkit-backdrop-filter: blur(28px) saturate(180%);
+        backdrop-filter: blur(28px) saturate(180%);
+        border: 0.5px solid rgba(255, 255, 255, 0.45);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.5),
+          0 12px 32px rgba(0, 0, 0, 0.25);
+        padding: 8px;
+        color: #fff;
+      }
+      .grow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        border-radius: 14px;
+        font-size: 14px;
+      }
+      .grow.hl:hover {
+        background: rgba(255, 255, 255, 0.22);
+      }
+      .grow small {
+        font-size: 12px;
+        opacity: 0.75;
+      }
+      .kbdg {
+        font-size: 12px;
+        background: rgba(255, 255, 255, 0.22);
+        border-radius: 6px;
+        padding: 2px 8px;
+      }
+      .sep {
+        height: 0.5px;
+        background: rgba(255, 255, 255, 0.35);
+        margin: 4px 12px;
+      }
+
+      .win {
+        width: 340px;
+        border: 0.5px solid var(--line);
+        border-radius: 12px;
+        background: var(--card);
+        overflow: hidden;
+      }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 9px 12px;
+        border-bottom: 0.5px solid var(--line);
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: var(--line);
+      }
+      .dot.c {
+        background: #ff5f57;
+      }
+      .body {
+        padding: 2px 14px 14px;
+      }
+      .h {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 16px 0 6px;
+      }
+      .grp {
+        margin: 10px 0 4px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .card {
+        border: 0.5px solid var(--line);
+        border-radius: 8px;
+      }
+      .r {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 10px;
+        font-size: 13px;
+        border-bottom: 0.5px solid var(--line);
+      }
+      .r:last-child {
+        border-bottom: none;
+      }
+      .r .d {
+        display: block;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .ctl {
+        font-size: 12px;
+        border: 0.5px solid var(--line);
+        border-radius: 6px;
+        padding: 3px 10px;
+        background: var(--bg);
+        white-space: nowrap;
+      }
+      .kbd {
+        font-size: 11px;
+        border: 0.5px solid var(--line);
+        border-radius: 6px;
+        padding: 2px 7px;
+        background: var(--bg);
+      }
+      .sw {
+        width: 30px;
+        height: 18px;
+        border-radius: 9px;
+        background: var(--line);
+        position: relative;
+        flex: none;
+      }
+      .sw::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #fff;
+      }
+      .sw.on {
+        background: var(--accent);
+      }
+      .sw.on::after {
+        left: 14px;
+      }
+      .track {
+        width: 90px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--line);
+        position: relative;
+      }
+      .track::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 4px;
+        width: 40%;
+        border-radius: 2px;
+        background: var(--accent);
+      }
+      .warn {
+        background: var(--warn-bg);
+        color: var(--warn-fg);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        margin: 0 0 8px;
+      }
+      .danger {
+        color: var(--danger);
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 14px;
+        margin: 8px 0;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>IdleViz UI mockups</h1>
+      <p class="lead">
+        The two native UIs, and how to build them. <code>project.md</code> points here: build the menu-bar popup and the
+        settings window to match these mockups. Only layout, grouping, row order and sizing are fixed. Colors, fonts and
+        exact spacing come from the system controls.
+      </p>
+
+      <div class="note">
+        <strong>These are HTML previews, not code to port.</strong> Both UIs are native Swift (AppKit plus SwiftUI). The
+        HTML only shows what goes where.
+      </div>
+
+      <h2>1. Menu-bar popup</h2>
+      <p class="lead">
+        Opens from the menu-bar icon. It is a small popover with a liquid-glass look, like the system Battery menu,
+        instead of a plain <code>NSMenu</code>.
+      </p>
+
+      <div class="stage">
+        <div>
+          <div class="desk">
+            <i style="width: 180px; height: 180px; background: #e0708a; left: 20px; top: -50px"></i>
+            <i style="width: 200px; height: 200px; background: #4fb3c9; right: 40px; bottom: -100px"></i>
+            <div class="menubar">
+              <span>Wi-Fi</span><span>Battery</span
+              ><span style="background: rgba(255, 255, 255, 0.3); border-radius: 4px; padding: 0 6px">IdleViz</span
+              ><span>Tue 9:41</span>
+            </div>
+            <div class="glass">
+              <div class="grow hl"><span>Settings…</span><small>⌘,</small></div>
+              <div class="sep"></div>
+              <div class="grow" style="opacity: 0.8"><span>Open visualizer</span><span class="kbdg">⌃⌥V</span></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h3>Contents</h3>
+          <ul>
+            <li>Exactly two rows. No Quit item here.</li>
+            <li><strong>Settings…</strong> is the only clickable row. It opens the settings window.</li>
+            <li>
+              <strong>Open visualizer</strong> is informational and dimmed. It shows the current hotkey, read from
+              <code>KeyboardShortcuts</code> so it updates when the shortcut changes.
+            </li>
+          </ul>
+          <h3>Build notes</h3>
+          <ul>
+            <li>
+              Use a popover, not <code>NSMenu</code>: SwiftUI <code>MenuBarExtra</code> with the
+              <code>.window</code> style, or an <code>NSPopover</code> with a material background.
+              <code>NSMenu</code> cannot be given this look.
+            </li>
+            <li>
+              Glass look: translucent fill, strong blur, thin light edge, about 22 pt corner radius, soft shadow. Rows
+              have a rounded highlight on hover.
+            </li>
+            <li>Width about 260 pt. Height is just the two rows.</li>
+            <li>
+              The menu-bar icon still flashes (alt icon 2 to 3 times over about 1 s) when a manual open is refused.
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>2. Settings window</h2>
+      <p class="lead">A small, fixed-size, portrait window. One page that scrolls. No sidebar and no tabs.</p>
+
+      <div class="stage">
+        <div>
+          <div class="win">
+            <div class="bar">
+              <span class="dot c"></span><span class="dot"></span><span class="dot" style="opacity: 0.35"></span
+              ><span style="flex: 1; text-align: center; margin-right: 40px">Settings</span>
+            </div>
+            <div class="body">
+              <div class="h" style="margin-top: 10px">General</div>
+              <div class="card">
+                <div class="r">
+                  <div>Start after idle<span class="d">Needs a Spotify track</span></div>
+                  <span class="ctl">10 min ▾</span>
+                </div>
+                <div class="r">
+                  <div>Open hotkey</div>
+                  <span class="kbd">⌃⌥V ✕</span>
+                </div>
+                <div class="r">
+                  <div>Open now</div>
+                  <span class="ctl">Open</span>
+                </div>
+                <div class="r">
+                  <div>Launch at login</div>
+                  <div class="sw on"></div>
+                </div>
+              </div>
+
+              <div class="h">Visualizer</div>
+              <div class="card">
+                <div class="r">
+                  <div>Brightness</div>
+                  <div style="display: flex; gap: 8px; align-items: center">
+                    <div class="track"></div>
+                    <span style="font-size: 12px">70%</span>
+                  </div>
+                </div>
+                <div class="r">
+                  <div>Shuffle</div>
+                  <div class="sw on"></div>
+                </div>
+                <div class="r">
+                  <div>Seconds per preset</div>
+                  <span class="ctl">30 ▾</span>
+                </div>
+                <div class="r">
+                  <div>Blend time</div>
+                  <span class="ctl">2.7 s ▾</span>
+                </div>
+                <div class="r">
+                  <div>Source</div>
+                  <span class="ctl">All ▾</span>
+                </div>
+                <div class="r">
+                  <div>Favorites</div>
+                  <span class="ctl">Manage (12)</span>
+                </div>
+                <div class="r">
+                  <div>Blocklist</div>
+                  <span class="ctl">Manage (4)</span>
+                </div>
+              </div>
+
+              <div class="h">Presets</div>
+              <div class="warn">Custom .js plugins are code. Only import ones you trust.</div>
+              <div class="card">
+                <div class="r">
+                  <div>Import…<span class="d">.json, .js, .milk</span></div>
+                  <span class="ctl">Import</span>
+                </div>
+                <div class="r">
+                  <div>Folder<span class="d">312 bundled, 18 custom</span></div>
+                  <span class="ctl">Open</span>
+                </div>
+                <div class="r">
+                  <div>Rescan</div>
+                  <span class="ctl">Reload</span>
+                </div>
+              </div>
+              <p class="grp">Failed to load (3)</p>
+              <div class="card">
+                <div class="r">
+                  <div>broken-tunnel.milk<span class="d">Shader compile error</span></div>
+                  <span class="ctl">Reveal</span>
+                </div>
+                <div class="r">
+                  <div>my-plugin.js<span class="d">No WebGL2</span></div>
+                  <span class="ctl">Reveal</span>
+                </div>
+                <div class="r">
+                  <div>slow.js<span class="d">Frame over 50 ms</span></div>
+                  <span class="ctl">Reveal</span>
+                </div>
+              </div>
+
+              <div class="h">App</div>
+              <div class="card">
+                <div class="r">
+                  <div>Quit IdleViz<span class="d">⌘Q when focused</span></div>
+                  <span class="ctl danger">Quit</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3>Window</h3>
+          <ul>
+            <li>
+              A normal <code>NSWindow</code> with SwiftUI content. Fixed width of about 340 pt and a fixed height of
+              about 560 pt. The content scrolls inside (<code>ScrollView</code>).
+            </li>
+            <li>
+              Not resizable and cannot go fullscreen: leave <code>.resizable</code> out of the style mask, set
+              <code>collectionBehavior = [.fullScreenNone]</code>, and disable the zoom (green) button. That also stops
+              the ⌃⌘F shortcut.
+            </li>
+            <li>Keep close and minimize.</li>
+            <li>
+              The app switches to <code>.regular</code> activation policy while the window is open so it can take focus,
+              then back to accessory on close. ⌘Q works while it is focused.
+            </li>
+          </ul>
+
+          <h3>Sections, in this order</h3>
+          <table>
+            <tr>
+              <th>Section</th>
+              <th>Rows</th>
+            </tr>
+            <tr>
+              <td>General</td>
+              <td>
+                Idle timeout (5, 10, 15, 30 min, Off), hotkey recorder (<code>KeyboardShortcuts.Recorder</code>), Open
+                now, Launch at login
+              </td>
+            </tr>
+            <tr>
+              <td>Visualizer</td>
+              <td>
+                Brightness (50 to 100%), Shuffle, Seconds per preset, Blend time, Source (All, Bundled, Custom),
+                Favorites, Blocklist
+              </td>
+            </tr>
+            <tr>
+              <td>Presets</td>
+              <td>
+                Plugin trust warning, Import…, Open folder, Reload, list of presets and plugins that failed to load
+                (each with its error and a Reveal button)
+              </td>
+            </tr>
+            <tr>
+              <td>App</td>
+              <td>Quit</td>
+            </tr>
+          </table>
+
+          <h3>Build notes</h3>
+          <ul>
+            <li>
+              Use native controls (<code>Picker</code>, <code>Toggle</code>, <code>Slider</code>, <code>Button</code>).
+              Rows are a label on the left and one control on the right, grouped into rounded cards under a section
+              heading.
+            </li>
+            <li>
+              Keep it compact: small text, tight rows, and a short hint under a label only when the label alone is
+              unclear.
+            </li>
+            <li>
+              Settings are stored in <code>UserDefaults</code>. Controls write them and the helper applies changes live
+              (for example, brightness updates the open window immediately).
+            </li>
+            <li>Favorites and Blocklist open a sheet listing presets.</li>
+            <li>The failed-to-load section is hidden when nothing has failed.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note">
+        <strong>Still to decide (ask before building):</strong>
+        <ul>
+          <li>
+            How the glass effect works on macOS older than 26, since the app targets 14.2 and later. Use a plain blur
+            material as a fallback, or raise the minimum version?
+          </li>
+          <li>Whether Favorites and Blocklist stay as Manage sheets, or become an inline searchable list.</li>
+        </ul>
+      </div>
+    </main>
+  </body>
+</html>
