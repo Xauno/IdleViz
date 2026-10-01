@@ -97,7 +97,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 - There is no Quit item in the menu or in settings. The red close button closes the settings window, and ⌘Q (while the window is focused) quits the app.
 - **Settings window** (separate native window, a normal `NSWindow` with SwiftUI content that follows the macOS light/dark appearance automatically, with no setting; the app switches to `.regular` activation policy while it's open so it can take focus, then back to accessory on close). It is small, portrait and fixed-size (about 340 × 560 pt): no `.resizable` in the style mask, `collectionBehavior = [.fullScreenNone]`, zoom button disabled. It is one scrolling page (no sidebar or tabs) with three sections, in this order:
   - **General:** idle timeout (5/10/15/30 min, Off), keep screen awake for (30 min, 1 hour, 2 hours, 4 hours; default 1 hour), **Different times on battery** switch (only on Macs with a battery; off by default; when on, it reveals "On battery: start after idle" and "On battery: keep screen awake", with the same choices, starting as copies of the values above), open hotkey recorder (`KeyboardShortcuts.Recorder`), **Like key** and **Skip key** pickers (see "Like and skip keys" under Dismiss), an "Open now" button, launch at login.
-  - **Visualizer:** Show Spotify overlay toggle, brightness slider (50–100%), audio delay slider (0–2.5 s, for the current output device) with a **Detect delay** button, mode (Single or Shuffle). Single: a picker for the one visualizer to show. Shuffle: shuffle-from filter (all/bundled/custom/favorites), seconds per preset, blend time. Then favorites and blocklist management.
+  - **Visualizer:** Show Spotify overlay toggle, brightness slider (50–100%), audio delay slider (0–2.5 s, for the current output device) with a **Detect delay** button and a **Manual delay test** row under it, mode (Single or Shuffle). Single: a picker for the one visualizer to show. Shuffle: shuffle-from filter (all/bundled/custom/favorites), seconds per preset, blend time. Then favorites and blocklist management.
   - **Presets:** plugin trust warning, Import Presets…, Open Presets Folder, Reload Presets, and the list of presets that failed to load.
 - Settings in `UserDefaults`. The window writes them and the helper applies changes live.
 
@@ -307,6 +307,14 @@ The tap hears Spotify's audio before it reaches the speakers. With built-in spea
   5. If the correlation peak is clear, save the result for the current device and move the slider. If not (too quiet, noisy room, or headphones, where the mic can't hear the music), keep the old value and say so in the hint.
   6. Stop the mic immediately after. The mic audio is only held in memory during those few seconds.
 - The correlation math lives in `IdleVizCore` and is tested with synthetic signals (a known delay plus noise).
+- **Manual delay test** (the row under Detect delay): for when the microphone can't hear the sound (headphones), or to check a measured value by eye.
+  1. **Start** opens a sheet on the settings window. If Spotify is playing, the app pauses it (`tell application "Spotify" to pause`, through the same AppleScript thread and checks as the query), since the beeps are hard to hear over music. This and the `play` at the end are the only times the app controls playback.
+  2. An `AVAudioEngine` with one `AVAudioPlayerNode` plays a 60 ms beep every second on the default output device, each scheduled at an exact host time (`scheduleBuffer(_:at:)`), handed over about 2 s ahead. If the output device changes, the engine is rebuilt on the new one.
+  3. The sheet's panel is redrawn every frame (`TimelineView(.animation)`) and lit for 120 ms starting `delay` after each beep's scheduled time, read from the same host clock. When the light and the sound land together, the delay matches what the speakers add.
+  4. Every fourth beep is an octave higher (1760 Hz instead of 880 Hz) and its flash is orange instead of white. The delay can be longer than the gap between beeps, and this tells a flash from the one a beep earlier or later.
+  5. The sheet has the delay slider and −10 ms and +10 ms buttons. They change the same per-device delay as the slider in the Visualizer section, live.
+  6. **Done** stops the beeps, saves the delay for the device even if it wasn't moved, and sends `play` if the app had paused Spotify.
+  - The timing (`BeepTest.flash(at:start:delay:)`) and the beep samples live in `IdleVizCore` and are unit-tested. Detect delay and the manual test can't run at the same time.
 - **As built (step 7e):**
   - `DelayLine` holds the packed frames with their capture time; each timer tick sends the newest frame that is at least `delay` old. Opening the window clears it and sends one frame of silence.
   - The page gets the delay with `window.setAudioDelay(seconds)` and subtracts it from the progress bar's position while playing.
@@ -437,7 +445,8 @@ IdleViz/
 │  ├─ SpotifyInfo.swift          # launch/quit tracking, notifications, AppleScript, artwork
 │  ├─ SpotifyAudioTap.swift      # process tap on Spotify only, rebuilt when its processes or the output device change
 │  ├─ AudioPump.swift            # while open: tap → IdleVizCore analysis → page, 60×/s; tap health check
-│  ├─ AudioDelay.swift           # per-device delay, device lookups, Detect delay (mic, ~5 s)
+│  ├─ AudioDelay.swift           # per-device delay, device lookups, Detect delay (mic, ~5 s), manual delay test
+│  ├─ BeepTest.swift             # plays the manual delay test's beeps at exact host times
 │  ├─ PresetLibrary.swift        # scan/watch custom preset folder, import, send list to page
 │  ├─ FolderWatcher.swift        # FSEvents wrapper
 │  ├─ MilkConverter.swift        # hidden page that converts .milk files

@@ -108,3 +108,15 @@ final class NowPlayingTests: XCTestCase {
         XCTAssertEqual(cache.image(for: "a"), Data([4]))
     }
 }
+
+final class SpotifyPlaybackTests: XCTestCase {
+    func testTheCommandsPauseAndPlayWithATimeout() {
+        for (source, command) in [(SpotifyPlayback.pauseSource, "pause"), (SpotifyPlayback.playSource, "play")] {
+            let lines = source.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+            XCTAssertEqual(
+                lines,
+                ["tell application \"Spotify\"", "with timeout of 2 seconds", command, "end timeout", "end tell"]
+            )
+        }
+    }
+}

@@ -75,6 +75,23 @@ public struct NowPlaying: Sendable, Equatable {
     }
 }
 
+/// The two playback commands the manual delay test sends, so its beeps aren't drowned out by music.
+/// Nothing else in the app controls playback.
+public enum SpotifyPlayback {
+    public static let pauseSource = source("pause")
+    public static let playSource = source("play")
+
+    private static func source(_ command: String) -> String {
+        """
+        tell application "Spotify"
+            with timeout of 2 seconds
+                \(command)
+            end timeout
+        end tell
+        """
+    }
+}
+
 /// The one AppleScript query, and parsing its reply.
 public enum SpotifyQuery {
     /// Fields are joined with ASCII unit separator (character id 31), which can't appear in titles.
