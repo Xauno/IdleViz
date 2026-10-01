@@ -84,11 +84,16 @@ export function shufflePool(presets, settings) {
 
 /**
  * @typedef {object} PresetEntry
- * @property {string} id       Stable key: the source, a colon, then the name.
+ * @property {string} id       Stable key: the source, a colon, then the name (or the file's path).
  * @property {string} name
  * @property {"bundled" | "custom"} source
- * @property {object} preset   The Butterchurn preset itself.
+ * @property {"preset" | "plugin"} kind  A Butterchurn preset, or a JavaScript plugin run in a frame.
+ * @property {object} [preset]   The Butterchurn preset itself. Custom ones are fetched when first shown.
+ * @property {string} [url]      Where a custom preset or a plugin is loaded from.
+ * @property {string} [version]  Changes when the file does.
  */
+
+const byName = (a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" });
 
 /**
  * One sorted list from several preset packs. A name that appears in more than one pack
@@ -99,15 +104,111 @@ export function shufflePool(presets, settings) {
  */
 export function collectPresets(packs, source = "bundled") {
   /** @type {Map<string, PresetEntry>} */
-  const byName = new Map();
+  const seen = new Map();
   for (const pack of packs) {
     if (!pack || typeof pack !== "object") continue;
     for (const [name, preset] of Object.entries(pack)) {
-      if (!preset || typeof preset !== "object" || byName.has(name)) continue;
-      byName.set(name, { id: `${source}:${name}`, name, source, preset });
+      if (!preset || typeof preset !== "object" || seen.has(name)) continue;
+      seen.set(name, { id: `${source}:${name}`, name, source, kind: "preset", preset });
     }
   }
-  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+  return [...seen.values()].sort(byName);
+}
+
+const MAX_CUSTOM_ENTRIES = 6000;
+const URL_PREFIXES = { custom: "idleviz-app://presets/", bundled: "idleviz-app://app/visuals/" };
+
+/**
+ * Checks the shape of a `setCustomPresets` payload: the plugins bundled with the app and the
+ * files in the custom presets folder. Entries that don't fit are dropped.
+ * @param {unknown} value
+ * @returns {{ entries: PresetEntry[], hung: string[] }}
+ */
+export function parseCustomPresets(value) {
+  const payload = /** @type {Record<string, unknown>} */ (value && typeof value === "object" ? value : {});
+  const text = (v, max = 400) => typeof v === "string" && v.length > 0 && v.length <= max;
+  /** @type {Map<string, PresetEntry>} */
+  const entries = new Map();
+  for (const raw of Array.isArray(payload.entries) ? payload.entries.slice(0, MAX_CUSTOM_ENTRIES) : []) {
+    if (!raw || typeof raw !== "object") continue;
+    const { id, name, source, kind, url, version } = raw;
+    if (!text(id) || !text(name) || !text(url, 2000) || entries.has(id)) continue;
+    if (kind !== "preset" && kind !== "plugin") continue;
+    // Each source may only load from its own place: the presets folder, or the app's bundled plugins.
+    if (!(source in URL_PREFIXES) || !url.startsWith(URL_PREFIXES[source]) || !id.startsWith(`${source}:`)) continue;
+    entries.set(id, { id, name, source, kind, url, version: typeof version === "string" ? version : "" });
+  }
+  const hung = Array.isArray(payload.hung) ? payload.hung.filter((item) => text(item)) : [];
+  return { entries: [...entries.values()], hung };
+}
+
+/**
+ * Whether a fetched value has the parts Butterchurn needs from a preset.
+ * @param {any} value
+ */
+export function isPreset(value) {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    Boolean(value.baseVals) &&
+    typeof value.baseVals === "object" &&
+    Array.isArray(value.shapes) &&
+    Array.isArray(value.waves)
+  );
+}
+
+/**
+ * The whole library, sorted by name: the bundled Butterchurn presets plus what Swift sent.
+ * An entry that is unchanged keeps the preset it already fetched.
+ * @param {PresetEntry[]} bundled
+ * @param {PresetEntry[]} custom
+ * @param {Map<string, PresetEntry>} [previous]  The library before, by id.
+ */
+export function mergeLibrary(bundled, custom, previous = new Map()) {
+  const taken = new Set(bundled.map((entry) => entry.id));
+  const added = custom
+    .filter((entry) => !taken.has(entry.id))
+    .map((entry) => {
+      const before = previous.get(entry.id);
+      return before?.preset && before.version === entry.version ? { ...entry, preset: before.preset } : entry;
+    });
+  return [...bundled, ...added].sort(byName);
+}
+
+/** Presets and plugins that failed, each with its error. A failed one is skipped until its file changes. */
+export class FailureLog {
+  constructor() {
+    /** @type {Map<string, { error: string, version: string | undefined }>} */
+    this.failures = new Map();
+  }
+
+  /**
+   * @param {PresetEntry | { id: string, version?: string }} entry
+   * @param {string} error
+   */
+  add(entry, error) {
+    this.failures.set(entry.id, { error: String(error).slice(0, 300), version: entry.version });
+  }
+
+  has(id) {
+    return this.failures.has(id);
+  }
+
+  /**
+   * Forgets failures of files that changed or are gone, so they get another try.
+   * @param {Map<string, PresetEntry>} library  The current library, by id.
+   */
+  prune(library) {
+    for (const [id, failure] of this.failures) {
+      const entry = library.get(id);
+      if (!entry || (entry.version ?? undefined) !== failure.version) this.failures.delete(id);
+    }
+  }
+
+  /** @returns {Array<{ id: string, error: string }>} */
+  list() {
+    return [...this.failures].map(([id, { error }]) => ({ id, error }));
+  }
 }
 
 /**

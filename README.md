@@ -9,7 +9,7 @@ A macOS menu-bar app that turns your Mac into a music display. When the Mac goes
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: in development.** The menu-bar app opens a fullscreen window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input. It shows a Butterchurn visualizer that reacts to Spotify's audio and shuffles through 395 bundled presets, with what Spotify is playing in an overlay styled after the Spotify TV app. Custom presets and the audio delay aren't built yet. See [Roadmap](#roadmap) for progress.
+> **Status: in development.** The menu-bar app opens a fullscreen window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input. It shows a Butterchurn visualizer that reacts to Spotify's audio and shuffles through 395 bundled presets, with what Spotify is playing in an overlay styled after the Spotify TV app. The audio delay for Bluetooth and AirPlay speakers isn't built yet. See [Roadmap](#roadmap) for progress.
 
 ## Contents
 
@@ -40,12 +40,13 @@ Working now:
 - [Butterchurn](https://github.com/jberg/butterchurn) (WebGL Milkdrop) visualizer with 395 bundled presets. By default it shows a random preset every 30 seconds with a 2.7-second blend, and goes through all of them before repeating one.
 - Preset controls in settings: shuffle or one fixed preset, which presets to shuffle from, seconds per preset, blend time, favorites, and a blocklist for presets you don't like. Changes apply at once, even while the visualizer is open. It renders at 60 fps, at most 2560 pixels wide, and only while the window is open.
 - Reacts to Spotify's audio only, through a Core Audio process tap that runs while the window is open. The visuals never hear the microphone or other system audio. A slow automatic gain keeps the visuals lively when Spotify's volume is low, and silence stays silent: paused, quit, or playing on another device, the visuals just drift.
+- Bring your own presets: drop Butterchurn `.json` or original Milkdrop `.milk` files, or custom `.js` visual plugins, into the presets folder, or use **Import…** in settings. Subfolders work, so a downloaded pack can go in as it is. The folder is watched, so new files show up without a restart. `.milk` files are converted once and cached.
+- Custom plugins run in a sandboxed frame with no network, no storage and no access to the rest of the app. A plugin that throws, runs too slowly or hangs is dropped and listed under **Failed to load** in settings, next to presets that couldn't be read or converted.
 - If the page ever stops responding, the app replaces it within a few seconds. The window also closes when the Mac goes to sleep or the displays change.
 - Reads what Spotify is playing (title, artist, album, playing or paused, position, length) and whether it's a song, a podcast or an ad, and downloads the album art. It never launches Spotify: it only asks while Spotify is running, and updates when Spotify says something changed rather than polling.
 
 Planned:
 
-- Bring your own presets: drop Butterchurn `.json` or Milkdrop `.milk` files, or custom `.js` visual plugins, into a folder.
 - Keeps the screen awake while it's showing, up to a limit you set (1 hour by default). After that the Mac sleeps and locks as usual.
 - Optional separate idle and keep-awake times for when the Mac is on battery.
 - Audio delay for Bluetooth and AirPlay speakers, set by hand or measured with a quick microphone check, saved per device.
@@ -69,7 +70,7 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | 7a   | Visualizer: Butterchurn with bundled presets                                      | Done    |
 | 7b   | Visualizer: real Spotify audio through the process tap                            | Done    |
 | 7c   | Visualizer: preset controls                                                       | Done    |
-| 7d   | Visualizer: custom preset folder and sandboxed plugins                            | Planned |
+| 7d   | Visualizer: custom preset folder and sandboxed plugins                            | Done    |
 | 7e   | Visualizer: audio delay, with a microphone-based detector                         | Planned |
 | 8    | Polish: fades, launch at login, brightness, keep-awake, battery, permission setup  | Planned |
 
@@ -126,6 +127,8 @@ The app is built from source for personal use. There is no download.
 - **Visualizer:** it moves to whatever Spotify is playing on this Mac, and a new preset blends in every 30 seconds. With Spotify paused, or playing on another device, the visuals get silence and drift slowly.
 - **Presets:** in settings, **Mode** is **Shuffle** or **Single**. Shuffle has **Shuffle from** (all, bundled, custom or favorites), **Seconds per preset** and **Blend time**. Single has one **Visualizer** picker, and that preset stays on screen. Any input closes the visualizer, so presets are rated afterwards: **Last shown** names the preset that was just on screen, with a heart to add it to your favorites and a block button to leave it out of shuffle. **Favorites** and **Blocklist** open a list where you can remove entries or search all presets to add more.
 
+- **Your own presets:** the presets folder is `~/Library/Application Support/IdleViz/Presets/`. In settings under **Presets**, **Import…** copies files or whole folders into it (`.json`, `.milk`, `.js`), **Open** shows it in Finder, and **Reload** reads it again, though it also notices changes by itself. Custom presets appear in the **Visualizer** picker and the favorites and blocklist sheets, and **Shuffle from** can be set to **Custom**. Anything that couldn't be loaded is listed under **Failed to load** with the reason and a **Reveal** button; fix or replace the file and it is tried again. Custom plugins and presets are code, so only import ones you trust.
+
 ## Custom visualizers
 
 You can add your own visuals without touching the app. The easiest way is a single `.js` file that draws into a canvas and receives Spotify's audio levels every frame. [`aurora.js`](IdleViz/web/visuals/aurora.js) is a complete working example, and the full guide is [docs/custom-visualizer.md](docs/custom-visualizer.md).
@@ -152,7 +155,7 @@ swift build && swift test
 swiftlint lint --strict
 ```
 
-In Debug builds, the launch argument `-IdleVizNoDismiss YES` keeps the window open so it can be inspected; trigger it again to close. `-IdleVizShowSettings YES` opens the settings window at launch. The page is inspectable in Debug builds: with the window open, attach Safari's Web Inspector from **Develop → [your Mac] → IdleViz**. The scheme has this argument ready to tick. Each open logs whether macOS let the app activate, and each preset change is logged too:
+In Debug builds, the launch argument `-IdleVizNoDismiss YES` keeps the window open so it can be inspected; trigger it again to close. `-IdleVizShowSettings YES` opens the settings window at launch, and `-IdleVizOpenAtLaunch YES` opens the visualizer three seconds after launch (unlike `open idleviz://open`, that can't end up in another copy of the app). The page is inspectable in Debug builds: with the window open, attach Safari's Web Inspector from **Develop → [your Mac] → IdleViz**. The scheme has this argument ready to tick. Each open logs whether macOS let the app activate, and each preset change is logged too:
 
 ```bash
 log stream --predicate 'subsystem == "com.xauno.IdleViz"'
@@ -170,11 +173,11 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
 ├─ Package.swift           IdleVizCore Swift package (testable logic)
-├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings
+├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks)
 ├─ IdleViz.xcodeproj       App target: bundle, Info.plist, entitlements, signing
-├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, Spotify info, Spotify audio tap, web view
-├─ IdleViz/web/            The page: visualizer and overlay HTML, CSS and JS, Figtree font (served from idleviz-app://)
-├─ IdleViz/web/vendor/     Butterchurn and its preset packs, copied unchanged from npm
+├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, Spotify info, Spotify audio tap, web view, presets folder and Milkdrop converter
+├─ IdleViz/web/            The page: visualizer and overlay HTML, CSS and JS, the plugin frame and its runner, the converter page, Figtree font (served from idleviz-app://)
+├─ IdleViz/web/vendor/     Butterchurn, its preset packs and the Milkdrop converter, copied unchanged from npm
 ├─ IdleViz/web/visuals/    Bundled visualizer plugins (aurora.js, the example plugin)
 ├─ Config/                 Build settings; your signing team goes in Local.xcconfig
 ├─ aurora-demo.html        Test page that feeds a plugin audio from a file or microphone
@@ -189,10 +192,10 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 
 ## License
 
-[MIT](LICENSE). Butterchurn and the bundled preset packs are MIT licensed too; their license files are in [IdleViz/web/vendor/](IdleViz/web/vendor/). Milkdrop presets and plugins that you import yourself keep their own licenses.
+[MIT](LICENSE). Butterchurn, the bundled preset packs and the Milkdrop converter are MIT licensed too; their license files are in [IdleViz/web/vendor/](IdleViz/web/vendor/). Milkdrop presets and plugins that you import yourself keep their own licenses.
 
 ## Acknowledgments
 
-- [Butterchurn](https://github.com/jberg/butterchurn), [butterchurn-presets](https://github.com/jberg/butterchurn-presets) and [Milkdrop](https://www.geisswerks.com/milkdrop/), the visualizer engine and the presets it plays
+- [Butterchurn](https://github.com/jberg/butterchurn), [butterchurn-presets](https://github.com/jberg/butterchurn-presets), [milkdrop-preset-converter](https://github.com/jberg/milkdrop-preset-converter) and [Milkdrop](https://www.geisswerks.com/milkdrop/), the visualizer engine and the presets it plays
 - [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) for the global hotkey
 - [Figtree](https://github.com/erikdkennedy/figtree) for the overlay font

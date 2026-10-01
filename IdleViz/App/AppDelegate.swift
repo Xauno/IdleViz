@@ -7,7 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let log = Logger(subsystem: "com.xauno.IdleViz", category: "app")
     private let windowController = WindowController()
     let menuBarIcon = MenuBarIcon()
-    private lazy var presets = PresetController(page: windowController.page)
+    private lazy var presets = PresetController(page: windowController.page, library: PresetLibrary())
     private lazy var settings = SettingsWindowController(
         presets: presets,
         openNow: { [weak self] in self?.open(from: .settings) }
@@ -44,6 +44,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         // Launch argument `-IdleVizShowSettings YES` opens the settings window at launch, for working on it.
         if UserDefaults.standard.bool(forKey: "IdleVizShowSettings") { showSettings() }
+        // `-IdleVizOpenAtLaunch YES` opens the visualizer a moment after launch. Unlike `open idleviz://open`,
+        // it can't be routed to another copy of the app that happens to be on disk.
+        if UserDefaults.standard.bool(forKey: "IdleVizOpenAtLaunch") {
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(3))
+                self?.open(from: .urlScheme)
+            }
+        }
         #endif
     }
 

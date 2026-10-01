@@ -329,12 +329,17 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
   - Accepted files:
     - `.json`: Butterchurn-format presets, loaded directly.
     - `.js`: custom visual plugins (see "Custom JS plugins" below).
-    - `.milk`: original Milkdrop presets, converted with `butterchurn-preset-converter`. Converted results are cached (e.g. `Presets/.cache/<hash>.json`) so conversion runs once per file. Verify the converter runs fully in-page/offline in the version you use; if it needs a server or build step, convert in a Node script instead.
+    - `.milk`: original Milkdrop presets, converted with `milkdrop-preset-converter` 0.1.2 (vendored in `web/vendor/`; its WebAssembly is inside the file, so it runs offline, checked in step 7d). Converted results are cached in `Presets/.cache/<key>.json`, where the key is a SHA-256 of the converter version and the file's contents, so conversion runs once per file and cached results of deleted or changed files are removed.
+      - Conversion runs in a hidden web page of its own (`converter.html`, CSP `default-src 'none'; script-src 'self' 'unsafe-eval'`), not in the visualizer page. Untrusted files are parsed away from the visualizer, and a slow conversion can't stall the visuals. Swift opens it only while there are files to convert, hands it each file's text with `callAsyncJavaScript`, and checks the JSON that comes back before caching it. A conversion that takes over 10 s is abandoned.
+      - The converter doesn't report errors itself: any text becomes an empty preset, and a shader it can't translate becomes the text "parsing failed". So Swift first checks that the file looks like a Milkdrop preset, and treats "parsing failed" in the result as a failure. A failed conversion isn't tried again until the file's contents change.
+    - At most 5,000 files are read. Hidden files and folders are skipped.
   - Settings window controls (Presets section):
-    - **Import Presets…** opens an `NSOpenPanel` (files or folders) and copies the picks into the presets folder.
+    - **Import Presets…** opens an `NSOpenPanel` (files or folders) and copies the picks into the presets folder. A name that's already taken gets a number, as in Finder ("Tunnel 2.milk"), so nothing is replaced.
     - **Open Presets Folder** reveals it in Finder.
     - **Reload Presets** rescans it.
-  - `PresetLibrary.swift` scans the folder and watches it for changes (`DispatchSource` file-system events or FSEvents), so dropping files in updates the library without a restart. It sends the list to the page with `window.setCustomPresets(json)`.
+  - `PresetLibrary.swift` scans the folder and watches it for changes (FSEvents, which covers subfolders; its own writes to `.cache` are ignored), so dropping files in updates the library without a restart. It sends the list to the page with `window.setCustomPresets(json)`: each entry has an id (`custom:` plus the path inside the folder), a name, its kind (preset or plugin), the `idleviz-app://presets/…` URL to load it from, and a version (size and modification time). The list also carries the plugins bundled in `web/visuals/`.
+  - The page fetches a custom preset when it is first shown, not up front, so a big pack costs nothing until its presets come up. Editing or replacing the file that is on screen shows the new version at once.
+  - `idleviz-app://presets/…` only serves `.json` and `.js` files inside the folder.
   - Each preset is validated (parse, compile its shaders) in a `try/catch` when first loaded. Bad ones are skipped and listed under "Failed to load" in settings ("3 presets failed to load"). They are not added to the blocklist, which only holds presets you chose to hide. When a failed file changes or is replaced, it's tried again.
   - Presets are tagged by source (bundled / custom) so the settings can shuffle all, bundled only, or custom only.
   - Check each pack's license before sharing the app. User-imported presets stay on the user's machine and are never bundled.
@@ -352,17 +357,20 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
   - Plugins draw only into the canvas they are given. Each `init` gets a fresh canvas, so a plugin picks its own context type (WebGL2 or 2D).
   - **Isolation: each plugin runs in its own sandboxed frame.** Bundled plugins in `web/visuals/` use the same frame, so there's only one way plugins are run.
     - The host page creates `<iframe sandbox="allow-scripts">` (no `allow-same-origin`, so it gets an opaque origin) loading `idleviz-app://app/plugin-host.html`, which holds the plugin's canvas.
-    - The frame's own CSP: `default-src 'none'; script-src idleviz-app:; img-src data: blob:`. No network, no storage.
+    - The frame's own CSP: `default-src 'none'; script-src idleviz-app:; img-src data: blob:`. No network, no storage. The policy allows no stylesheets either, so the runner sets the canvas layout from script.
+    - The frame's origin is opaque, so its runner script and the plugin itself are cross-origin requests. The scheme handler sends `Access-Control-Allow-Origin: *` with every response.
+    - Checked in step 7d with a plugin that tries each of these: `fetch` to the web and to the app's own scheme, `window.parent.document`, `localStorage`, cookies and `getUserMedia` were all blocked, its origin was `null`, and it saw no `webkit.messageHandlers`.
     - Each frame, the host posts the audio object to the frame with `postMessage`. A small runner inside the frame copies it into reused arrays and calls the plugin's `frame(audio, time)`.
     - The frame can't reach the overlay DOM, the host's JS, or Swift.
   - **The page has no way to call into Swift.** Don't register any `WKScriptMessageHandler`. Swift talks to the page with `evaluateJavaScript`, and finds out how the page is doing by asking it (see "Loading and failure"). That way neither plugins nor custom presets can reach the app.
   - **Loading and failure:**
     - The runner imports the file with `import()` inside `try/catch` and calls `init`.
-    - It wraps `frame` so that a throw, or a frame that takes over ~50 ms for several seconds in a row, reports a failure to the host. The host then removes the frame and moves on to the next preset.
-    - **Status check.** About once a second while the window is open, Swift calls `evaluateJavaScript("window.idlevizStatus()")`. It returns the current preset and any new load failures (name + error message), which Swift shows in settings. Treat the reply as untrusted: check its shape and cap string lengths. Built in step 7b (`PageStatus`, `PageWatchdog`): for now Swift logs preset changes and failures; settings shows them from step 7d.
-    - WebKit may run the frame on the same thread as the host, so a plugin stuck in an endless loop freezes the whole page. If the status check gets no reply for ~3 s, Swift replaces the web view (see "Recovery" under Window) and marks the preset that was last reported as failed (the marking arrives in step 7d).
+    - It wraps `frame` so that a throw, or a frame that takes over ~50 ms for several seconds in a row (3 s as built), reports a failure to the host. The host then removes the frame and moves on to the next preset. A plugin that hasn't started within 5 s counts as failed too.
+    - A plugin fades in over the Butterchurn canvas for the blend time and fades out the same way. Butterchurn stops rendering while a plugin fully covers it.
+    - **Status check.** About once a second while the window is open, Swift calls `evaluateJavaScript("window.idlevizStatus()")`. It returns the current preset and any new load failures (name + error message), which Swift shows in settings. Treat the reply as untrusted: check its shape and cap string lengths. Settings lists the failures, each with a Reveal button for its file.
+    - WebKit may run the frame on the same thread as the host, so a plugin stuck in an endless loop freezes the whole page. If the status check gets no reply for ~3 s, Swift replaces the web view (see "Recovery" under Window) and marks the preset that was last reported as failed, so the new page doesn't hang on it again. The mark is dropped when the file changes.
   - The regex check in `tests/plugin-contract.test.js` is a lint for plugins in the repo, not a security boundary. The sandboxed frame and CSP are what enforce the limits.
-  - The settings window still shows a one-time warning that custom plugins (and custom presets, see "Page security") are code and should only come from sources the user trusts.
+  - The settings window shows a warning above the Presets rows that custom plugins and presets (see "Page security") are code and should only come from sources the user trusts.
   - Same license caveat as presets: imported plugins stay on the user's machine and are never bundled.
   - Settings window shows plugin load failures alongside preset failures, and includes plugins in favorites and the blocklist.
 - Alternative considered: native **libprojectM** (open-source Milkdrop engine, C++/OpenGL). Larger ecosystem, but OpenGL is deprecated on macOS and it needs a native rendering layer under the window, so Butterchurn is the simpler start.
@@ -397,11 +405,17 @@ IdleViz/
 │  ├─ AudioPump.swift            # while open: tap → IdleVizCore analysis → page, 60×/s; tap health check
 │  ├─ AudioDelay.swift           # per-device delay line, Detect delay (mic, ~5 s)
 │  ├─ PresetLibrary.swift        # scan/watch custom preset folder, import, send list to page
+│  ├─ FolderWatcher.swift        # FSEvents wrapper
+│  ├─ MilkConverter.swift        # hidden page that converts .milk files
 │  ├─ Info.plist                 # LSUIElement, NSAppleEventsUsageDescription, NSAudioCaptureUsageDescription, NSMicrophoneUsageDescription
 │  └─ IdleViz.entitlements       # hardened runtime + apple-events + audio-input, no sandbox
 ├─ web/
 │  ├─ index.html
 │  ├─ plugin-host.html           # sandboxed frame that runs one custom JS plugin
+│  ├─ plugin-runner.js           # inside the frame: loads the plugin, runs it on posted frames
+│  ├─ plugin-runner-core.js      # DOM-free part of the runner (tested with Vitest)
+│  ├─ plugin-frame.js            # host side: creates the frame, posts audio, handles failures
+│  ├─ converter.html / converter.js  # hidden page for .milk conversion
 │  ├─ overlay.css / overlay.js   # nowPlaying(), progress interpolation, states
 │  ├─ overlay-state.js           # DOM-free overlay logic (tested with Vitest)
 │  ├─ fonts/                     # Figtree + OFL license
@@ -427,7 +441,7 @@ Each step is one pull request. At the end of each step, update the README (Roadm
    - **7a.** Butterchurn in the page with bundled presets and fake audio. Move `aurora.js` to `web/visuals/`. Done.
    - **7b.** Real audio: process tap (with process-list changes), analysis in Swift, automatic gain, silence rules, web view recovery. Done.
    - **7c.** Preset controls (mode, shuffle, timing, blend, favorites, blocklist). Done.
-   - **7d.** Custom preset folder: `.json` loading, folder watching, `.js` plugins in sandboxed frames (with the audio, CSP and status-check rules), Import/Open/Reload controls in settings, then `.milk` conversion with caching and failure handling.
+   - **7d.** Custom preset folder: `.json` loading, folder watching, `.js` plugins in sandboxed frames (with the audio, CSP and status-check rules), Import/Open/Reload controls in settings, then `.milk` conversion with caching and failure handling. Done.
    - **7e.** Audio delay: per-device delay line, the settings slider, and **Detect delay** with the microphone. Test with built-in speakers, Bluetooth headphones and speakers, and AirPlay if available.
 8. **Polish:** fades, launch at login, brightness slider in settings, keep awake with its time limit setting (and the idle rule to wait for input after the limit), different times on battery, first-launch welcome window for permissions, yellow icon and popup error rows for missing permissions.
 

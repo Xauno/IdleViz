@@ -20,8 +20,14 @@ describe("vendored libraries", () => {
     expect(actual).toBe(expected);
   });
 
-  it("is loaded by the page in full", () => {
-    const html = readFileSync(join(vendorDir, "..", "index.html"), "utf8");
-    for (const file of Object.keys(checksums)) expect(html).toContain(`src="vendor/${file}"`);
+  it("is loaded by the pages that need it", () => {
+    const page = readFileSync(join(vendorDir, "..", "index.html"), "utf8");
+    const converter = readFileSync(join(vendorDir, "..", "converter.html"), "utf8");
+    for (const file of Object.keys(checksums)) {
+      // The Milkdrop converter only runs in its own hidden page, away from the visualizer.
+      const [html, other] = file.startsWith("milkdrop") ? [converter, page] : [page, converter];
+      expect(html).toContain(`src="vendor/${file}"`);
+      expect(other).not.toContain(file);
+    }
   });
 });

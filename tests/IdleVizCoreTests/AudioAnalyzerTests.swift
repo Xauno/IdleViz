@@ -278,10 +278,16 @@ final class TapHealthTests: XCTestCase {
 
 final class PageStatusTests: XCTestCase {
     func testReadsAStatusReply() {
-        let reply: [String: Any] = ["preset": "bundled:Geiss - Swirl", "frames": 1200.0, "audioFrames": 1190.0, "failed": ["bundled:Bad"]]
+        let reply: [String: Any] = [
+            "preset": "bundled:Geiss - Swirl", "frames": 1200.0, "audioFrames": 1190.0,
+            "failed": [["id": "custom:bad.json", "error": "Unexpected token"]],
+        ]
         XCTAssertEqual(
             PageStatus(reply: reply),
-            PageStatus(preset: "bundled:Geiss - Swirl", frames: 1200, audioFrames: 1190, failed: ["bundled:Bad"])
+            PageStatus(
+                preset: "bundled:Geiss - Swirl", frames: 1200, audioFrames: 1190,
+                failed: [PresetFailure(id: "custom:bad.json", error: "Unexpected token")]
+            )
         )
     }
 
@@ -293,17 +299,21 @@ final class PageStatusTests: XCTestCase {
 
     func testTreatsTheReplyAsUntrusted() {
         let long = String(repeating: "x", count: 5000)
+        let entry: [String: Any] = ["id": "custom:f", "error": "e"]
         let reply: [String: Any] = [
             "preset": long,
             "frames": Double.infinity,
             "audioFrames": -5.0,
-            "failed": [long, 3, ["nested"]] + [Any](repeating: "f", count: 500),
+            "failed": [["id": long, "error": long], "text", 3, ["error": "no id"], ["id": "custom:no-error"]]
+                + [Any](repeating: entry, count: 500),
         ]
         let status = PageStatus(reply: reply)
         XCTAssertEqual(status?.preset?.count, PageStatus.maxTextLength)
         XCTAssertEqual(status?.frames, 0)
         XCTAssertEqual(status?.audioFrames, 0)
-        XCTAssertEqual(status?.failed.first?.count, PageStatus.maxTextLength)
+        XCTAssertEqual(status?.failed.first?.id.count, PageStatus.maxTextLength)
+        XCTAssertEqual(status?.failed.first?.error.count, PageStatus.maxTextLength)
+        XCTAssertEqual(status?.failed[1], PresetFailure(id: "custom:no-error", error: "Failed to load"))
         XCTAssertLessThanOrEqual(status?.failed.count ?? .max, PageStatus.maxFailures)
     }
 

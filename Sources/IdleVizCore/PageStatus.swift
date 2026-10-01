@@ -12,10 +12,10 @@ public struct PageStatus: Sendable, Equatable {
     public var frames: Int
     /// Audio frames the page has received since it loaded.
     public var audioFrames: Int
-    /// Ids of presets that failed to load.
-    public var failed: [String]
+    /// Presets and plugins that failed to load, each with its error message.
+    public var failed: [PresetFailure]
 
-    public init(preset: String?, frames: Int, audioFrames: Int, failed: [String]) {
+    public init(preset: String?, frames: Int, audioFrames: Int, failed: [PresetFailure]) {
         self.preset = preset
         self.frames = frames
         self.audioFrames = audioFrames
@@ -28,16 +28,31 @@ public struct PageStatus: Sendable, Equatable {
         preset = (reply["preset"] as? String).map(Self.clip)
         frames = Self.count(reply["frames"])
         audioFrames = Self.count(reply["audioFrames"])
-        failed = (reply["failed"] as? [Any] ?? []).prefix(Self.maxFailures).compactMap { ($0 as? String).map(Self.clip) }
+        failed = (reply["failed"] as? [Any] ?? []).prefix(Self.maxFailures).compactMap { item in
+            guard let item = item as? [String: Any], let id = item["id"] as? String, !id.isEmpty else { return nil }
+            return PresetFailure(id: Self.clip(id), error: Self.clip(item["error"] as? String ?? "Failed to load"))
+        }
     }
 
-    private static func clip(_ text: String) -> String {
+    /// Cuts text from the page down to a length that is safe to log and show.
+    public static func clip(_ text: String) -> String {
         String(text.prefix(maxTextLength))
     }
 
     private static func count(_ value: Any?) -> Int {
         guard let number = value as? Double, number.isFinite, number >= 0, number < 1e15 else { return 0 }
         return Int(number)
+    }
+}
+
+/// One preset or plugin that couldn't be loaded, for the "Failed to load" list in settings.
+public struct PresetFailure: Sendable, Equatable, Identifiable {
+    public var id: String
+    public var error: String
+
+    public init(id: String, error: String) {
+        self.id = id
+        self.error = error
     }
 }
 

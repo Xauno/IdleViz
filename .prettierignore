@@ -5,3 +5,4 @@ aurora-demo.html
 .build/
 *.md
 IdleViz/web/vendor/*.min.js
+.claude/

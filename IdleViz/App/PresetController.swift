@@ -20,13 +20,18 @@ final class PresetController {
     private(set) var presets: [PresetInfo] = []
     /// The preset that was last on screen, so it can be liked or blocked after closing the visualizer.
     private(set) var lastShown: String?
+    /// Presets and plugins the page couldn't load.
+    private(set) var pageFailures: [PresetFailure] = []
+    /// The custom presets folder.
+    let library: PresetLibrary
 
     @ObservationIgnored private let page: PageView
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var names: [String: String] = [:]
 
-    init(page: PageView, defaults: UserDefaults = .standard) {
+    init(page: PageView, library: PresetLibrary, defaults: UserDefaults = .standard) {
         self.page = page
+        self.library = library
         self.defaults = defaults
         settings = PresetSettings(defaults: defaults)
         lastShown = defaults.string(forKey: Self.lastShownKey)
@@ -39,8 +44,21 @@ final class PresetController {
             self.lastShown = id
             self.defaults.set(id, forKey: Self.lastShownKey)
         }
+        page.onFailures = { [weak self] failures in self?.pageFailures = failures }
+        page.onHung = { [weak library] id in library?.markHung(id) }
+        library.onChange = { [weak page] payload in page?.send(customPresets: payload) }
         page.send(presetSettings: settings)
+        library.start()
     }
+
+    /// Everything that failed to load: files that didn't convert, then what the page reported.
+    var failures: [PresetFailure] {
+        let converted = library.conversionFailures
+        let known = Set(converted.map(\.id))
+        return converted + pageFailures.filter { !known.contains($0.id) }
+    }
+
+    var bundledCount: Int { presets.count { $0.source == "bundled" } }
 
     func name(for id: String) -> String {
         names[id] ?? PresetInfo.fallbackName(for: id)

@@ -193,3 +193,51 @@ struct PresetListSheet: View {
         .font(.callout)
     }
 }
+
+/// The Presets section in settings: the trust warning, Import, the folder, Reload, and what failed to load.
+struct PresetFolderControls: View {
+    @Bindable var presets: PresetController
+
+    var body: some View {
+        Section {
+            LabeledContent {
+                Button("Import") { presets.library.importPresets() }
+            } label: {
+                Text("Import…")
+                Text(".json, .js, .milk")
+            }
+            LabeledContent {
+                Button("Open") { presets.library.openFolder() }
+            } label: {
+                Text("Folder")
+                Text("\(presets.bundledCount) bundled, \(presets.library.customCount) custom")
+            }
+            LabeledContent("Rescan") {
+                Button("Reload") { presets.library.reload() }
+            }
+        } header: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Presets")
+                // Presets carry equations that run as code, so the warning covers them as well as plugins.
+                Text("Custom plugins and presets are code. Only import ones you trust.")
+                    .font(.caption)
+                    .fontWeight(.regular)
+                    .foregroundStyle(.orange)
+            }
+        }
+        if !presets.failures.isEmpty {
+            Section("Failed to load (\(presets.failures.count))") {
+                ForEach(presets.failures) { failure in
+                    LabeledContent {
+                        if presets.library.file(for: failure.id) != nil {
+                            Button("Reveal") { presets.library.reveal(failure.id) }
+                        }
+                    } label: {
+                        Text(presets.name(for: failure.id)).lineLimit(1)
+                        Text(failure.error).lineLimit(2)
+                    }
+                }
+            }
+        }
+    }
+}

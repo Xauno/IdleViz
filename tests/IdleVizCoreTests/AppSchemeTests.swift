@@ -43,6 +43,39 @@ final class AppSchemeTests: XCTestCase {
         XCTAssertNil(AppScheme.file(for: try url("file:///etc/hosts"), in: root))
     }
 
+    func testPresetsHostServesOnlyPresetsAndPlugins() throws {
+        let base = root.standardizedFileURL.resolvingSymlinksInPath().path
+        XCTAssertEqual(AppScheme.presetFile(for: try url("idleviz-app://presets/pack/a.json"), in: root)?.path, base + "/pack/a.json")
+        XCTAssertEqual(AppScheme.presetFile(for: try url("idleviz-app://presets/Wave.JS"), in: root)?.path, base + "/Wave.JS")
+        XCTAssertEqual(
+            AppScheme.presetFile(for: try url("idleviz-app://presets/.cache/abc.json"), in: root)?.path, base + "/.cache/abc.json"
+        )
+        XCTAssertNil(AppScheme.presetFile(for: try url("idleviz-app://presets/a.milk"), in: root))
+        XCTAssertNil(AppScheme.presetFile(for: try url("idleviz-app://presets/notes.txt"), in: root))
+        XCTAssertNil(AppScheme.presetFile(for: try url("idleviz-app://presets/../secret.json"), in: root))
+        XCTAssertNil(AppScheme.presetFile(for: try url("idleviz-app://app/a.json"), in: root))
+    }
+
+    func testPresetURLsSurviveOddNames() throws {
+        let path = "My Pack/100% wild #1? [v2];x.json"
+        let string = AppScheme.presetURL(relativePath: path)
+        XCTAssertTrue(string.hasPrefix("idleviz-app://presets/My%20Pack/"))
+        let base = root.standardizedFileURL.resolvingSymlinksInPath().path
+        XCTAssertEqual(AppScheme.presetFile(for: try url(string), in: root)?.path, base + "/" + path)
+    }
+
+    func testEachPageGetsItsOwnPolicy() {
+        XCTAssertEqual(AppScheme.contentSecurityPolicy(forPage: URL(filePath: "/web/index.html")), AppScheme.contentSecurityPolicy)
+        XCTAssertEqual(
+            AppScheme.contentSecurityPolicy(forPage: URL(filePath: "/web/plugin-host.html")),
+            "default-src 'none'; script-src idleviz-app:; img-src data: blob:"
+        )
+        XCTAssertEqual(
+            AppScheme.contentSecurityPolicy(forPage: URL(filePath: "/web/converter.html")),
+            "default-src 'none'; script-src 'self' 'unsafe-eval'"
+        )
+    }
+
     func testMimeTypes() {
         XCTAssertEqual(AppScheme.mimeType(for: URL(filePath: "/a/overlay.js")), "text/javascript; charset=utf-8")
         XCTAssertEqual(AppScheme.mimeType(for: URL(filePath: "/a/index.html")), "text/html; charset=utf-8")

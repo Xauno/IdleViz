@@ -3,8 +3,8 @@ import IdleVizCore
 import KeyboardShortcuts
 import SwiftUI
 
-/// Separate settings window, per mockups.html section 2. So far it has the idle timeout, the
-/// hotkey, Open now and the preset controls; the other rows arrive with the features they control.
+/// Separate settings window, per mockups.html section 2. So far it has the idle timeout, the hotkey,
+/// Open now, the preset controls and the presets folder; the other rows arrive with the features they control.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let presets: PresetController
@@ -71,6 +71,7 @@ struct SettingsView: View {
                 }
             }
             PresetControls(presets: presets)
+            PresetFolderControls(presets: presets)
         }
         .formStyle(.grouped)
     }

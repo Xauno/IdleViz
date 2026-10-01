@@ -18,10 +18,52 @@ public enum AppScheme {
         "frame-src 'self'",
     ].joined(separator: "; ")
 
-    /// The file inside `root` that an `idleviz-app://app/…` URL names, or nil if the URL
+    /// Sent with `plugin-host.html`, the sandboxed frame one plugin runs in: scripts from the app's
+    /// own scheme only, no network, no storage.
+    public static let pluginFrameContentSecurityPolicy = [
+        "default-src 'none'",
+        "script-src idleviz-app:",
+        "img-src data: blob:",
+    ].joined(separator: "; ")
+
+    /// Sent with `converter.html`, the hidden page that converts `.milk` files. The converter is
+    /// WebAssembly and compiles equations, which is what `'unsafe-eval'` allows; it gets nothing else.
+    public static let converterContentSecurityPolicy = "default-src 'none'; script-src 'self' 'unsafe-eval'"
+
+    public static let converterURL = URL(string: "idleviz-app://app/converter.html")!
+    public static let appHost = "app"
+    public static let presetsHost = "presets"
+
+    /// The policy for an HTML file of the app, by file name.
+    public static func contentSecurityPolicy(forPage file: URL) -> String {
+        switch file.lastPathComponent {
+        case "plugin-host.html": pluginFrameContentSecurityPolicy
+        case "converter.html": converterContentSecurityPolicy
+        default: contentSecurityPolicy
+        }
+    }
+
+    /// The file in the custom presets folder that an `idleviz-app://presets/…` URL names. Only
+    /// presets (`.json`) and plugins (`.js`) are served, and nothing outside the folder.
+    public static func presetFile(for url: URL, in root: URL) -> URL? {
+        guard let file = file(for: url, in: root, host: presetsHost) else { return nil }
+        return ["json", "js"].contains(file.pathExtension.lowercased()) ? file : nil
+    }
+
+    /// The URL the page uses for a file in the presets folder, from its path relative to the folder.
+    public static func presetURL(relativePath: String) -> String {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "%?#;")
+        let path = relativePath.split(separator: "/").map { part in
+            String(part).addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
+        }.joined(separator: "/")
+        return "\(scheme)://\(presetsHost)/\(path)"
+    }
+
+    /// The file inside `root` that an `idleviz-app://<host>/…` URL names, or nil if the URL
     /// is for another host or would escape `root` (`..`, symlinks).
-    public static func file(for url: URL, in root: URL) -> URL? {
-        guard url.scheme?.lowercased() == scheme, url.host()?.lowercased() == "app" else { return nil }
+    public static func file(for url: URL, in root: URL, host: String = appHost) -> URL? {
+        guard url.scheme?.lowercased() == scheme, url.host()?.lowercased() == host else { return nil }
         let relative = url.path(percentEncoded: false).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard !relative.isEmpty else { return nil }
         let base = root.standardizedFileURL.resolvingSymlinksInPath()
