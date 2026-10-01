@@ -48,6 +48,14 @@ final class WindowController {
 
     var isOpen: Bool { window?.isVisible ?? false }
 
+    /// Creates the hidden window. Call this at launch, while the app is still an accessory:
+    /// macOS decides when a window is created whether it may join other apps' fullscreen Spaces,
+    /// and a window created while the app is regular (settings open) never can.
+    func prepare(on screen: NSScreen) {
+        guard window == nil else { return }
+        window = VisualizerWindow.make(on: screen, content: page.view)
+    }
+
     func open(on screen: NSScreen, source: TriggerSource) {
         guard !isOpen else { return }
         let window = window ?? VisualizerWindow.make(on: screen, content: page.view)
