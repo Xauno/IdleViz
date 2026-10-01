@@ -8,7 +8,8 @@ import IdleVizCore
 /// `DismissTracker`.
 ///
 /// The like and skip keys are the exception: the local monitor hands them to `onAction`
-/// and the window stays open.
+/// and the window stays open. The media keys (brightness, keyboard backlight, playback, volume)
+/// don't close it either.
 @MainActor
 final class DismissWatcher {
     /// How long the backup check waits for the local monitor to explain an input before closing on it.
@@ -16,7 +17,7 @@ final class DismissWatcher {
 
     private static let localMask: NSEvent.EventTypeMask = [
         .mouseMoved, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel,
-        .keyDown, .keyUp, .flagsChanged, .gesture, .magnify, .swipe,
+        .keyDown, .keyUp, .flagsChanged, .gesture, .magnify, .swipe, .systemDefined,
     ]
     private static let globalMask: NSEvent.EventTypeMask = [
         .mouseMoved, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel,
@@ -44,8 +45,9 @@ final class DismissWatcher {
     func start() {
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: Self.localMask) { [weak self] event in
             MainActor.assumeIsolated { self?.handle(event) }
-            // Swallow all input while open so nothing reaches views or beeps.
-            return nil
+            // Swallow all input while open so nothing reaches views or beeps. System-defined events
+            // go on, so the media keys still do their job.
+            return event.type == .systemDefined ? event : nil
         }
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: Self.globalMask) { [weak self] event in
             MainActor.assumeIsolated { self?.handle(event) }
@@ -60,12 +62,10 @@ final class DismissWatcher {
                 try? await Task.sleep(for: .milliseconds(100))
                 guard let self, !Task.isCancelled else { return }
                 guard self.backupSaysDismiss() else { continue }
-                if !self.tracker.passKeys.isEmpty {
-                    // The idle time resets the moment a key moves, before the local monitor gets the
-                    // event. If that was a like or skip key, the monitor explains it in a moment.
-                    try? await Task.sleep(for: Self.settleTime)
-                    guard !Task.isCancelled, self.backupSaysDismiss() else { continue }
-                }
+                // The idle time resets the moment a key moves, before the local monitor gets the
+                // event. If that was a like, skip or media key, the monitor explains it in a moment.
+                try? await Task.sleep(for: Self.settleTime)
+                guard !Task.isCancelled, self.backupSaysDismiss() else { continue }
                 self.fire()
                 return
             }
@@ -110,6 +110,7 @@ final class DismissWatcher {
         // A modifier changed; whether it went down or up is read from the key state.
         case .flagsChanged: .key(code: event.keyCode, isDown: isKeyDown(event.keyCode), isRepeat: false)
         case .gesture, .magnify, .swipe: .gesture
+        case .systemDefined: MediaKey.inputEvent(subtype: Int(event.subtype.rawValue), data1: event.data1)
         default: nil
         }
     }
