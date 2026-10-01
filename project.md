@@ -39,7 +39,7 @@ A menu-bar app that opens a fullscreen music visualizer with a Spotify now-playi
 - **Signing.** Sign every local build with the same free Apple Development certificate (Xcode's personal team). macOS ties the Automation and System Audio Recording permissions to the signature, so ad-hoc or changing signatures make the prompts come back or silently return all-zero audio.
 - **Hardened Runtime** on, with the `com.apple.security.automation.apple-events` entitlement, and `com.apple.security.device.audio-input` for the delay detector's microphone use.
 - **Not sandboxed.** The sandbox would need a temporary-exception entitlement for Apple Events to Spotify and would move the presets folder into a container.
-- **Install** by copying the built app to `/Applications`. Launch at login (`SMAppService`) works best from there.
+- **Install** by copying the built app to `/Applications`. Launch at login (`SMAppService`) works best from there. The `.app` bundle is the whole app, so there is no installer. `IdleViz.command` at the repo root does the build, the copy and the launch in one step.
 
 ---
 
@@ -411,6 +411,7 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
 ```
 IdleViz.xcodeproj                # app target (bundle ID com.xauno.IdleViz), synchronized with IdleViz/; web/ is an explicit folder so it's copied with its subfolders
 Config/                          # IdleViz.xcconfig; Local.xcconfig (gitignored) holds DEVELOPMENT_TEAM
+IdleViz.command                  # build Release, install to /Applications, open
 Package.swift                    # IdleVizCore package (testable logic)
 Sources/IdleVizCore/             # open rules, idle/skip rules, dismiss rules, like and skip keys, keep-awake + battery timing, fade times, permission states, brightness and overlay settings, Spotify parsing, content type, FFT/bands, delay detection
 tests/IdleVizCoreTests/          # XCTest, runs in CI with swift test (shares tests/ with the JS suite; Package.swift names the path)
