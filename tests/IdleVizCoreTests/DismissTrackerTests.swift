@@ -5,6 +5,7 @@ final class DismissTrackerTests: XCTestCase {
     let control: UInt16 = 59
     let option: UInt16 = 58
     let keyA: UInt16 = 0
+    let keyL: UInt16 = 37
 
     private func armed(holding keys: Set<UInt16> = []) -> DismissTracker {
         var tracker = DismissTracker(gracePeriod: 0.4)
@@ -87,6 +88,90 @@ final class DismissTrackerTests: XCTestCase {
         XCTAssertTrue(tracker.shouldDismiss(on: .key(code: keyA, isDown: true, isRepeat: false), elapsed: 1))
         var mouse = armed(holding: [control])
         XCTAssertTrue(mouse.shouldDismiss(on: .mouseDown, elapsed: 1))
+    }
+
+    // MARK: Like and skip keys
+
+    func testAPassKeyNeverCloses() {
+        var tracker = DismissTracker(gracePeriod: 0.4, passKeys: [keyL])
+        tracker.arm(heldKeys: [], elapsed: 0.4)
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: false), elapsed: 1))
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: true), elapsed: 1.5))
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: false, isRepeat: false), elapsed: 1.6))
+        // Pressed again, it still doesn't close.
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: false), elapsed: 2))
+    }
+
+    func testOtherKeysStillCloseNextToAPassKey() {
+        var tracker = DismissTracker(gracePeriod: 0.4, passKeys: [keyL])
+        tracker.arm(heldKeys: [], elapsed: 0.4)
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: false), elapsed: 1))
+        XCTAssertTrue(tracker.shouldDismiss(on: .key(code: keyA, isDown: true, isRepeat: false), elapsed: 1.1))
+    }
+
+    func testBackupIgnoresAPassKeyTheEventMonitorHandled() {
+        var tracker = DismissTracker(gracePeriod: 0.4, passKeys: [keyL])
+        tracker.arm(heldKeys: [], elapsed: 0.4)
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: false), elapsed: 1.0))
+        XCTAssertFalse(tracker.shouldDismiss(secondsSinceLastInput: 0.03, heldKeys: [keyL], elapsed: 1.02))
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: false, isRepeat: false), elapsed: 1.1))
+        XCTAssertFalse(tracker.shouldDismiss(secondsSinceLastInput: 0.02, heldKeys: [], elapsed: 1.11))
+        // Input after that is new.
+        XCTAssertTrue(tracker.shouldDismiss(secondsSinceLastInput: 0.01, heldKeys: [], elapsed: 2.0))
+    }
+
+    func testBackupClosesOnAPassKeyTheEventMonitorNeverSaw() {
+        // The window isn't key, so the key went to another app and did nothing here.
+        var tracker = DismissTracker(gracePeriod: 0.4, passKeys: [keyL])
+        tracker.arm(heldKeys: [], elapsed: 0.4)
+        XCTAssertTrue(tracker.shouldDismiss(secondsSinceLastInput: 0.05, heldKeys: [keyL], elapsed: 3))
+    }
+
+    func testAPassKeyHeldSinceOpeningIsNotStuck() {
+        var tracker = DismissTracker(gracePeriod: 0.4, passKeys: [keyL])
+        tracker.arm(heldKeys: [keyL], elapsed: 0.4)
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: false, isRepeat: false), elapsed: 0.9))
+        XCTAssertTrue(tracker.stuckKeys.isEmpty)
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: false), elapsed: 2))
+    }
+
+    // MARK: Media keys
+
+    /// `data1` of a system-defined event: the key type in the high half, "key down" in the low half.
+    private func data1(keyType: Int) -> Int { keyType << 16 | 0xA00 }
+
+    func testMediaKeysAreRecognized() {
+        // Volume up and down, brightness up and down, mute, play, next, previous, fast, rewind, backlight.
+        for keyType in [0, 1, 2, 3, 7, 16, 17, 18, 19, 20, 21, 22, 23] {
+            XCTAssertEqual(MediaKey.inputEvent(subtype: 8, data1: data1(keyType: keyType)), .mediaKey, "\(keyType)")
+        }
+        // The same key going up, and repeating.
+        XCTAssertEqual(MediaKey.inputEvent(subtype: 8, data1: 0 << 16 | 0xB00), .mediaKey)
+        XCTAssertEqual(MediaKey.inputEvent(subtype: 8, data1: 1 << 16 | 0xA01), .mediaKey)
+    }
+
+    func testOtherSystemKeysAreNotMediaKeys() {
+        // Caps Lock, Help, power, Num Lock, contrast, the launch panel, Eject and video mirror.
+        for keyType in [4, 5, 6, 10, 11, 12, 13, 14, 15, 24, 100] {
+            XCTAssertNil(MediaKey.inputEvent(subtype: 8, data1: data1(keyType: keyType)), "\(keyType)")
+        }
+        // Other kinds of system-defined events.
+        XCTAssertNil(MediaKey.inputEvent(subtype: 7, data1: data1(keyType: 0)))
+        XCTAssertNil(MediaKey.inputEvent(subtype: 1, data1: 0))
+    }
+
+    func testAMediaKeyNeverCloses() {
+        var tracker = armed()
+        XCTAssertFalse(tracker.shouldDismiss(on: .mediaKey, elapsed: 1))
+        XCTAssertFalse(tracker.shouldDismiss(on: .mediaKey, elapsed: 1.1))
+        XCTAssertTrue(tracker.shouldDismiss(on: .key(code: keyA, isDown: true, isRepeat: false), elapsed: 1.2))
+    }
+
+    func testBackupIgnoresAMediaKeyTheEventMonitorHandled() {
+        var tracker = armed()
+        XCTAssertFalse(tracker.shouldDismiss(on: .mediaKey, elapsed: 1.0))
+        XCTAssertFalse(tracker.shouldDismiss(secondsSinceLastInput: 0.03, heldKeys: [], elapsed: 1.02))
+        XCTAssertTrue(tracker.shouldDismiss(secondsSinceLastInput: 0.01, heldKeys: [], elapsed: 2.0))
     }
 
     // MARK: Backup check

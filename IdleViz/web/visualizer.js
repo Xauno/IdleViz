@@ -14,6 +14,7 @@ import {
   renderSize,
   shouldRender,
   shufflePool,
+  skipBlendSeconds,
 } from "./visualizer-state.js";
 
 /** @typedef {import("./visualizer-state.js").PresetEntry} PresetEntry */
@@ -343,6 +344,12 @@ function setCustomPresets(value) {
   reconcile();
 }
 
+/** Called by Swift when the skip key is pressed. The seconds-per-preset count starts over with the new preset. */
+function skipPreset() {
+  const blend = skipBlendSeconds(settings);
+  if (blend !== null) showNext(blend);
+}
+
 /** Swift asks the page how it's doing with this; the page has no way to call Swift. */
 function idlevizStatus() {
   return { preset: current?.id ?? null, frames, audioFrames, presets: presets.length, failed: failures.list() };
@@ -352,7 +359,7 @@ function idlevizStatus() {
 function idlevizPresets() {
   return presets.map(({ id, name, source }) => ({ id, name, source }));
 }
-Object.assign(window, { audioFrame, idlevizPresets, idlevizStatus, setCustomPresets, setPresetSettings });
+Object.assign(window, { audioFrame, idlevizPresets, idlevizStatus, setCustomPresets, setPresetSettings, skipPreset });
 
 if (butterchurn && presets.length > 0) {
   try {

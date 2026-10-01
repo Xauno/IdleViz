@@ -65,4 +65,20 @@ final class PresetController {
     }
 
     var hasCustomPresets: Bool { presets.contains { $0.source == "custom" } }
+
+    /// Runs the like or skip key.
+    func perform(_ action: VisualizerAction) {
+        switch action {
+        case .skip:
+            page.skipPreset()
+        case .like:
+            // `lastShown` can be a second behind, so ask the page what is on screen right now.
+            page.currentPreset { [weak self] id in
+                guard let self, let id else { return }
+                let liked = !self.settings.isFavorite(id)
+                self.settings.setFavorite(id, liked)
+                self.page.showLike(liked)
+            }
+        }
+    }
 }

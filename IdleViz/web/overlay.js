@@ -4,12 +4,14 @@ import {
   formatTime,
   fraction,
   layoutFor,
+  likePlacement,
   parseNowPlaying,
   positionAt,
 } from "./overlay-state.js";
 
 const STAGE_WIDTH = 1920;
 const NOTE_PATH = "M9 18V5.5l12-2.5v12.5a3 3 0 1 1-2-2.83V7.4l-8 1.66v9.44a3 3 0 1 1-2-2.83z";
+const HEART_PATH = "M12 21C7 17 3 13 3 8.5a4.5 4.5 0 0 1 9 0 4.5 4.5 0 0 1 9 0C21 13 17 17 12 21z";
 
 const stage = /** @type {HTMLElement} */ (document.getElementById("stage"));
 const tracks = /** @type {HTMLElement} */ (document.getElementById("tracks"));
@@ -32,6 +34,23 @@ let overlayEnabled = true;
 function fitStage() {
   stage.style.transform = `scale(${window.innerWidth / STAGE_WIDTH})`;
 }
+
+/** The heart that confirms the like key. It stays hidden until `showLike` starts its animation. */
+function makeHeart() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.classList.add("like");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", HEART_PATH);
+  svg.append(path);
+  svg.addEventListener("animationend", () => svg.classList.remove("liked", "unliked"));
+  return svg;
+}
+
+/** For when the track block isn't showing. It sits outside the stage, which may be hidden. */
+const cornerHeart = makeHeart();
+cornerHeart.id = "like-corner";
+document.body.append(cornerHeart);
 
 function makeTrack(item) {
   const track = document.createElement("div");
@@ -57,7 +76,10 @@ function makeTrack(item) {
   title.className = "title";
   const artist = document.createElement("div");
   artist.className = "artist";
-  text.append(title, artist);
+  const titleRow = document.createElement("div");
+  titleRow.className = "title-row";
+  titleRow.append(title, makeHeart());
+  text.append(titleRow, artist);
 
   track.append(art, text);
   return track;
@@ -179,4 +201,19 @@ function setBrightness(value) {
   document.documentElement.style.setProperty("--viz-brightness", String(clampBrightness(value)));
 }
 
-Object.assign(window, { nowPlaying, setAudioDelay, setOverlayEnabled, setBrightness });
+/**
+ * Called by Swift when the like key added the preset on screen to the favorites (a filled heart)
+ * or took it off again (an outline).
+ * @param {unknown} liked
+ */
+function showLike(liked) {
+  const beside =
+    likePlacement(layoutFor(current, overlayEnabled)) === "title" ? currentTrack?.querySelector(".like") : null;
+  const heart = beside ?? cornerHeart;
+  for (const other of document.querySelectorAll(".like")) other.classList.remove("liked", "unliked");
+  // Reading the layout lets the animation start over when the key is pressed again mid-fade.
+  heart.getBoundingClientRect();
+  heart.classList.add(liked === false ? "unliked" : "liked");
+}
+
+Object.assign(window, { nowPlaying, setAudioDelay, setOverlayEnabled, setBrightness, showLike });

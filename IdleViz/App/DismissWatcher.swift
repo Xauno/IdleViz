@@ -6,11 +6,18 @@ import IdleVizCore
 /// case where macOS refused to activate the app. None of these need permissions.
 /// The rules themselves, including keys still held after the grace period, live in
 /// `DismissTracker`.
+///
+/// The like and skip keys are the exception: the local monitor hands them to `onAction`
+/// and the window stays open. The media keys (brightness, keyboard backlight, playback, volume)
+/// don't close it either.
 @MainActor
 final class DismissWatcher {
+    /// How long the backup check waits for the local monitor to explain an input before closing on it.
+    private static let settleTime = Duration.milliseconds(30)
+
     private static let localMask: NSEvent.EventTypeMask = [
         .mouseMoved, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel,
-        .keyDown, .keyUp, .flagsChanged, .gesture, .magnify, .swipe,
+        .keyDown, .keyUp, .flagsChanged, .gesture, .magnify, .swipe, .systemDefined,
     ]
     private static let globalMask: NSEvent.EventTypeMask = [
         .mouseMoved, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel,
@@ -18,14 +25,18 @@ final class DismissWatcher {
     ]
 
     private var tracker: DismissTracker
+    private let keys: VisualizerKeys
+    private let onAction: (VisualizerAction) -> Void
     private let onDismiss: () -> Void
     private let openedAt = ProcessInfo.processInfo.systemUptime
     private var localMonitor: Any?
     private var globalMonitor: Any?
     private var backupCheck: Task<Void, Never>?
 
-    init(tracker: DismissTracker, onDismiss: @escaping () -> Void) {
-        self.tracker = tracker
+    init(keys: VisualizerKeys, onAction: @escaping (VisualizerAction) -> Void, onDismiss: @escaping () -> Void) {
+        tracker = DismissTracker(passKeys: keys.codes)
+        self.keys = keys
+        self.onAction = onAction
         self.onDismiss = onDismiss
     }
 
@@ -34,8 +45,9 @@ final class DismissWatcher {
     func start() {
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: Self.localMask) { [weak self] event in
             MainActor.assumeIsolated { self?.handle(event) }
-            // Swallow all input while open so nothing reaches views or beeps.
-            return nil
+            // Swallow all input while open so nothing reaches views or beeps. System-defined events
+            // go on, so the media keys still do their job.
+            return event.type == .systemDefined ? event : nil
         }
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: Self.globalMask) { [weak self] event in
             MainActor.assumeIsolated { self?.handle(event) }
@@ -49,18 +61,20 @@ final class DismissWatcher {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(100))
                 guard let self, !Task.isCancelled else { return }
-                let idle = CGEventSource.secondsSinceLastEventType(
-                    .combinedSessionState, eventType: CGEventType(rawValue: ~0)!
-                )
-                let dismiss = self.tracker.shouldDismiss(
-                    secondsSinceLastInput: idle, heldKeys: Self.heldKeys(), elapsed: self.elapsed
-                )
-                if dismiss {
-                    self.fire()
-                    return
-                }
+                guard self.backupSaysDismiss() else { continue }
+                // The idle time resets the moment a key moves, before the local monitor gets the
+                // event. If that was a like, skip or media key, the monitor explains it in a moment.
+                try? await Task.sleep(for: Self.settleTime)
+                guard !Task.isCancelled, self.backupSaysDismiss() else { continue }
+                self.fire()
+                return
             }
         }
+    }
+
+    private func backupSaysDismiss() -> Bool {
+        let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+        return tracker.shouldDismiss(secondsSinceLastInput: idle, heldKeys: Self.heldKeys(), elapsed: elapsed)
     }
 
     func stop() {
@@ -74,7 +88,11 @@ final class DismissWatcher {
 
     private func handle(_ event: NSEvent) {
         guard let input = Self.inputEvent(from: event) else { return }
-        if tracker.shouldDismiss(on: input, elapsed: elapsed) { fire() }
+        if tracker.shouldDismiss(on: input, elapsed: elapsed) {
+            fire()
+        } else if event.type == .keyDown, !event.isARepeat, let action = keys.action(for: event.keyCode) {
+            onAction(action)
+        }
     }
 
     private func fire() {
@@ -92,6 +110,7 @@ final class DismissWatcher {
         // A modifier changed; whether it went down or up is read from the key state.
         case .flagsChanged: .key(code: event.keyCode, isDown: isKeyDown(event.keyCode), isRepeat: false)
         case .gesture, .magnify, .swipe: .gesture
+        case .systemDefined: MediaKey.inputEvent(subtype: Int(event.subtype.rawValue), data1: event.data1)
         default: nil
         }
     }

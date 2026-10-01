@@ -496,6 +496,14 @@
                   <span class="kbd">⌃⌥V ✕</span>
                 </div>
                 <div class="r">
+                  <div>Like key</div>
+                  <span class="ctl">L ▾</span>
+                </div>
+                <div class="r">
+                  <div>Skip key</div>
+                  <span class="ctl">N ▾</span>
+                </div>
+                <div class="r">
                   <div>Open now</div>
                   <span class="ctl">Open</span>
                 </div>
@@ -628,7 +636,8 @@
                 Idle timeout (5, 10, 15, 30 min, Off), keep screen awake for (30 min, 1 hour, 2 hours, 4 hours; default
                 1 hour), Different times on battery (only on Macs with a battery; off by default; when on, two more
                 rows: idle timeout and keep screen awake on battery), hotkey recorder
-                (<code>KeyboardShortcuts.Recorder</code>), Open now, Launch at login
+                (<code>KeyboardShortcuts.Recorder</code>), Like key and Skip key (A to Z, 0 to 9, arrow keys, Space,
+                Off), Open now, Launch at login
               </td>
             </tr>
             <tr>
@@ -675,9 +684,14 @@
             </li>
             <li>Seconds per preset offers 15, 30, 45, 60, 120 and 300. Blend time offers 0, 1, 2.7, 5 and 8 s.</li>
             <li>
+              Like key and Skip key work while the visualizer is open, where every other key closes it. Like adds the
+              preset on screen to the favorites, or takes it off again. Skip shows the next one in Shuffle mode. Each
+              picker leaves out the key the other one uses. Each has a short hint under its label.
+            </li>
+            <li>
               Last shown names the preset that was last on screen, with a heart button (favorite) and a block button.
-              Any input closes the visualizer, so this is how a preset you just watched gets onto a list. The row is
-              hidden until a preset has been shown.
+              Any input but the like and skip keys closes the visualizer, so this is how a preset you just watched gets
+              blocked, or liked after the fact. The row is hidden until a preset has been shown.
             </li>
             <li>
               Favorites and Blocklist open a sheet with two tabs: the presets on that list, where entries can be
