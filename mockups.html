@@ -546,6 +546,10 @@
                   <span class="ctl">2.7 s ▾</span>
                 </div>
                 <div class="r">
+                  <div>Last shown<span class="d">Geiss - Swirlie 5</span></div>
+                  <div style="display: flex; gap: 4px"><span class="ctl">♡</span><span class="ctl">⊘</span></div>
+                </div>
+                <div class="r">
                   <div>Favorites</div>
                   <span class="ctl">Manage (12)</span>
                 </div>
@@ -669,8 +673,15 @@
               Show Spotify overlay off means the page shows only the visualizer and dim layer: no now-playing layout in
               any state, not even the paused progress bar. Brightness, mode and the rest behave the same.
             </li>
+            <li>Seconds per preset offers 15, 30, 45, 60, 120 and 300. Blend time offers 0, 1, 2.7, 5 and 8 s.</li>
             <li>
-              Favorites and Blocklist open a sheet listing the presets on that list, where entries can be removed.
+              Last shown names the preset that was last on screen, with a heart button (favorite) and a block button.
+              Any input closes the visualizer, so this is how a preset you just watched gets onto a list. The row is
+              hidden until a preset has been shown.
+            </li>
+            <li>
+              Favorites and Blocklist open a sheet with two tabs: the presets on that list, where entries can be
+              removed, and all presets with a search field, where they can be added. A preset is never on both lists.
             </li>
             <li>The failed-to-load section is hidden when nothing has failed.</li>
             <li>

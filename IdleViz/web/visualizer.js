@@ -1,12 +1,13 @@
 import { createAudioState, decodeAudioFrame } from "./audio-frame.js";
 import {
-  BLEND_SECONDS,
+  DEFAULT_SETTINGS,
   Rotation,
-  SECONDS_PER_PRESET,
   ShuffleBag,
   collectPresets,
+  parsePresetSettings,
   renderSize,
   shouldRender,
+  shufflePool,
 } from "./visualizer-state.js";
 
 const PACKS = ["butterchurnPresets", "butterchurnPresetsExtra", "butterchurnPresetsExtra2", "butterchurnPresetsMD1"];
@@ -21,8 +22,11 @@ const butterchurn = globals.butterchurn?.default ?? globals.butterchurn;
 
 const presets = collectPresets(PACKS.map((pack) => globals[pack]?.getPresets?.()));
 const byId = new Map(presets.map((entry) => [entry.id, entry]));
-const shuffle = new ShuffleBag(presets.map((entry) => entry.id));
-const rotation = new Rotation(SECONDS_PER_PRESET);
+/** The preset controls. Swift sends the stored ones right after the page loads. */
+let settings = parsePresetSettings(DEFAULT_SETTINGS);
+let pool = new Set(shufflePool(presets, settings));
+const shuffle = new ShuffleBag([...pool]);
+const rotation = new Rotation(settings.secondsPerPreset);
 /** Presets that threw while loading; skipped for the rest of the session. */
 const failed = new Set();
 
@@ -32,6 +36,8 @@ const audioState = createAudioState();
 // ranges. It stays suspended and unconnected: the audio arrives as plain arrays through
 // render({ audioLevels }).
 let audioContext = new AudioContext({ sampleRate: audioState.sampleRate });
+/** The tap rate the context was last matched to. */
+let contextRate = audioState.sampleRate;
 
 /** @type {HTMLCanvasElement | null} */
 let canvas = null;
@@ -60,7 +66,12 @@ function build() {
   canvas.width = width;
   canvas.height = height;
   visualizer = butterchurn.createVisualizer(audioContext, canvas, { width, height, pixelRatio: 1 });
-  if (!show(current, 0)) showNext(0);
+  if (!show(current ?? wanted(), 0)) showNext(0);
+}
+
+/** The preset single mode asks for, or null in shuffle mode or when that preset is gone. */
+function wanted() {
+  return settings.mode === "single" ? (byId.get(settings.single) ?? null) : null;
 }
 
 /** WebGL contexts can be lost after sleep and wake. The old canvas is gone for good, so start over. */
@@ -124,7 +135,7 @@ function tick(now) {
     }
   }
 
-  if (rotation.tick(seconds)) showNext(BLEND_SECONDS);
+  if (settings.mode === "shuffle" && rotation.tick(seconds)) showNext(settings.blendSeconds);
   visualizer.render({ audioLevels: audioState.levels, elapsedTime: seconds });
   frames++;
 }
@@ -136,12 +147,39 @@ function tick(now) {
 function audioFrame(base64) {
   if (!decodeAudioFrame(base64, audioState)) return;
   audioFrames++;
-  if (audioState.sampleRate !== audioContext.sampleRate) {
+  if (audioState.sampleRate !== contextRate) {
     // A different output device can change the tap's rate. Butterchurn reads it once, so start over.
-    audioContext.close();
-    audioContext = new AudioContext({ sampleRate: audioState.sampleRate });
-    visualizer = null;
-    nextBuildAt = 0;
+    contextRate = audioState.sampleRate;
+    try {
+      const next = new AudioContext({ sampleRate: contextRate });
+      audioContext.close();
+      audioContext = next;
+      visualizer = null;
+      nextBuildAt = 0;
+    } catch (error) {
+      console.warn(`No AudioContext at ${contextRate} Hz; keeping ${audioContext.sampleRate} Hz`, error);
+    }
+  }
+}
+
+/**
+ * Called by Swift with the preset controls, at load and whenever one changes in settings.
+ * @param {unknown} value
+ */
+function setPresetSettings(value) {
+  settings = parsePresetSettings(value);
+  rotation.secondsPerPreset = settings.secondsPerPreset;
+  pool = new Set(shufflePool(presets, settings));
+  shuffle.setIds([...pool], current?.id ?? null);
+  if (!visualizer) return;
+  // Before the first frame nothing is on screen yet, so there's nothing to blend from.
+  const blend = frames === 0 ? 0 : settings.blendSeconds;
+  const single = wanted();
+  if (single) {
+    if (single !== current && !show(single, blend)) showNext(blend);
+  } else if (!current || !pool.has(current.id)) {
+    // The preset on screen was just blocked or filtered out (or single mode points at nothing).
+    showNext(blend);
   }
 }
 
@@ -149,7 +187,12 @@ function audioFrame(base64) {
 function idlevizStatus() {
   return { preset: current?.id ?? null, frames, audioFrames, presets: presets.length, failed: [...failed] };
 }
-Object.assign(window, { audioFrame, idlevizStatus });
+
+/** Every preset the page can show, for the pickers in settings. */
+function idlevizPresets() {
+  return presets.map(({ id, name, source }) => ({ id, name, source }));
+}
+Object.assign(window, { audioFrame, idlevizPresets, idlevizStatus, setPresetSettings });
 
 if (butterchurn && presets.length > 0) {
   try {

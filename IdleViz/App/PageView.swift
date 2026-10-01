@@ -11,7 +11,10 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
     /// Goes in the window. It holds the web view, which is replaced when the page hangs.
     let view = NSView()
     private var webView: WKWebView
+    /// True once the page's scripts have run and its functions can be called.
     private var loaded = false
+    /// Counts page loads, so a readiness check left over from an earlier load is ignored.
+    private var loadID = 0
     /// Audio frames the page hasn't taken yet. More than a couple means it's busy, so newer frames are dropped.
     private var framesInFlight = 0
     private var statusTimer: Timer?
@@ -19,6 +22,12 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
     private var lastStatus: PageStatus?
     /// The latest `nowPlaying` call, replayed whenever the page (re)loads.
     private var nowPlayingScript = OverlayPayload.script(for: nil)
+    /// The latest preset controls, replayed the same way.
+    private var presetSettingsScript = PresetSettings().script
+    /// Called with the page's preset list each time the page has loaded.
+    var onPresets: (([PresetInfo]) -> Void)?
+    /// Called when a different preset comes on screen.
+    var onPresetShown: ((String) -> Void)?
 
     override init() {
         webView = Self.makeWebView()
@@ -53,6 +62,12 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         nowPlayingScript = OverlayPayload.script(for: payload)
         guard loaded else { return }
         webView.evaluateJavaScript(nowPlayingScript)
+    }
+
+    func send(presetSettings: PresetSettings) {
+        presetSettingsScript = presetSettings.script
+        guard loaded else { return }
+        webView.evaluateJavaScript(presetSettingsScript)
     }
 
     /// Hands one packed audio frame to the page. Frames are dropped, not queued, while the page is busy or loading.
@@ -95,6 +110,7 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
                 self.watchdog.replied(at: ProcessInfo.processInfo.systemUptime)
                 if status.preset != self.lastStatus?.preset {
                     self.log.notice("Preset: \(status.preset ?? "none", privacy: .public)")
+                    if let preset = status.preset { self.onPresetShown?(preset) }
                 }
                 if let last = self.lastStatus {
                     let frames = status.frames - last.frames
@@ -112,6 +128,7 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     private func resetPageState() {
         loaded = false
+        loadID += 1
         framesInFlight = 0
         lastStatus = nil
     }
@@ -143,8 +160,38 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard webView === self.webView else { return }
+        loadID += 1
+        waitUntilReady(load: loadID, attempt: 0)
+    }
+
+    /// WebKit can report the navigation as finished before the page's modules have run (seen in
+    /// about one launch in five in step 7c), and a call made then is silently lost. So ask the
+    /// page whether its functions exist yet, and only then send it the current state.
+    private func waitUntilReady(load: Int, attempt: Int) {
+        let check = "typeof window.nowPlaying === 'function' && typeof window.setPresetSettings === 'function'"
+        webView.evaluateJavaScript(check) { [weak self] reply, _ in
+            MainActor.assumeIsolated {
+                guard let self, load == self.loadID, !self.loaded else { return }
+                if reply as? Bool == true {
+                    self.pageBecameReady()
+                } else if attempt < 200 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(50)) { [weak self] in
+                        self?.waitUntilReady(load: load, attempt: attempt + 1)
+                    }
+                } else {
+                    self.log.error("The page's scripts didn't start within 10 s")
+                }
+            }
+        }
+    }
+
+    private func pageBecameReady() {
         loaded = true
+        webView.evaluateJavaScript(presetSettingsScript)
         webView.evaluateJavaScript(nowPlayingScript)
+        webView.evaluateJavaScript("window.idlevizPresets?.()") { [weak self] reply, _ in
+            MainActor.assumeIsolated { self?.onPresets?(PresetInfo.list(reply: reply)) }
+        }
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
