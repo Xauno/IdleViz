@@ -3,9 +3,9 @@ import IdleVizCore
 import KeyboardShortcuts
 import SwiftUI
 
-/// Separate settings window, per mockups.html section 2. So far it has the idle timeout, the hotkey,
-/// Open now, the audio delay, the preset controls and the presets folder; the other rows arrive with
-/// the features they control.
+/// Separate settings window, per mockups.html section 2. So far it has the idle and keep-awake times
+/// (with their battery values), the hotkey, Open now, the audio delay, the preset controls and the
+/// presets folder; the other rows arrive with the features they control.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let presets: PresetController
@@ -59,16 +59,31 @@ struct SettingsView: View {
     @Bindable var audioDelay: AudioDelayController
     let openNow: () -> Void
     @AppStorage(IdleTimeoutSetting.key) private var idleTimeout = IdleTimeoutSetting.defaultMinutes
+    @AppStorage(KeepAwakeSetting.key) private var keepAwake = KeepAwakeSetting.defaultMinutes
+    @AppStorage(BatteryTimesSetting.enabledKey) private var useBatteryTimes = false
+    @AppStorage(BatteryTimesSetting.idleTimeoutKey) private var idleTimeoutBattery = IdleTimeoutSetting.defaultMinutes
+    @AppStorage(BatteryTimesSetting.keepAwakeKey) private var keepAwakeBattery = KeepAwakeSetting.defaultMinutes
 
     var body: some View {
         Form {
             Section("General") {
-                Picker(selection: $idleTimeout) {
-                    ForEach(IdleTimeoutSetting.choices, id: \.self) { Text("\($0) min").tag($0) }
-                    Text("Off").tag(0)
-                } label: {
+                idlePicker($idleTimeout) {
                     Text("Start after idle")
                     Text("Needs a Spotify track")
+                }
+                keepAwakePicker($keepAwake) {
+                    Text("Keep screen awake")
+                    Text("Then the Mac sleeps as usual")
+                }
+                if PowerSource.hasBattery {
+                    Toggle("Different times on battery", isOn: $useBatteryTimes)
+                        .onChange(of: useBatteryTimes) { _, enabled in
+                            if enabled { copyTimesToBatteryIfUnset() }
+                        }
+                    if useBatteryTimes {
+                        idlePicker($idleTimeoutBattery) { Text("On battery: start after idle") }
+                        keepAwakePicker($keepAwakeBattery) { Text("On battery: keep screen awake") }
+                    }
                 }
                 KeyboardShortcuts.Recorder("Open hotkey", name: .openVisualizer)
                 LabeledContent("Open now") {
@@ -82,5 +97,29 @@ struct SettingsView: View {
             PresetFolderControls(presets: presets)
         }
         .formStyle(.grouped)
+    }
+
+    private func idlePicker(_ minutes: Binding<Int>, @ViewBuilder label: () -> some View) -> some View {
+        Picker(selection: minutes) {
+            ForEach(IdleTimeoutSetting.choices, id: \.self) { Text("\($0) min").tag($0) }
+            Text("Off").tag(0)
+        } label: {
+            label()
+        }
+    }
+
+    private func keepAwakePicker(_ minutes: Binding<Int>, @ViewBuilder label: () -> some View) -> some View {
+        Picker(selection: minutes) {
+            ForEach(KeepAwakeSetting.choices, id: \.self) { Text(KeepAwakeSetting.label(minutes: $0)).tag($0) }
+        } label: {
+            label()
+        }
+    }
+
+    /// The first time the switch is turned on, the battery rows start as copies of the rows above.
+    private func copyTimesToBatteryIfUnset() {
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: BatteryTimesSetting.idleTimeoutKey) == nil { idleTimeoutBattery = idleTimeout }
+        if defaults.object(forKey: BatteryTimesSetting.keepAwakeKey) == nil { keepAwakeBattery = keepAwake }
     }
 }

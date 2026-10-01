@@ -9,7 +9,7 @@ A macOS menu-bar app that turns your Mac into a music display. When the Mac goes
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: in development.** The menu-bar app opens a fullscreen window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input. It shows a Butterchurn visualizer that reacts to Spotify's audio and shuffles through 395 bundled presets, with what Spotify is playing in an overlay styled after the Spotify TV app. See [Roadmap](#roadmap) for progress.
+> **Status: in development.** The menu-bar app opens a fullscreen window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input or after a keep-awake limit. It shows a Butterchurn visualizer that reacts to Spotify's audio and shuffles through 395 bundled presets, with what Spotify is playing in an overlay styled after the Spotify TV app. See [Roadmap](#roadmap) for progress.
 
 ## Contents
 
@@ -35,6 +35,9 @@ Working now:
 - Only opens while Spotify is running and has a track loaded (playing or paused). Otherwise the menu-bar icon flashes and nothing opens.
 - Opens by itself after 5 idle minutes (or 10, 15, 30, or never, set in settings). It doesn't open on idle while the screen is locked or while another app keeps the display awake, such as a video or a call. After a blocked attempt it waits until you've used the Mac again.
 - Closes on any input (mouse movement, click, scroll, key, modifier key, trackpad gesture), then returns focus to the app you were using. The cursor is hidden while it's open.
+- Fades in when it opens, and fades out quickly on input, like the macOS screensaver.
+- Keeps the screen awake while it's showing, up to a limit you set (1 hour by default; 30 minutes, 2 hours or 4 hours also available). At the limit it fades out slowly, and the Mac sleeps and locks as usual. It doesn't open again until you've used the Mac.
+- Optional separate idle and keep-awake times for when the Mac is on battery. They apply the moment you unplug or plug in, even while the visualizer is open. Macs without a battery don't show the option.
 - Settings window with a hotkey recorder and an **Open now** button.
 - Now-playing overlay styled after the Spotify TV app: album art, title, artist, progress bar and times, in the Figtree font. When paused, only the progress bar stays. Music ads show an "Advertisement" label with the progress bar, and podcasts show no overlay. If Spotify quits or the track goes away, the overlay fades out and the window stays open.
 - [Butterchurn](https://github.com/jberg/butterchurn) (WebGL Milkdrop) visualizer with 395 bundled presets. By default it shows a random preset every 30 seconds with a 2.7-second blend, and goes through all of them before repeating one.
@@ -48,8 +51,6 @@ Working now:
 
 Planned:
 
-- Keeps the screen awake while it's showing, up to a limit you set (1 hour by default). After that the Mac sleeps and locks as usual.
-- Optional separate idle and keep-awake times for when the Mac is on battery.
 - The menu-bar icon turns yellow when a permission is missing, and the popup says what to fix.
 - Adjustable visualizer brightness, launch at login, and a small settings window.
 - Never launches Spotify and never uses Spotify's web API or a login.
@@ -72,7 +73,9 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | 7c   | Visualizer: preset controls                                                       | Done    |
 | 7d   | Visualizer: custom preset folder and sandboxed plugins                            | Done    |
 | 7e   | Visualizer: audio delay, with a microphone-based detector                         | Done    |
-| 8    | Polish: fades, launch at login, brightness, keep-awake, battery, permission setup  | Planned |
+| 8a   | Polish: keep-awake limit, battery times, fades                                    | Done    |
+| 8b   | Polish: permission setup (welcome window, yellow icon, error rows)                | Planned |
+| 8c   | Polish: brightness, overlay switch, launch at login                               | Planned |
 
 ## Requirements
 
@@ -118,7 +121,9 @@ The app is built from source for personal use. There is no download.
 - **Open:** press the hotkey (⌃⌥V by default), run `open idleviz://open` in Terminal, or click **Open now** in settings. Spotify has to be running with a track loaded, playing or paused. If it isn't, the menu-bar icon flashes a few times instead.
 - **Close:** move the mouse, click, scroll, press any key or use a trackpad gesture. Input in the first 0.4 s after opening is ignored, so the hotkey itself doesn't close it. Keys you're still holding after that are ignored until you let go; pressing one again closes it.
 - **Idle:** after the **Start after idle** time with no input (5 minutes by default), it opens by itself, with the same Spotify check. It skips that while the screen is locked or another app keeps the display awake (a video, a call, a presentation), and then waits until you use the Mac again before trying again.
-- **Settings:** change the idle time or turn it off, and change the hotkey. Close the window with its red button; ⌘Q quits the app while settings is focused.
+- **Keep awake:** while the visualizer is showing, the display doesn't sleep and the Mac doesn't lock by itself. After the **Keep screen awake** time (1 hour by default), counted from when it opened, it fades out and the Mac's own sleep, screensaver and lock settings take over. It then stays closed until you use the Mac again.
+- **On battery:** turn on **Different times on battery** in settings to get a second **start after idle** and **keep screen awake** time that apply while the Mac is unplugged. They start as copies of the normal times.
+- **Settings:** change the idle and keep-awake times, or turn idle opening off, and change the hotkey. Close the window with its red button; ⌘Q quits the app while settings is focused.
 
 - **Now playing:** the overlay updates whenever Spotify's track or state changes, and re-syncs the progress bar every 5 s while the window is open. The app also logs each change:
 
@@ -176,9 +181,9 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
 ├─ Package.swift           IdleVizCore Swift package (testable logic)
-├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks), the audio delay (per-device setting, delay line, delay detection)
+├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, keep-awake and battery times, fade times, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks), the audio delay (per-device setting, delay line, delay detection)
 ├─ IdleViz.xcodeproj       App target: bundle, Info.plist, entitlements, signing
-├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, Spotify info, Spotify audio tap, web view, presets folder and Milkdrop converter
+├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, keep awake, power source, Spotify info, Spotify audio tap, web view, presets folder and Milkdrop converter
 ├─ IdleViz/web/            The page: visualizer and overlay HTML, CSS and JS, the plugin frame and its runner, the converter page, Figtree font (served from idleviz-app://)
 ├─ IdleViz/web/vendor/     Butterchurn, its preset packs and the Milkdrop converter, copied unchanged from npm
 ├─ IdleViz/web/visuals/    Bundled visualizer plugins (aurora.js, the example plugin)

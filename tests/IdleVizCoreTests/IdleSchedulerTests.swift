@@ -35,6 +35,18 @@ final class IdleSchedulerTests: XCTestCase {
         XCTAssertEqual(scheduler.check(now: 1400, idle: 300), .fire)
     }
 
+    func testWaitsForInputAfterTheKeepAwakeLimit() {
+        // Opened by hotkey at uptime 1000, so the idle trigger never used this idle period.
+        var scheduler = IdleScheduler(timeout: 3600)
+        XCTAssertEqual(scheduler.check(now: 1000, idle: 0), .wait(3600))
+        // The 30 min limit closes the window; without the rule it would reopen at uptime 4600.
+        scheduler.waitForInput(now: 2800, idle: 1800)
+        XCTAssertEqual(scheduler.check(now: 4600, idle: 3600), .wait(3600))
+        XCTAssertEqual(scheduler.check(now: 9000, idle: 8000), .wait(3600))
+        // New input at uptime 9100 starts a period that may fire again.
+        XCTAssertEqual(scheduler.check(now: 12700, idle: 3600), .fire)
+    }
+
     func testChangingTheTimeoutAppliesAtOnce() {
         var scheduler = IdleScheduler(timeout: 600)
         XCTAssertEqual(scheduler.check(now: 1000, idle: 400), .wait(200))

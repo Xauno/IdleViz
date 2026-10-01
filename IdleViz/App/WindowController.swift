@@ -25,16 +25,23 @@ final class VisualizerWindow: NSWindow {
 
 @MainActor
 final class WindowController {
+    private enum State { case closed, open, closing }
+
     private let log = Logger(subsystem: "com.xauno.IdleViz", category: "window")
     // Kept between opens (hidden, not destroyed) so opening is instant.
     private var window: VisualizerWindow?
     // Created at launch and kept loaded, so the page is ready the first time the window opens.
     let page = PageView()
+    private var state = State.closed
+    /// Counts fades, so the end of one that was replaced by another does nothing.
+    private var fadeID = 0
     private var dismissWatcher: DismissWatcher?
     private var previousApp: NSRunningApplication?
     private var cursorHidden = false
     private var stats = ActivationStats()
     var onOpen: (() -> Void)?
+    /// Called when the fade-out starts. The page keeps running until `onClose`, so the visuals don't freeze mid-fade.
+    var onClosing: (() -> Void)?
     var onClose: (() -> Void)?
 
     let dismissEnabled: Bool = {
@@ -46,7 +53,8 @@ final class WindowController {
         #endif
     }()
 
-    var isOpen: Bool { window?.isVisible ?? false }
+    /// False again as soon as it starts to fade out.
+    var isOpen: Bool { state == .open }
 
     /// Creates the hidden window. Call this at launch, while the app is still an accessory:
     /// macOS decides when a window is created whether it may join other apps' fullscreen Spaces,
@@ -57,7 +65,9 @@ final class WindowController {
     }
 
     func open(on screen: NSScreen, source: TriggerSource) {
-        guard !isOpen else { return }
+        guard state != .open else { return }
+        // Triggered again while it fades out: finish that close first, so everything starts clean.
+        if state == .closing { finishClosing() }
         let window = window ?? VisualizerWindow.make(on: screen, content: page.view)
         self.window = window
         window.setFrame(screen.frame, display: false)
@@ -65,15 +75,19 @@ final class WindowController {
         let frontmost = NSWorkspace.shared.frontmostApplication
         previousApp = frontmost?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : frontmost
 
+        window.ignoresMouseEvents = false
+        window.alphaValue = 0
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
+        state = .open
+        fade(window, to: 1, seconds: VisualizerFade.openSeconds)
         onOpen?()
 
         if dismissEnabled {
             NSCursor.hide()
             cursorHidden = true
-            let watcher = DismissWatcher(tracker: DismissTracker()) { [weak self] in self?.close() }
+            let watcher = DismissWatcher(tracker: DismissTracker()) { [weak self] in self?.close(.input) }
             watcher.start()
             dismissWatcher = watcher
         }
@@ -91,17 +105,50 @@ final class WindowController {
         }
     }
 
-    func close() {
-        guard isOpen else { return }
+    /// Hands the Mac back at once (cursor, focus, clicks) and fades the window out on top of it.
+    func close(_ reason: CloseReason) {
+        // A close that can't wait cuts a fade-out short.
+        if state == .closing, reason.fadeSeconds == 0 { finishClosing() }
+        guard state == .open, let window else { return }
+        state = .closing
+        log.notice("Closing: \(reason.rawValue, privacy: .public)")
         dismissWatcher?.stop()
         dismissWatcher = nil
-        window?.orderOut(nil)
+        window.ignoresMouseEvents = true
         if cursorHidden {
             NSCursor.unhide()
             cursorHidden = false
         }
         previousApp?.activate()
         previousApp = nil
+        onClosing?()
+        if reason.fadeSeconds > 0 {
+            fade(window, to: 0, seconds: reason.fadeSeconds)
+        } else {
+            finishClosing()
+        }
+    }
+
+    private func finishClosing() {
+        guard state == .closing else { return }
+        fadeID += 1
+        window?.orderOut(nil)
+        state = .closed
         onClose?()
+    }
+
+    private func fade(_ window: NSWindow, to alpha: CGFloat, seconds: TimeInterval) {
+        fadeID += 1
+        let id = fadeID
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = seconds
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().alphaValue = alpha
+        } completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.fadeID == id else { return }
+                self.finishClosing()
+            }
+        }
     }
 }

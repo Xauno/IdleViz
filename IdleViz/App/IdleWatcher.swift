@@ -8,13 +8,16 @@ import IOKit.pwr_mgt
 @MainActor
 final class IdleWatcher {
     private var scheduler: IdleScheduler
+    private let timeout: () -> TimeInterval?
     private let onIdle: () -> Void
     private var loop: Task<Void, Never>?
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
 
-    init(onIdle: @escaping () -> Void) {
+    /// - Parameter timeout: The timeout that applies right now. It depends on the settings and the power source.
+    init(timeout: @escaping () -> TimeInterval?, onIdle: @escaping () -> Void) {
+        self.timeout = timeout
         self.onIdle = onIdle
-        scheduler = IdleScheduler(timeout: Self.timeoutSetting())
+        scheduler = IdleScheduler(timeout: timeout())
     }
 
     func start() {
@@ -40,8 +43,9 @@ final class IdleWatcher {
         reschedule()
     }
 
-    private func timeoutMayHaveChanged() {
-        let timeout = Self.timeoutSetting()
+    /// Call when the setting or the power source changed.
+    func timeoutMayHaveChanged() {
+        let timeout = timeout()
         guard timeout != scheduler.timeout else { return }
         scheduler.timeout = timeout
         reschedule()
@@ -65,8 +69,10 @@ final class IdleWatcher {
         }
     }
 
-    private static func timeoutSetting() -> TimeInterval? {
-        IdleTimeoutSetting.timeout(minutes: UserDefaults.standard.integer(forKey: IdleTimeoutSetting.key))
+    /// After the keep-awake limit closed the visualizer, the Mac is still idle. Don't open again until there is input.
+    func waitForInput() {
+        scheduler.waitForInput(now: ProcessInfo.processInfo.systemUptime, idle: Self.secondsSinceLastInput())
+        reschedule()
     }
 
     static func secondsSinceLastInput() -> TimeInterval {
