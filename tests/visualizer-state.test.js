@@ -16,6 +16,7 @@ import {
   renderSize,
   shouldRender,
   shufflePool,
+  skipBlendSeconds,
 } from "../IdleViz/web/visualizer-state.js";
 
 /** A repeatable stand-in for Math.random. */
@@ -343,6 +344,17 @@ describe("shufflePool", () => {
       "bundled:A",
     ]);
     expect(pool({ blocked: presets.map((p) => p.id) })).toHaveLength(5);
+  });
+});
+
+describe("skipBlendSeconds", () => {
+  it("blends quickly in shuffle mode, whatever the blend time setting is", () => {
+    expect(skipBlendSeconds(parsePresetSettings({ mode: "shuffle", blendSeconds: 8 }))).toBe(0.5);
+    expect(skipBlendSeconds(parsePresetSettings({ mode: "shuffle", blendSeconds: 0 }))).toBe(0.5);
+  });
+
+  it("has nothing to skip to in single mode", () => {
+    expect(skipBlendSeconds(parsePresetSettings({ mode: "single", single: "bundled:a" }))).toBeNull();
   });
 });
 

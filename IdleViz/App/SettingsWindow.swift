@@ -61,6 +61,8 @@ struct SettingsView: View {
     @AppStorage(BatteryTimesSetting.keepAwakeKey) private var keepAwakeBattery = KeepAwakeSetting.defaultMinutes
     @AppStorage(OverlaySetting.key) private var showOverlay = true
     @AppStorage(BrightnessSetting.key) private var brightness = BrightnessSetting.defaultValue
+    @AppStorage(VisualizerKeys.likeKey) private var likeKey = VisualizerKeys.defaultLike
+    @AppStorage(VisualizerKeys.skipKey) private var skipKey = VisualizerKeys.defaultSkip
 
     var body: some View {
         Form {
@@ -84,6 +86,14 @@ struct SettingsView: View {
                     }
                 }
                 KeyboardShortcuts.Recorder("Open hotkey", name: .openVisualizer)
+                keyPicker($likeKey, taken: skipKey) {
+                    Text("Like key")
+                    Text("Favorites what's on screen")
+                }
+                keyPicker($skipKey, taken: likeKey) {
+                    Text("Skip key")
+                    Text("Next visualizer, in Shuffle")
+                }
                 LabeledContent("Open now") {
                     Button("Open", action: openNow)
                 }
@@ -122,6 +132,18 @@ struct SettingsView: View {
     private func keepAwakePicker(_ minutes: Binding<Int>, @ViewBuilder label: () -> some View) -> some View {
         Picker(selection: minutes) {
             ForEach(KeepAwakeSetting.choices, id: \.self) { Text(KeepAwakeSetting.label(minutes: $0)).tag($0) }
+        } label: {
+            label()
+        }
+    }
+
+    /// A key for use while the visualizer is open. The other action's key isn't offered, so one key never does both.
+    private func keyPicker(_ code: Binding<Int>, taken: Int, @ViewBuilder label: () -> some View) -> some View {
+        Picker(selection: code) {
+            Text("Off").tag(VisualizerKeys.off)
+            ForEach(VisualizerKey.choices.filter { Int($0.code) != taken }) { key in
+                Text(key.label).tag(Int(key.code))
+            }
         } label: {
             label()
         }

@@ -5,6 +5,8 @@ export const MAX_RENDER_WIDTH = 2560;
 /** Frames closer together than this are skipped, which halves 120 Hz to 60 fps. A strict
  *  16.7 ms would also drop about a third of the frames on a 60 Hz display (timestamp jitter). */
 export const MIN_FRAME_GAP_MS = 12;
+/** The skip key blends this fast whatever the blend time setting is, so the key feels immediate. */
+export const SKIP_BLEND_SECONDS = 0.5;
 
 /**
  * The preset controls from the settings window, as Swift sends them.
@@ -209,6 +211,14 @@ export class FailureLog {
   list() {
     return [...this.failures].map(([id, { error }]) => ({ id, error }));
   }
+}
+
+/**
+ * The blend for the skip key, or null when there is no next preset to skip to (single mode).
+ * @param {PresetSettings} settings
+ */
+export function skipBlendSeconds(settings) {
+  return settings.mode === "shuffle" ? SKIP_BLEND_SECONDS : null;
 }
 
 /**

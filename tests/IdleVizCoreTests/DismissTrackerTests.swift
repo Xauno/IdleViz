@@ -5,6 +5,7 @@ final class DismissTrackerTests: XCTestCase {
     let control: UInt16 = 59
     let option: UInt16 = 58
     let keyA: UInt16 = 0
+    let keyL: UInt16 = 37
 
     private func armed(holding keys: Set<UInt16> = []) -> DismissTracker {
         var tracker = DismissTracker(gracePeriod: 0.4)
@@ -87,6 +88,51 @@ final class DismissTrackerTests: XCTestCase {
         XCTAssertTrue(tracker.shouldDismiss(on: .key(code: keyA, isDown: true, isRepeat: false), elapsed: 1))
         var mouse = armed(holding: [control])
         XCTAssertTrue(mouse.shouldDismiss(on: .mouseDown, elapsed: 1))
+    }
+
+    // MARK: Like and skip keys
+
+    func testAPassKeyNeverCloses() {
+        var tracker = DismissTracker(gracePeriod: 0.4, passKeys: [keyL])
+        tracker.arm(heldKeys: [], elapsed: 0.4)
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: false), elapsed: 1))
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: true), elapsed: 1.5))
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: false, isRepeat: false), elapsed: 1.6))
+        // Pressed again, it still doesn't close.
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: false), elapsed: 2))
+    }
+
+    func testOtherKeysStillCloseNextToAPassKey() {
+        var tracker = DismissTracker(gracePeriod: 0.4, passKeys: [keyL])
+        tracker.arm(heldKeys: [], elapsed: 0.4)
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: false), elapsed: 1))
+        XCTAssertTrue(tracker.shouldDismiss(on: .key(code: keyA, isDown: true, isRepeat: false), elapsed: 1.1))
+    }
+
+    func testBackupIgnoresAPassKeyTheEventMonitorHandled() {
+        var tracker = DismissTracker(gracePeriod: 0.4, passKeys: [keyL])
+        tracker.arm(heldKeys: [], elapsed: 0.4)
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: false), elapsed: 1.0))
+        XCTAssertFalse(tracker.shouldDismiss(secondsSinceLastInput: 0.03, heldKeys: [keyL], elapsed: 1.02))
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: false, isRepeat: false), elapsed: 1.1))
+        XCTAssertFalse(tracker.shouldDismiss(secondsSinceLastInput: 0.02, heldKeys: [], elapsed: 1.11))
+        // Input after that is new.
+        XCTAssertTrue(tracker.shouldDismiss(secondsSinceLastInput: 0.01, heldKeys: [], elapsed: 2.0))
+    }
+
+    func testBackupClosesOnAPassKeyTheEventMonitorNeverSaw() {
+        // The window isn't key, so the key went to another app and did nothing here.
+        var tracker = DismissTracker(gracePeriod: 0.4, passKeys: [keyL])
+        tracker.arm(heldKeys: [], elapsed: 0.4)
+        XCTAssertTrue(tracker.shouldDismiss(secondsSinceLastInput: 0.05, heldKeys: [keyL], elapsed: 3))
+    }
+
+    func testAPassKeyHeldSinceOpeningIsNotStuck() {
+        var tracker = DismissTracker(gracePeriod: 0.4, passKeys: [keyL])
+        tracker.arm(heldKeys: [keyL], elapsed: 0.4)
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: false, isRepeat: false), elapsed: 0.9))
+        XCTAssertTrue(tracker.stuckKeys.isEmpty)
+        XCTAssertFalse(tracker.shouldDismiss(on: .key(code: keyL, isDown: true, isRepeat: false), elapsed: 2))
     }
 
     // MARK: Backup check
