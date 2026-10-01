@@ -49,6 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.windowController.page.stopStatusChecks()
         }
         closeWhenTheDisplayMayHaveChanged()
+        // Before anything can open settings, which makes the app regular.
+        if let screen = NSScreen.screens.first { windowController.prepare(on: screen) }
         triggers = Triggers(onTrigger: { [weak self] source in self?.open(from: source) })
         #if DEBUG
         // Launch argument `-IdleVizShowSettings YES` opens the settings window at launch, for working on it.
