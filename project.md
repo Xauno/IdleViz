@@ -137,6 +137,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
   - `idleviz-app://presets/…` serves the custom presets folder, with `Access-Control-Allow-Origin: *` so the sandboxed plugin frame (an opaque origin) can import from it.
   - This gives one origin, working ES modules, and a place to send the Content-Security-Policy as a response header. `idleviz://` stays the external "open" URL scheme and is never loaded in the page.
 - Keep the window and web view alive between opens (hide instead of destroying it) so opening is instant.
+- **Wait for the page's scripts.** WebKit can report the navigation as finished before the page's modules have run (about one launch in five, found in step 7c), and a call made then is silently lost. After `didFinish`, Swift asks the page every 50 ms whether its functions exist, and only then sends the current state (preset settings, now playing).
 - **Recovery:**
   - Reload the page and re-send state on `webViewWebContentProcessDidTerminate`.
   - Replace the web view if the once-a-second status check gets no reply for ~3 s (see "Loading and failure" under Presets). A reload isn't enough: checked in step 7b, a page stuck in a JavaScript loop never starts the navigation. A new `WKWebView` gets a new web content process and the latest state is sent again. WebKit leaves the stuck process spinning at full CPU, so the app ends it with `kill`, using the process ID from WebKit's private `_webProcessIdentifier` property (skipped if a future WebKit drops it).
@@ -321,7 +322,7 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
 
 ### Presets
 - **Bundled:** `butterchurn-presets` 2.4.7, shipped in the app: the base, Extra, Extra2 and MD1 packs, 395 presets once names that appear in more than one pack are dropped. Butterchurn and the packs are copied unchanged from npm into `web/vendor/` and committed, so building the app needs no Node step. A test checks their hashes.
-- **Until the preset controls exist (step 7c):** shuffle all presets, 30 s each, with a 2.7 s blend. Every preset is shown once before any repeats.
+- **Shuffle** shows every preset in the chosen set once, in random order, before any repeats.
 - **Custom (folder import):** any preset you add yourself, loaded alongside the bundled ones.
   - Folder: `~/Library/Application Support/IdleViz/Presets/` (created on first launch; subfolders allowed, so a downloaded pack can be dropped in as-is).
   - Accepted files:
@@ -337,6 +338,13 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
   - Presets are tagged by source (bundled / custom) so the settings can shuffle all, bundled only, or custom only.
   - Check each pack's license before sharing the app. User-imported presets stay on the user's machine and are never bundled.
 - **Preset control** (in the settings window, since any input closes the visualizer): mode (single visualizer or shuffle), seconds per preset, blend time, shuffle-from filter (all/bundled/custom/favorites), favorites, and a blocklist for presets you dislike.
+  - Settings: `visualizerMode` (`shuffle`, the default, or `single`), `singlePreset` (a preset id), `shuffleFrom` (`all`), `secondsPerPreset` (15, 30, 45, 60, 120 or 300; default 30), `blendSeconds` (0, 1, 2.7, 5 or 8; default 2.7), `favoritePresets` and `blockedPresets` (lists of preset ids). A preset id is its source, a colon and its name, for example `bundled:Geiss - Swirlie 5`.
+  - Swift sends them all to the page with `window.setPresetSettings(json)` when the page is ready and on every change, and the page applies them at once: a newly blocked or filtered-out preset on screen blends to the next one.
+  - Blocked presets are left out of shuffle in every filter. A preset picked in Single mode is shown even if it's blocked.
+  - A filter with nothing in it (no favorites yet, no custom presets) falls back to all presets that aren't blocked, and the settings row says so. If everything is blocked, shuffle uses all presets rather than showing nothing.
+  - A preset is never both a favorite and blocked: adding it to one list takes it off the other.
+  - **Getting presets onto the lists.** The **Last shown** row names the preset that was last on screen (from the status check, kept in `lastShownPreset`), with a favorite and a block button. The Favorites and Blocklist sheets also list all presets, with search, to add from.
+  - Swift gets the preset list for the pickers by asking the page (`window.idlevizPresets()`), checked like the status reply.
 - **Custom JS plugins:** users can drop `.js` files into the presets folder (subfolders allowed) and they appear in the preset list next to Butterchurn presets, tagged "custom".
   - Each file is an ES module with named exports `init(canvas)`, `frame(audio, time)` and `dispose()`, plus an optional `meta = { name }`. The same interface is used for plugins bundled in `web/visuals/*.js` (see `web/visuals/aurora.js` for an example). The full author guide is in `docs/custom-visualizer.md`.
   - `audio` is a plain object: `{ bands: Float32Array(64), bass, mid, treble, waveform: Float32Array(1024), rms }`, built from the Spotify-only frame (see the audio guarantee above). Bands are 0..1 and log-spaced (about 40 Hz to 16 kHz), already noise-floored and smoothed (fast attack, slow release); `bass`/`mid`/`treble` average bands 0-7, 8-29 and 30-63. The arrays are reused every frame. It is the only audio data a plugin ever sees.
@@ -373,6 +381,8 @@ IdleViz/
 │  ├─ AppDelegate.swift          # menu bar (Settings… + hotkey row + error rows), icon flash, yellow icon
 │  ├─ Permissions.swift          # check Automation / audio / mic, open System Settings pages
 │  ├─ SettingsWindow.swift       # separate settings UI (one scrolling page, per mockups.html)
+│  ├─ PresetControls.swift       # the preset rows in settings, and the favorites and blocklist sheets
+│  ├─ PresetController.swift     # preset settings in UserDefaults → page; preset list and last-shown preset from the page
 │  ├─ WelcomeWindow.swift        # first launch: explains and triggers the two permission prompts
 │  ├─ Triggers.swift             # idle, hotkey, URL scheme, open rules
 │  ├─ DismissWatcher.swift
@@ -415,7 +425,7 @@ Each step is one pull request. At the end of each step, update the README (Roadm
 7. **Visualizer**, split into five PRs:
    - **7a.** Butterchurn in the page with bundled presets and fake audio. Move `aurora.js` to `web/visuals/`. Done.
    - **7b.** Real audio: process tap (with process-list changes), analysis in Swift, automatic gain, silence rules, web view recovery. Done.
-   - **7c.** Preset controls (mode, shuffle, timing, blend, favorites, blocklist).
+   - **7c.** Preset controls (mode, shuffle, timing, blend, favorites, blocklist). Done.
    - **7d.** Custom preset folder: `.json` loading, folder watching, `.js` plugins in sandboxed frames (with the audio, CSP and status-check rules), Import/Open/Reload controls in settings, then `.milk` conversion with caching and failure handling.
    - **7e.** Audio delay: per-device delay line, the settings slider, and **Detect delay** with the microphone. Test with built-in speakers, Bluetooth headphones and speakers, and AirPlay if available.
 8. **Polish:** fades, launch at login, brightness slider in settings, keep awake with its time limit setting (and the idle rule to wait for input after the limit), different times on battery, first-launch welcome window for permissions, yellow icon and popup error rows for missing permissions.

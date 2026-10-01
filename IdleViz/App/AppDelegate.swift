@@ -7,7 +7,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let log = Logger(subsystem: "com.xauno.IdleViz", category: "app")
     private let windowController = WindowController()
     let menuBarIcon = MenuBarIcon()
-    private lazy var settings = SettingsWindowController(openNow: { [weak self] in self?.open(from: .settings) })
+    private lazy var presets = PresetController(page: windowController.page)
+    private lazy var settings = SettingsWindowController(
+        presets: presets,
+        openNow: { [weak self] in self?.open(from: .settings) }
+    )
     private var triggers: Triggers?
     private var spotify: SpotifyInfo?
     private let audio = AudioPump()
@@ -15,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: [IdleTimeoutSetting.key: IdleTimeoutSetting.defaultMinutes])
+        // Created at launch, so the stored preset controls reach the page as soon as it loads.
+        _ = presets
         let spotify = SpotifyInfo()
         self.spotify = spotify
         spotify.onOverlay = { [weak self] payload in self?.windowController.page.show(payload) }
@@ -33,6 +39,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         closeWhenTheDisplayMayHaveChanged()
         triggers = Triggers(onTrigger: { [weak self] source in self?.open(from: source) })
+        #if DEBUG
+        // Launch argument `-IdleVizShowSettings YES` opens the settings window at launch, for working on it.
+        if UserDefaults.standard.bool(forKey: "IdleVizShowSettings") { showSettings() }
+        #endif
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {

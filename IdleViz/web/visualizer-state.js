@@ -5,8 +5,82 @@ export const MAX_RENDER_WIDTH = 2560;
 /** Frames closer together than this are skipped, which halves 120 Hz to 60 fps. A strict
  *  16.7 ms would also drop about a third of the frames on a 60 Hz display (timestamp jitter). */
 export const MIN_FRAME_GAP_MS = 12;
-export const SECONDS_PER_PRESET = 30;
-export const BLEND_SECONDS = 2.7;
+
+/**
+ * The preset controls from the settings window, as Swift sends them.
+ * @typedef {object} PresetSettings
+ * @property {"shuffle" | "single"} mode
+ * @property {string} single            Id of the preset shown in single mode.
+ * @property {"all" | "bundled" | "custom" | "favorites"} shuffleFrom
+ * @property {number} secondsPerPreset
+ * @property {number} blendSeconds
+ * @property {string[]} favorites       Preset ids.
+ * @property {string[]} blocked         Preset ids left out of shuffle.
+ */
+
+/** @type {Readonly<PresetSettings>} */
+export const DEFAULT_SETTINGS = Object.freeze({
+  mode: "shuffle",
+  single: "",
+  shuffleFrom: "all",
+  secondsPerPreset: 30,
+  blendSeconds: 2.7,
+  favorites: [],
+  blocked: [],
+});
+
+const idList = (value) => (Array.isArray(value) ? value.filter((id) => typeof id === "string") : []);
+
+/**
+ * Checks the shape of a `setPresetSettings` payload. Anything missing or out of range gets its default.
+ * @param {unknown} value
+ * @returns {PresetSettings}
+ */
+export function parsePresetSettings(value) {
+  const item = /** @type {Record<string, unknown>} */ (value && typeof value === "object" ? value : {});
+  const seconds = Number(item.secondsPerPreset);
+  const blend = Number(item.blendSeconds);
+  const sources = ["all", "bundled", "custom", "favorites"];
+  return {
+    mode: item.mode === "single" ? "single" : "shuffle",
+    single: typeof item.single === "string" ? item.single : "",
+    shuffleFrom: /** @type {PresetSettings["shuffleFrom"]} */ (
+      sources.includes(/** @type {string} */ (item.shuffleFrom)) ? item.shuffleFrom : "all"
+    ),
+    secondsPerPreset:
+      Number.isFinite(seconds) && seconds >= 1 ? Math.min(seconds, 86_400) : DEFAULT_SETTINGS.secondsPerPreset,
+    blendSeconds: Number.isFinite(blend) && blend >= 0 ? Math.min(blend, 60) : DEFAULT_SETTINGS.blendSeconds,
+    favorites: idList(item.favorites),
+    blocked: idList(item.blocked),
+  };
+}
+
+/**
+ * The ids shuffle may pick from: the chosen source, minus blocked presets.
+ * An empty choice (no favorites yet, no custom presets, everything blocked) would leave the
+ * screen black, so it widens: first to every preset that isn't blocked, then to all of them.
+ * @param {PresetEntry[]} presets
+ * @param {PresetSettings} settings
+ * @returns {string[]}
+ */
+export function shufflePool(presets, settings) {
+  const blocked = new Set(settings.blocked);
+  const favorites = new Set(settings.favorites);
+  const allowed = presets.filter((entry) => !blocked.has(entry.id));
+  const chosen = allowed.filter((entry) => {
+    switch (settings.shuffleFrom) {
+      case "bundled":
+      case "custom":
+        return entry.source === settings.shuffleFrom;
+      case "favorites":
+        return favorites.has(entry.id);
+      default:
+        return true;
+    }
+  });
+  const pool = chosen.length > 0 ? chosen : allowed.length > 0 ? allowed : presets;
+  return pool.map((entry) => entry.id);
+}
 
 /**
  * @typedef {object} PresetEntry
@@ -51,6 +125,17 @@ export class ShuffleBag {
     this.bag = [];
     /** @type {string | null} */
     this.last = null;
+  }
+
+  /**
+   * Switches to a new set of ids and starts a fresh round.
+   * @param {string[]} ids
+   * @param {string | null} [last]  The id on screen now, so the new round doesn't start with it.
+   */
+  setIds(ids, last = this.last) {
+    this.ids = [...ids];
+    this.bag = [];
+    this.last = last;
   }
 
   /** The next id, or null when there are none. */

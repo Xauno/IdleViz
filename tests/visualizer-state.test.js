@@ -3,12 +3,15 @@ import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_SETTINGS,
   MAX_RENDER_WIDTH,
   Rotation,
   ShuffleBag,
   collectPresets,
+  parsePresetSettings,
   renderSize,
   shouldRender,
+  shufflePool,
 } from "../IdleViz/web/visualizer-state.js";
 
 /** A repeatable stand-in for Math.random. */
@@ -102,6 +105,103 @@ describe("ShuffleBag", () => {
     const one = new ShuffleBag(["only"]);
     expect([one.next(), one.next()]).toEqual(["only", "only"]);
     expect(new ShuffleBag([]).next()).toBeNull();
+  });
+});
+
+describe("ShuffleBag.setIds", () => {
+  it("starts a fresh round from the new ids without repeating the one on screen", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const bag = new ShuffleBag(["a", "b", "c"], seeded(seed));
+      bag.next();
+      bag.setIds(["x", "y"], "x");
+      expect(bag.next()).toBe("y");
+      expect(bag.next()).toBe("x");
+    }
+  });
+
+  it("keeps its own last id when none is given", () => {
+    const bag = new ShuffleBag(["a", "b"], seeded(3));
+    const last = bag.next();
+    bag.setIds(["a", "b"]);
+    expect(bag.next()).not.toBe(last);
+  });
+});
+
+describe("parsePresetSettings", () => {
+  it("keeps a full payload", () => {
+    const payload = {
+      mode: "single",
+      single: "bundled:A",
+      shuffleFrom: "favorites",
+      secondsPerPreset: 120,
+      blendSeconds: 0,
+      favorites: ["bundled:A"],
+      blocked: ["bundled:B"],
+    };
+    expect(parsePresetSettings(payload)).toEqual(payload);
+  });
+
+  it("falls back to the defaults for anything missing or wrong", () => {
+    expect(parsePresetSettings(null)).toEqual(DEFAULT_SETTINGS);
+    expect(parsePresetSettings("text")).toEqual(DEFAULT_SETTINGS);
+    expect(
+      parsePresetSettings({
+        mode: "sideways",
+        single: 7,
+        shuffleFrom: "everything",
+        secondsPerPreset: 0,
+        blendSeconds: -1,
+        favorites: "bundled:A",
+        blocked: [1, "bundled:B", null],
+      }),
+    ).toEqual({ ...DEFAULT_SETTINGS, blocked: ["bundled:B"] });
+    expect(parsePresetSettings({ secondsPerPreset: NaN, blendSeconds: Infinity })).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("matches the defaults in mockups.html", () => {
+    expect(DEFAULT_SETTINGS).toMatchObject({
+      mode: "shuffle",
+      shuffleFrom: "all",
+      secondsPerPreset: 30,
+      blendSeconds: 2.7,
+    });
+  });
+});
+
+describe("shufflePool", () => {
+  const presets = [...collectPresets([{ A: {}, B: {}, C: {} }]), ...collectPresets([{ X: {}, Y: {} }], "custom")];
+  const pool = (overrides) => shufflePool(presets, { ...DEFAULT_SETTINGS, ...overrides });
+
+  it("takes everything by default", () => {
+    expect(pool({})).toEqual(["bundled:A", "bundled:B", "bundled:C", "custom:X", "custom:Y"]);
+  });
+
+  it("filters by source", () => {
+    expect(pool({ shuffleFrom: "bundled" })).toEqual(["bundled:A", "bundled:B", "bundled:C"]);
+    expect(pool({ shuffleFrom: "custom" })).toEqual(["custom:X", "custom:Y"]);
+  });
+
+  it("takes only favorites", () => {
+    expect(pool({ shuffleFrom: "favorites", favorites: ["custom:Y", "bundled:B", "gone:Z"] })).toEqual([
+      "bundled:B",
+      "custom:Y",
+    ]);
+  });
+
+  it("leaves blocked presets out of every source", () => {
+    const blocked = ["bundled:A", "custom:X"];
+    expect(pool({ blocked })).toEqual(["bundled:B", "bundled:C", "custom:Y"]);
+    expect(pool({ blocked, shuffleFrom: "custom" })).toEqual(["custom:Y"]);
+    expect(pool({ blocked, shuffleFrom: "favorites", favorites: ["bundled:A", "bundled:B"] })).toEqual(["bundled:B"]);
+  });
+
+  it("widens an empty choice instead of leaving nothing to show", () => {
+    expect(pool({ shuffleFrom: "favorites" })).toHaveLength(5);
+    expect(pool({ shuffleFrom: "favorites", blocked: ["bundled:A"] })).toHaveLength(4);
+    expect(shufflePool(collectPresets([{ A: {} }]), { ...DEFAULT_SETTINGS, shuffleFrom: "custom" })).toEqual([
+      "bundled:A",
+    ]);
+    expect(pool({ blocked: presets.map((p) => p.id) })).toHaveLength(5);
   });
 });
 

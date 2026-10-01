@@ -3,14 +3,16 @@ import IdleVizCore
 import KeyboardShortcuts
 import SwiftUI
 
-/// Separate settings window, per mockups.html section 2. So far it has the idle
-/// timeout, the hotkey and Open now; the other rows arrive with the features they control.
+/// Separate settings window, per mockups.html section 2. So far it has the idle timeout, the
+/// hotkey, Open now and the preset controls; the other rows arrive with the features they control.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
+    private let presets: PresetController
     private let openNow: () -> Void
     private var window: NSWindow?
 
-    init(openNow: @escaping () -> Void) {
+    init(presets: PresetController, openNow: @escaping () -> Void) {
+        self.presets = presets
         self.openNow = openNow
     }
 
@@ -28,7 +30,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow {
-        let hosting = NSHostingController(rootView: SettingsView(openNow: openNow))
+        let hosting = NSHostingController(rootView: SettingsView(presets: presets, openNow: openNow))
         hosting.sizingOptions = []
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 340, height: 560),
@@ -49,6 +51,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 }
 
 struct SettingsView: View {
+    @Bindable var presets: PresetController
     let openNow: () -> Void
     @AppStorage(IdleTimeoutSetting.key) private var idleTimeout = IdleTimeoutSetting.defaultMinutes
 
@@ -67,6 +70,7 @@ struct SettingsView: View {
                     Button("Open", action: openNow)
                 }
             }
+            PresetControls(presets: presets)
         }
         .formStyle(.grouped)
     }
