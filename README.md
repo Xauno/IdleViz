@@ -9,7 +9,7 @@ A macOS menu-bar app that turns your Mac into a music display. When the Mac goes
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: in development.** The menu-bar app opens a fullscreen window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input or after a keep-awake limit. It shows a Butterchurn visualizer that reacts to Spotify's audio and shuffles through 395 bundled presets, with what Spotify is playing in an overlay styled after the Spotify TV app. See [Roadmap](#roadmap) for progress.
+> **Status: in development.** The menu-bar app opens a fullscreen window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input or after a keep-awake limit. It shows a Butterchurn visualizer that reacts to Spotify's audio and shuffles through 395 bundled presets, with what Spotify is playing in an overlay styled after the Spotify TV app. Every step in the [Roadmap](#roadmap) is built; it runs on the main display only.
 
 ## Contents
 
@@ -51,10 +51,10 @@ Working now:
 - If the page ever stops responding, the app replaces it within a few seconds. The window also closes when the Mac goes to sleep or the displays change.
 - Reads what Spotify is playing (title, artist, album, playing or paused, position, length) and whether it's a song, a podcast or an ad, and downloads the album art. It never launches Spotify: it only asks while Spotify is running, and updates when Spotify says something changed rather than polling.
 
-Planned:
-
-- Adjustable visualizer brightness, launch at login, and a small settings window.
+- Adjustable visualizer brightness (50 to 100%, 70% by default), a switch to hide the now-playing overlay and show only the visualizer, and launch at login.
 - Never launches Spotify and never uses Spotify's web API or a login.
+
+Not built: more than one display. The visualizer opens on the main display only.
 
 ## Roadmap
 
@@ -76,7 +76,7 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | 7e   | Visualizer: audio delay, with a microphone-based detector                         | Done    |
 | 8a   | Polish: keep-awake limit, battery times, fades                                    | Done    |
 | 8b   | Polish: permission setup (welcome window, yellow icon, error rows)                | Done    |
-| 8c   | Polish: brightness, overlay switch, launch at login                               | Planned |
+| 8c   | Polish: brightness, overlay switch, launch at login                               | Done    |
 
 ## Requirements
 
@@ -126,6 +126,8 @@ The app is built from source for personal use. There is no download.
 - **Idle:** after the **Start after idle** time with no input (5 minutes by default), it opens by itself, with the same Spotify check. It skips that while the screen is locked or another app keeps the display awake (a video, a call, a presentation), and then waits until you use the Mac again before trying again.
 - **Keep awake:** while the visualizer is showing, the display doesn't sleep and the Mac doesn't lock by itself. After the **Keep screen awake** time (1 hour by default), counted from when it opened, it fades out and the Mac's own sleep, screensaver and lock settings take over. It then stays closed until you use the Mac again.
 - **On battery:** turn on **Different times on battery** in settings to get a second **start after idle** and **keep screen awake** time that apply while the Mac is unplugged. They start as copies of the normal times.
+- **Brightness and overlay:** in settings under **Visualizer**, **Brightness** dims the visuals behind the overlay (50 to 100%), and **Show Spotify overlay** turns the now-playing layout off, leaving only the visualizer. Both apply at once, even while the visualizer is open.
+- **Launch at login:** the switch in settings adds IdleViz to your login items. It works best from the copy in `/Applications`. macOS may ask you to allow it under System Settings → General → Login Items.
 - **Settings:** change the idle and keep-awake times, or turn idle opening off, and change the hotkey. Close the window with its red button; ⌘Q quits the app while settings is focused.
 
 - **Now playing:** the overlay updates whenever Spotify's track or state changes, and re-syncs the progress bar every 5 s while the window is open. The app also logs each change:
@@ -184,7 +186,7 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
 ├─ Package.swift           IdleVizCore Swift package (testable logic)
-├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, keep-awake and battery times, fade times, permission states, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks), the audio delay (per-device setting, delay line, delay detection)
+├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, keep-awake and battery times, fade times, permission states, brightness and overlay settings, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks), the audio delay (per-device setting, delay line, delay detection)
 ├─ IdleViz.xcodeproj       App target: bundle, Info.plist, entitlements, signing
 ├─ IdleViz/App/            Menu-bar app, settings window, welcome window and permission checks, triggers, fullscreen window, dismiss, keep awake, power source, Spotify info, Spotify audio tap, web view, presets folder and Milkdrop converter
 ├─ IdleViz/web/            The page: visualizer and overlay HTML, CSS and JS, the plugin frame and its runner, the converter page, Figtree font (served from idleviz-app://)

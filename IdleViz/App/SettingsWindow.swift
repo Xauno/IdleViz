@@ -3,9 +3,8 @@ import IdleVizCore
 import KeyboardShortcuts
 import SwiftUI
 
-/// Separate settings window, per mockups.html section 2. So far it has the idle and keep-awake times
-/// (with their battery values), the hotkey, Open now, the audio delay, the preset controls and the
-/// presets folder; the other rows arrive with the features they control.
+/// Separate settings window, per mockups.html section 2: one scrolling page with the General,
+/// Visualizer and Presets sections.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let presets: PresetController
@@ -60,6 +59,8 @@ struct SettingsView: View {
     @AppStorage(BatteryTimesSetting.enabledKey) private var useBatteryTimes = false
     @AppStorage(BatteryTimesSetting.idleTimeoutKey) private var idleTimeoutBattery = IdleTimeoutSetting.defaultMinutes
     @AppStorage(BatteryTimesSetting.keepAwakeKey) private var keepAwakeBattery = KeepAwakeSetting.defaultMinutes
+    @AppStorage(OverlaySetting.key) private var showOverlay = true
+    @AppStorage(BrightnessSetting.key) private var brightness = BrightnessSetting.defaultValue
 
     var body: some View {
         Form {
@@ -86,8 +87,21 @@ struct SettingsView: View {
                 LabeledContent("Open now") {
                     Button("Open", action: openNow)
                 }
+                LaunchAtLoginToggle()
             }
             Section("Visualizer") {
+                Toggle("Show Spotify overlay", isOn: $showOverlay)
+                LabeledContent("Brightness") {
+                    HStack(spacing: 6) {
+                        Slider(value: $brightness, in: BrightnessSetting.range)
+                            .frame(width: 96)
+                            .accessibilityLabel("Brightness")
+                        Text(BrightnessSetting.label(brightness))
+                            .font(.callout)
+                            .monospacedDigit()
+                            .frame(width: 58, alignment: .trailing)
+                    }
+                }
                 AudioDelayControls(audioDelay: audioDelay)
                 PresetControls(presets: presets)
             }

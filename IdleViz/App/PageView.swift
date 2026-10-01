@@ -28,6 +28,9 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
     private var customPresetsScript = CustomPresetPayload().script
     /// The latest audio delay, replayed the same way. The progress bar needs it to show the position you hear.
     private var audioDelayScript = AudioDelaySetting.script(for: 0)
+    /// The latest brightness and overlay switch, replayed the same way.
+    private var brightnessScript = BrightnessSetting.script(for: BrightnessSetting.defaultValue)
+    private var overlayEnabledScript = OverlaySetting.script(for: true)
     /// Called with the presets the page reports as failed, each time that list changes.
     var onFailures: (([PresetFailure]) -> Void)?
     /// Called with the preset that was on screen when the page stopped answering.
@@ -90,6 +93,18 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         audioDelayScript = AudioDelaySetting.script(for: audioDelay)
         guard loaded else { return }
         webView.evaluateJavaScript(audioDelayScript)
+    }
+
+    func send(brightness: Double) {
+        brightnessScript = BrightnessSetting.script(for: brightness)
+        guard loaded else { return }
+        webView.evaluateJavaScript(brightnessScript)
+    }
+
+    func send(overlayEnabled: Bool) {
+        overlayEnabledScript = OverlaySetting.script(for: overlayEnabled)
+        guard loaded else { return }
+        webView.evaluateJavaScript(overlayEnabledScript)
     }
 
     func send(presetSettings: PresetSettings) {
@@ -225,6 +240,8 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         webView.evaluateJavaScript(customPresetsScript)
         webView.evaluateJavaScript(presetSettingsScript)
         webView.evaluateJavaScript(audioDelayScript)
+        webView.evaluateJavaScript(brightnessScript)
+        webView.evaluateJavaScript(overlayEnabledScript)
         webView.evaluateJavaScript(nowPlayingScript)
         fetchPresetList()
     }

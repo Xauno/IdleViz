@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var welcome = WelcomeWindowController(permissions: permissions)
     private lazy var presets = PresetController(page: windowController.page, library: PresetLibrary())
     private lazy var audioDelay = AudioDelayController(pump: audio)
+    private lazy var displayOptions = DisplayOptions(page: windowController.page)
     private lazy var settings = SettingsWindowController(
         presets: presets,
         audioDelay: audioDelay,
@@ -38,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Created at launch, so the stored preset controls reach the page as soon as it loads.
         _ = presets
         _ = audioDelay
+        _ = displayOptions
         let spotify = SpotifyInfo()
         self.spotify = spotify
         spotify.onOverlay = { [weak self] payload in self?.windowController.page.show(payload) }
