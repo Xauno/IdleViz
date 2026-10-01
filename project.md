@@ -48,7 +48,7 @@ The app needs two permissions: **Automation** (to ask Spotify what's playing) an
 
 - On first launch, a small welcome window explains the two required ones and triggers the prompts on purpose: one AppleScript query (if Spotify is running) and a short tap. That way a prompt never pops up during an idle open while nobody is at the Mac. Both prompts need Spotify running, so if it isn't, the window asks you to open Spotify and continues by itself once it launches. The microphone prompt only appears the first time you press **Detect delay**.
 - Check Automation without prompting with `AEDeterminePermissionToAutomateTarget(..., askUserIfNeeded: false)`.
-- There's no public API to check the audio permission. Treat several seconds of exact-zero buffers, or no buffers at all, while Spotify reports "playing" as "probably denied" and log it. (A paused Spotify sends exact-zero buffers, and one that hasn't played since launch sends none, so only count time while it's playing.)
+- There's no public API to check the audio permission. Treat several seconds (5, in `TapHealth`) of exact-zero buffers, or no buffers at all, while Spotify reports "playing" as "probably denied" and log it. Spotify playing on another device (Spotify Connect) looks the same, and the log line says so. (A paused Spotify sends exact-zero buffers, and one that hasn't played since launch sends none, so only count time while it's playing.)
 - No camera permission, ever.
 
 ### When a permission is missing
@@ -139,7 +139,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 - Keep the window and web view alive between opens (hide instead of destroying it) so opening is instant.
 - **Recovery:**
   - Reload the page and re-send state on `webViewWebContentProcessDidTerminate`.
-  - Reload the page if the once-a-second status check gets no reply for ~3 s (see "Loading and failure" under Presets).
+  - Replace the web view if the once-a-second status check gets no reply for ~3 s (see "Loading and failure" under Presets). A reload isn't enough: checked in step 7b, a page stuck in a JavaScript loop never starts the navigation. A new `WKWebView` gets a new web content process and the latest state is sent again. WebKit leaves the stuck process spinning at full CPU, so the app ends it with `kill`, using the process ID from WebKit's private `_webProcessIdentifier` property (skipped if a future WebKit drops it).
   - Rebuild Butterchurn on `webglcontextlost`, which can happen after sleep and wake.
   - Close the visualizer on `NSWorkspace.willSleepNotification` and `NSApplication.didChangeScreenParametersNotification`, since the main display may have changed.
 - Set `isInspectable = true` in Debug builds so Safari's Web Inspector can attach.
@@ -261,7 +261,9 @@ The only visualizer is **Butterchurn** (WebGL port of Milkdrop), chosen because 
   - the plugin audio object: 64 bands (noise-floored, smoothed), `bass`/`mid`/`treble`, `rms`, and a 1024-sample waveform;
   - Butterchurn's input: 1024-sample 8-bit time-domain data, mono plus left and right.
   - Swift packs this into one binary frame and sends it ~60×/s with `evaluateJavaScript`, base64-encoded.
-- **Automatic gain.** The tap captures after Spotify's own volume slider (but before the system volume), so a low Spotify volume would mean weak visuals. Normalize with a slow automatic gain on the RMS level, with a gate so real silence stays silent.
+- **Automatic gain.** The tap captures after Spotify's own volume slider (but before the system volume), so a low Spotify volume would mean weak visuals. Normalize with a slow automatic gain on the RMS level, with a gate so real silence stays silent. As built (`AutoGain`): it follows the RMS of each 1024-sample frame, rising to louder audio in about 0.5 s and falling to quieter audio in about 5 s, and scales it to 0.2. The gain stays between 0.5× and 32×, starts at 1×, is held while the input is below −60 dBFS, and is remembered between opens.
+- **Bands as built** (`AudioAnalyzer`): a Hann-windowed 1024-point FFT of the gained mono signal. Each band maps −65 dB to −10 dB (a full-scale sine is 0 dB) onto 0..1, moves 70% of the way to a higher value per frame and 12% of the way to a lower one, and snaps to exact zero in silence. The lowest bands are narrower than one FFT bin (47 Hz at 48 kHz), so they read a value interpolated between the two nearest bins.
+- **Sample rate.** Each frame carries the tap's sample rate. When it changes (another output device), the page recreates Butterchurn with a new `AudioContext` at that rate. The tap is rebuilt when the default output device changes, since that device is its clock.
 - **Feeding Butterchurn.** Pass the levels straight to `visualizer.render({ audioLevels: { timeByteArray, timeByteArrayL, timeByteArrayR } })`, which skips Web Audio entirely. The step 2 spike confirmed this works in `butterchurn` 2.6.7 (the current stable release; 3.0 is still in beta), so no `AudioWorklet` fallback is needed. `createVisualizer` still takes an `AudioContext`, but it can stay suspended and unconnected. Butterchurn reads that context's `sampleRate` to place its bass/mid/treble ranges, so create it with the tap's rate (`new AudioContext({ sampleRate })`).
 - **Spotify-only audio guarantee: the visuals only ever see Spotify's audio** (applies to Butterchurn and to every custom plugin):
   - The only audio source for the visuals is the Spotify process tap above. Never feed them from a global/system tap, an input device, or the microphone. Always build the tap with `CATapDescription(stereoMixdownOfProcesses:)` containing Spotify's process objects only. If none are found, send silence.
@@ -348,8 +350,8 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
   - **Loading and failure:**
     - The runner imports the file with `import()` inside `try/catch` and calls `init`.
     - It wraps `frame` so that a throw, or a frame that takes over ~50 ms for several seconds in a row, reports a failure to the host. The host then removes the frame and moves on to the next preset.
-    - **Status check.** About once a second while the window is open, Swift calls `evaluateJavaScript("window.idlevizStatus()")`. It returns the current preset and any new load failures (name + error message), which Swift shows in settings. Treat the reply as untrusted: check its shape and cap string lengths.
-    - WebKit may run the frame on the same thread as the host, so a plugin stuck in an endless loop freezes the whole page. If the status check gets no reply for ~3 s, Swift reloads the web view and marks the preset that was last reported as failed.
+    - **Status check.** About once a second while the window is open, Swift calls `evaluateJavaScript("window.idlevizStatus()")`. It returns the current preset and any new load failures (name + error message), which Swift shows in settings. Treat the reply as untrusted: check its shape and cap string lengths. Built in step 7b (`PageStatus`, `PageWatchdog`): for now Swift logs preset changes and failures; settings shows them from step 7d.
+    - WebKit may run the frame on the same thread as the host, so a plugin stuck in an endless loop freezes the whole page. If the status check gets no reply for ~3 s, Swift replaces the web view (see "Recovery" under Window) and marks the preset that was last reported as failed (the marking arrives in step 7d).
   - The regex check in `tests/plugin-contract.test.js` is a lint for plugins in the repo, not a security boundary. The sandboxed frame and CSP are what enforce the limits.
   - The settings window still shows a one-time warning that custom plugins (and custom presets, see "Page security") are code and should only come from sources the user trusts.
   - Same license caveat as presets: imported plugins stay on the user's machine and are never bundled.
@@ -377,10 +379,11 @@ IdleViz/
 │  ├─ KeepAwake.swift            # display-sleep assertion + time limit
 │  ├─ PowerSource.swift          # plugged in / battery, change notifications
 │  ├─ WindowController.swift     # key-capable borderless window
-│  ├─ PageView.swift             # WKWebView, nowPlaying calls, media capture denied
+│  ├─ PageView.swift             # WKWebView, nowPlaying and audio frames, status check and recovery, media capture denied
 │  ├─ AppSchemeHandler.swift     # serves idleviz-app://app/ with the CSP header
 │  ├─ SpotifyInfo.swift          # launch/quit tracking, notifications, AppleScript, artwork
-│  ├─ SpotifyAudioTap.swift      # process tap → IdleVizCore analysis
+│  ├─ SpotifyAudioTap.swift      # process tap on Spotify only, rebuilt when its processes or the output device change
+│  ├─ AudioPump.swift            # while open: tap → IdleVizCore analysis → page, 60×/s; tap health check
 │  ├─ AudioDelay.swift           # per-device delay line, Detect delay (mic, ~5 s)
 │  ├─ PresetLibrary.swift        # scan/watch custom preset folder, import, send list to page
 │  ├─ Info.plist                 # LSUIElement, NSAppleEventsUsageDescription, NSAudioCaptureUsageDescription, NSMicrophoneUsageDescription
@@ -393,7 +396,7 @@ IdleViz/
 │  ├─ fonts/                     # Figtree + OFL license
 │  ├─ visualizer.js              # Butterchurn wrapper: canvas, render loop, preset changes, context-loss rebuild
 │  ├─ visualizer-state.js        # DOM-free visualizer logic (preset list, shuffle, timing, render size; tested with Vitest)
-│  ├─ fake-audio.js              # test beat, used until the Spotify tap arrives in step 7b
+│  ├─ audio-frame.js             # DOM-free decoder for the packed audio frame from Swift (tested with Vitest)
 │  ├─ vendor/                    # butterchurn.min.js + preset packs from npm, unchanged, with licenses and checksums
 │  └─ visuals/                   # bundled plugin modules only (aurora.js); the plugin contract test loads every file here
 └─ design/reference/             # Spotify TV app reference photo (gitignored, local only)
@@ -411,7 +414,7 @@ Each step is one pull request. At the end of each step, update the README (Roadm
 6. **Idle trigger**, with the skip rules (locked screen, another app keeping the display awake).
 7. **Visualizer**, split into five PRs:
    - **7a.** Butterchurn in the page with bundled presets and fake audio. Move `aurora.js` to `web/visuals/`. Done.
-   - **7b.** Real audio: process tap (with process-list changes), analysis in Swift, automatic gain, silence rules, web view recovery.
+   - **7b.** Real audio: process tap (with process-list changes), analysis in Swift, automatic gain, silence rules, web view recovery. Done.
    - **7c.** Preset controls (mode, shuffle, timing, blend, favorites, blocklist).
    - **7d.** Custom preset folder: `.json` loading, folder watching, `.js` plugins in sandboxed frames (with the audio, CSP and status-check rules), Import/Open/Reload controls in settings, then `.milk` conversion with caching and failure handling.
    - **7e.** Audio delay: per-device delay line, the settings slider, and **Detect delay** with the microphone. Test with built-in speakers, Bluetooth headphones and speakers, and AirPlay if available.

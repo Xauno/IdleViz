@@ -1,4 +1,4 @@
-import { SAMPLE_COUNT, SAMPLE_RATE, fillFakeAudio } from "./fake-audio.js";
+import { createAudioState, decodeAudioFrame } from "./audio-frame.js";
 import {
   BLEND_SECONDS,
   Rotation,
@@ -26,14 +26,12 @@ const rotation = new Rotation(SECONDS_PER_PRESET);
 /** Presets that threw while loading; skipped for the rest of the session. */
 const failed = new Set();
 
-// Butterchurn only reads the sample rate from this context. It stays suspended and unconnected:
-// the audio arrives as plain arrays through render({ audioLevels }).
-const audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-const levels = {
-  timeByteArray: new Uint8Array(SAMPLE_COUNT).fill(128),
-  timeByteArrayL: new Uint8Array(SAMPLE_COUNT).fill(128),
-  timeByteArrayR: new Uint8Array(SAMPLE_COUNT).fill(128),
-};
+// The only audio the visuals ever see: frames from Swift's tap on Spotify, silence until one arrives.
+const audioState = createAudioState();
+// Butterchurn only reads the sample rate from this context, to place its bass, mid and treble
+// ranges. It stays suspended and unconnected: the audio arrives as plain arrays through
+// render({ audioLevels }).
+let audioContext = new AudioContext({ sampleRate: audioState.sampleRate });
 
 /** @type {HTMLCanvasElement | null} */
 let canvas = null;
@@ -43,8 +41,8 @@ let visualizer = null;
 let current = null;
 let lastRender = 0;
 let nextBuildAt = 0;
-let audioTime = 0;
 let frames = 0;
+let audioFrames = 0;
 
 function targetSize() {
   // The web view has no size until the window first opens; build for a common one meanwhile.
@@ -126,18 +124,32 @@ function tick(now) {
     }
   }
 
-  audioTime += seconds;
-  fillFakeAudio(levels, audioTime);
   if (rotation.tick(seconds)) showNext(BLEND_SECONDS);
-  visualizer.render({ audioLevels: levels, elapsedTime: seconds });
+  visualizer.render({ audioLevels: audioState.levels, elapsedTime: seconds });
   frames++;
+}
+
+/**
+ * Called by Swift about 60 times a second with one packed, base64-encoded frame.
+ * @param {unknown} base64
+ */
+function audioFrame(base64) {
+  if (!decodeAudioFrame(base64, audioState)) return;
+  audioFrames++;
+  if (audioState.sampleRate !== audioContext.sampleRate) {
+    // A different output device can change the tap's rate. Butterchurn reads it once, so start over.
+    audioContext.close();
+    audioContext = new AudioContext({ sampleRate: audioState.sampleRate });
+    visualizer = null;
+    nextBuildAt = 0;
+  }
 }
 
 /** Swift asks the page how it's doing with this; the page has no way to call Swift. */
 function idlevizStatus() {
-  return { preset: current?.id ?? null, frames, presets: presets.length, failed: [...failed] };
+  return { preset: current?.id ?? null, frames, audioFrames, presets: presets.length, failed: [...failed] };
 }
-Object.assign(window, { idlevizStatus });
+Object.assign(window, { audioFrame, idlevizStatus });
 
 if (butterchurn && presets.length > 0) {
   try {

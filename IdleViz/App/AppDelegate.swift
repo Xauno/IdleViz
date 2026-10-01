@@ -10,14 +10,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var settings = SettingsWindowController(openNow: { [weak self] in self?.open(from: .settings) })
     private var triggers: Triggers?
     private var spotify: SpotifyInfo?
+    private let audio = AudioPump()
+    private var observers: [NSObjectProtocol] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: [IdleTimeoutSetting.key: IdleTimeoutSetting.defaultMinutes])
         let spotify = SpotifyInfo()
         self.spotify = spotify
         spotify.onOverlay = { [weak self] payload in self?.windowController.page.show(payload) }
-        windowController.onOpen = { spotify.startResync() }
-        windowController.onClose = { spotify.stopResync() }
+        audio.onFrame = { [weak self] frame in self?.windowController.page.send(audioFrame: frame) }
+        audio.spotifyIsPlaying = { spotify.current?.nowPlaying.state == .playing }
+        // The tap and the status checks only run while the window is open.
+        windowController.onOpen = { [weak self] in
+            spotify.startResync()
+            self?.audio.start()
+            self?.windowController.page.startStatusChecks()
+        }
+        windowController.onClose = { [weak self] in
+            spotify.stopResync()
+            self?.audio.stop()
+            self?.windowController.page.stopStatusChecks()
+        }
+        closeWhenTheDisplayMayHaveChanged()
         triggers = Triggers(onTrigger: { [weak self] source in self?.open(from: source) })
     }
 
@@ -31,6 +45,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .open: open(from: .urlScheme)
             }
         }
+    }
+
+    /// After sleep or a change of displays the main display may be a different one, so close
+    /// instead of staying on a screen that may be gone.
+    private func closeWhenTheDisplayMayHaveChanged() {
+        let close: @Sendable (Notification) -> Void = { [weak self] _ in
+            MainActor.assumeIsolated { self?.windowController.close() }
+        }
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification, object: nil, queue: .main, using: close
+        ))
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main, using: close
+        ))
     }
 
     func showSettings() {

@@ -9,7 +9,7 @@ A macOS menu-bar app that turns your Mac into a music display. When the Mac goes
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: in development.** The menu-bar app opens a fullscreen window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input. It shows a Butterchurn visualizer that shuffles through 395 bundled presets, with what Spotify is playing in an overlay styled after the Spotify TV app. The visualizer doesn't hear Spotify yet: it reacts to a built-in test beat until the audio tap is built. See [Roadmap](#roadmap) for progress.
+> **Status: in development.** The menu-bar app opens a fullscreen window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input. It shows a Butterchurn visualizer that reacts to Spotify's audio and shuffles through 395 bundled presets, with what Spotify is playing in an overlay styled after the Spotify TV app. Preset controls, custom presets and the audio delay aren't built yet. See [Roadmap](#roadmap) for progress.
 
 ## Contents
 
@@ -37,12 +37,13 @@ Working now:
 - Closes on any input (mouse movement, click, scroll, key, modifier key, trackpad gesture), then returns focus to the app you were using. The cursor is hidden while it's open.
 - Settings window with a hotkey recorder and an **Open now** button.
 - Now-playing overlay styled after the Spotify TV app: album art, title, artist, progress bar and times, in the Figtree font. When paused, only the progress bar stays. Music ads show an "Advertisement" label with the progress bar, and podcasts show no overlay. If Spotify quits or the track goes away, the overlay fades out and the window stays open.
-- [Butterchurn](https://github.com/jberg/butterchurn) (WebGL Milkdrop) visualizer with 395 bundled presets. It shows a random preset every 30 seconds with a 2.7-second blend, and goes through all of them before repeating one. It renders at 60 fps, at most 2560 pixels wide, and only while the window is open. For now it reacts to a built-in test beat, not to Spotify.
+- [Butterchurn](https://github.com/jberg/butterchurn) (WebGL Milkdrop) visualizer with 395 bundled presets. It shows a random preset every 30 seconds with a 2.7-second blend, and goes through all of them before repeating one. It renders at 60 fps, at most 2560 pixels wide, and only while the window is open.
+- Reacts to Spotify's audio only, through a Core Audio process tap that runs while the window is open. The visuals never hear the microphone or other system audio. A slow automatic gain keeps the visuals lively when Spotify's volume is low, and silence stays silent: paused, quit, or playing on another device, the visuals just drift.
+- If the page ever stops responding, the app replaces it within a few seconds. The window also closes when the Mac goes to sleep or the displays change.
 - Reads what Spotify is playing (title, artist, album, playing or paused, position, length) and whether it's a song, a podcast or an ad, and downloads the album art. It never launches Spotify: it only asks while Spotify is running, and updates when Spotify says something changed rather than polling.
 
 Planned:
 
-- Reacts to Spotify's audio only, through a Core Audio process tap. The visuals never hear the microphone or other system audio.
 - Preset controls: one fixed preset or shuffle, time per preset, blend time, favorites and a blocklist.
 - Bring your own presets: drop Butterchurn `.json` or Milkdrop `.milk` files, or custom `.js` visual plugins, into a folder.
 - Keeps the screen awake while it's showing, up to a limit you set (1 hour by default). After that the Mac sleeps and locks as usual.
@@ -66,7 +67,7 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | 5    | Overlay page matched to the Spotify TV app, all states                            | Done    |
 | 6    | Idle trigger, with skip rules (locked screen, video or call playing)              | Done    |
 | 7a   | Visualizer: Butterchurn with bundled presets                                      | Done    |
-| 7b   | Visualizer: real Spotify audio through the process tap                            | Planned |
+| 7b   | Visualizer: real Spotify audio through the process tap                            | Done    |
 | 7c   | Visualizer: preset controls                                                       | Planned |
 | 7d   | Visualizer: custom preset folder and sandboxed plugins                            | Planned |
 | 7e   | Visualizer: audio delay, with a microphone-based detector                         | Planned |
@@ -106,6 +107,8 @@ The app is built from source for personal use. There is no download.
 
 4. With Spotify running, macOS asks whether IdleViz may control Spotify. Click **OK**; the app uses this only to read what's playing. If you clicked **Don't Allow**, turn it on in System Settings → Privacy & Security → Automation.
 
+5. The first time the visualizer opens, macOS asks whether IdleViz may record system audio. Click **Allow**; the app listens to Spotify's audio only, and only while the visualizer is open. If you denied it, turn it on in System Settings → Privacy & Security → Screen & System Audio Recording, under **System Audio Recording Only**. Without it the visualizer still opens but doesn't react to the music.
+
 ## Usage
 
 - **Menu bar:** click the waveform icon for a small popup with **Settings…** (⌘,) and the current open hotkey.
@@ -120,7 +123,7 @@ The app is built from source for personal use. There is no download.
   log stream --predicate 'subsystem == "com.xauno.IdleViz" AND category == "spotify"'
   ```
 
-- **Visualizer:** a new preset blends in every 30 seconds. There are no preset controls yet, and it moves to a built-in test beat rather than to your music.
+- **Visualizer:** it moves to whatever Spotify is playing on this Mac, and a new preset blends in every 30 seconds. There are no preset controls yet. With Spotify paused, or playing on another device, the visuals get silence and drift slowly.
 
 ## Custom visualizers
 
@@ -148,11 +151,13 @@ swift build && swift test
 swiftlint lint --strict
 ```
 
-In Debug builds, the launch argument `-IdleVizNoDismiss YES` keeps the window open so it can be inspected; trigger it again to close. The page is inspectable in Debug builds: with the window open, attach Safari's Web Inspector from **Develop → [your Mac] → IdleViz**. The scheme has this argument ready to tick. Each open logs whether macOS let the app activate:
+In Debug builds, the launch argument `-IdleVizNoDismiss YES` keeps the window open so it can be inspected; trigger it again to close. The page is inspectable in Debug builds: with the window open, attach Safari's Web Inspector from **Develop → [your Mac] → IdleViz**. The scheme has this argument ready to tick. Each open logs whether macOS let the app activate, and each preset change is logged too:
 
 ```bash
 log stream --predicate 'subsystem == "com.xauno.IdleViz"'
 ```
+
+Add `--level debug` to also see, once a second, what the tap delivered (buffers, gain, levels) and how many frames the page rendered and received.
 
 CI runs all of this on every pull request, and builds the app unsigned with `xcodebuild` on a `macos-26` runner.
 
@@ -164,9 +169,9 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
 ├─ Package.swift           IdleVizCore Swift package (testable logic)
-├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking
+├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks
 ├─ IdleViz.xcodeproj       App target: bundle, Info.plist, entitlements, signing
-├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, Spotify info, web view
+├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, Spotify info, Spotify audio tap, web view
 ├─ IdleViz/web/            The page: visualizer and overlay HTML, CSS and JS, Figtree font (served from idleviz-app://)
 ├─ IdleViz/web/vendor/     Butterchurn and its preset packs, copied unchanged from npm
 ├─ IdleViz/web/visuals/    Bundled visualizer plugins (aurora.js, the example plugin)

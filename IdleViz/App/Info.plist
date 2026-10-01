@@ -35,6 +35,8 @@
 	<string>public.app-category.entertainment</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>IdleViz listens to Spotify's audio only, to drive the visualizer.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>IdleViz asks Spotify what's playing, to show it on the visualizer.</string>
 	<key>LSUIElement</key>
