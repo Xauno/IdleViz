@@ -1,4 +1,12 @@
-import { NO_TRACK_GRACE_MS, formatTime, fraction, layoutFor, parseNowPlaying, positionAt } from "./overlay-state.js";
+import {
+  NO_TRACK_GRACE_MS,
+  clampBrightness,
+  formatTime,
+  fraction,
+  layoutFor,
+  parseNowPlaying,
+  positionAt,
+} from "./overlay-state.js";
 
 const STAGE_WIDTH = 1920;
 const NOTE_PATH = "M9 18V5.5l12-2.5v12.5a3 3 0 1 1-2-2.83V7.4l-8 1.66v9.44a3 3 0 1 1-2-2.83z";
@@ -18,6 +26,8 @@ let currentTrack = null;
 let hideTimer;
 /** Seconds the speakers lag behind Spotify, from Swift. */
 let audioDelay = 0;
+/** The "Show Spotify overlay" setting, from Swift. */
+let overlayEnabled = true;
 
 function fitStage() {
   stage.style.transform = `scale(${window.innerWidth / STAGE_WIDTH})`;
@@ -97,7 +107,7 @@ function renderProgress() {
 }
 
 function render() {
-  const layout = layoutFor(current);
+  const layout = layoutFor(current, overlayEnabled);
   if (layout === "none") {
     // Hide the overlay but keep the last content in place while it fades.
     stage.classList.add("hidden");
@@ -152,4 +162,21 @@ function setAudioDelay(seconds) {
   renderProgress();
 }
 
-Object.assign(window, { nowPlaying, setAudioDelay });
+/**
+ * Called by Swift with the "Show Spotify overlay" setting.
+ * @param {unknown} enabled
+ */
+function setOverlayEnabled(enabled) {
+  overlayEnabled = enabled !== false;
+  render();
+}
+
+/**
+ * Called by Swift with the brightness setting. The dim layer's opacity follows the variable.
+ * @param {unknown} value
+ */
+function setBrightness(value) {
+  document.documentElement.style.setProperty("--viz-brightness", String(clampBrightness(value)));
+}
+
+Object.assign(window, { nowPlaying, setAudioDelay, setOverlayEnabled, setBrightness });

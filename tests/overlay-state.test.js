@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { formatTime, fraction, layoutFor, parseNowPlaying, positionAt } from "../IdleViz/web/overlay-state.js";
+import {
+  clampBrightness,
+  formatTime,
+  fraction,
+  layoutFor,
+  parseNowPlaying,
+  positionAt,
+} from "../IdleViz/web/overlay-state.js";
 
 const song = {
   id: "spotify:track:a",
@@ -22,6 +29,32 @@ describe("layoutFor", () => {
     expect(layoutFor({ ...song, content: "podcast" })).toBe("none");
     expect(layoutFor({ ...song, content: "podcastAd" })).toBe("none");
     expect(layoutFor(null)).toBe("none");
+  });
+
+  it("shows nothing in any state while the overlay is switched off", () => {
+    expect(layoutFor(song, false)).toBe("none");
+    expect(layoutFor({ ...song, state: "paused" }, false)).toBe("none");
+    expect(layoutFor({ ...song, content: "musicAd" }, false)).toBe("none");
+    expect(layoutFor(song, true)).toBe("full");
+  });
+});
+
+describe("clampBrightness", () => {
+  it("keeps values inside the slider's range", () => {
+    expect(clampBrightness(0.7)).toBe(0.7);
+    expect(clampBrightness(1)).toBe(1);
+    expect(clampBrightness(0.5)).toBe(0.5);
+  });
+
+  it("clamps values outside it", () => {
+    expect(clampBrightness(0.1)).toBe(0.5);
+    expect(clampBrightness(3)).toBe(1);
+  });
+
+  it("falls back to the default for anything that isn't a number", () => {
+    expect(clampBrightness("0.9")).toBe(0.7);
+    expect(clampBrightness(NaN)).toBe(0.7);
+    expect(clampBrightness(undefined)).toBe(0.7);
   });
 });
 

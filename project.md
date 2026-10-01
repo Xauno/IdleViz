@@ -89,7 +89,7 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 ### Menu-bar helper
 **UI reference:** build the menu-bar popup and the settings window to match [mockups.html](mockups.html) (layout, grouping, row order, sizes, and build notes). Open it in a browser.
 
-- `LSUIElement = YES`, launch at login (`SMAppService.mainApp.register()`).
+- `LSUIElement = YES`, launch at login (`SMAppService.mainApp.register()`). The settings switch reads its state from `SMAppService.mainApp.status` instead of storing a setting, since it can also be changed under Login Items in System Settings.
 - The menu-bar popup is a small glass-style popover (SwiftUI `MenuBarExtra` with `.window` style, or `NSPopover`), not a plain `NSMenu`. The background is real Liquid Glass (`glassEffect`). The app requires macOS 26, so there's no fallback look. It is deliberately tiny, with two rows:
   1. **Settings…** opens the separate settings window.
   2. Below it, a disabled, informational row showing the current open hotkey (e.g. "Open visualizer: ⌃⌥V"), read from `KeyboardShortcuts` so it updates if the shortcut changes.
@@ -234,7 +234,9 @@ Match the Spotify TV app's now-playing screen, with these changes: the visualize
 #dim { background: #000; opacity: calc(1 - var(--viz-brightness)); }
 ```
 
-Swift updates brightness live (from the settings window slider): `webView.evaluateJavaScript("document.documentElement.style.setProperty('--viz-brightness', '\(value)')")`.
+Swift updates brightness live from the settings slider with `window.setBrightness(value)` (setting `visualizerBrightness`, 0.5 to 1, default 0.7, in whole percent). The page clamps the value and sets `--viz-brightness`; setting it from script is allowed by the CSP, which only blocks inline style attributes and `<style>` blocks.
+
+**Show Spotify overlay** (setting `showOverlay`, default on) reaches the page as `window.setOverlayEnabled(bool)`. Off means no layout in any state, the scrim included. Both values are sent when the page is ready and again on every change, like the preset settings.
 
 ### Page security (CSP)
 Sent as a response header by the scheme handler for the host page:
@@ -402,7 +404,7 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
 IdleViz.xcodeproj                # app target (bundle ID com.xauno.IdleViz), synchronized with IdleViz/; web/ is an explicit folder so it's copied with its subfolders
 Config/                          # IdleViz.xcconfig; Local.xcconfig (gitignored) holds DEVELOPMENT_TEAM
 Package.swift                    # IdleVizCore package (testable logic)
-Sources/IdleVizCore/             # open rules, idle/skip rules, keep-awake + battery timing, fade times, permission states, Spotify parsing, content type, FFT/bands, delay detection
+Sources/IdleVizCore/             # open rules, idle/skip rules, keep-awake + battery timing, fade times, permission states, brightness and overlay settings, Spotify parsing, content type, FFT/bands, delay detection
 tests/IdleVizCoreTests/          # XCTest, runs in CI with swift test (shares tests/ with the JS suite; Package.swift names the path)
 IdleViz/
 ├─ App/
@@ -411,6 +413,8 @@ IdleViz/
 │  ├─ MenuBarIcon.swift          # icon flash, yellow icon
 │  ├─ Permissions.swift          # check Automation and audio, run the welcome window's prompts, open System Settings pages
 │  ├─ SettingsWindow.swift       # separate settings UI (one scrolling page, per mockups.html)
+│  ├─ LaunchAtLogin.swift        # the launch at login switch (SMAppService)
+│  ├─ DisplayOptions.swift       # brightness and overlay switch → page
 │  ├─ PresetControls.swift       # the preset rows in settings, and the favorites and blocklist sheets
 │  ├─ PresetController.swift     # preset settings in UserDefaults → page; preset list and last-shown preset from the page
 │  ├─ WelcomeWindow.swift        # explains and triggers the two permission prompts
@@ -467,7 +471,7 @@ Each step is one pull request. At the end of each step, update the README (Roadm
 8. **Polish**, split into three PRs:
    - **8a.** Keep awake with its time limit setting (and the idle rule to wait for input after the limit), different times on battery, and the window fades. Done.
    - **8b.** Permissions: welcome window, yellow icon and popup error rows for missing permissions. Done. The macOS prompts themselves weren't triggered, since both permissions were already granted on the test Mac.
-   - **8c.** Brightness slider, Show Spotify overlay switch and launch at login in settings.
+   - **8c.** Brightness slider, Show Spotify overlay switch and launch at login in settings. Done. The launch at login switch wasn't flipped during testing.
 
 ## Later
 

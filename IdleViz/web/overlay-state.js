@@ -3,6 +3,8 @@
 /** How long "no track" has to last before the overlay hides. Spotify briefly reports
  *  no track while switching to a new album or playlist. */
 export const NO_TRACK_GRACE_MS = 1500;
+/** Matches `--viz-brightness` in overlay.css. */
+export const DEFAULT_BRIGHTNESS = 0.7;
 
 /**
  * @typedef {object} NowPlaying
@@ -24,10 +26,11 @@ export const NO_TRACK_GRACE_MS = 1500;
  * - "ad": "Advertisement" label and progress (ad between songs)
  * - "none": nothing (podcasts, podcast ads, no track)
  * @param {NowPlaying | null} item
+ * @param {boolean} [overlayEnabled]  The "Show Spotify overlay" setting. Off means nothing in any state.
  * @returns {"full" | "progress" | "ad" | "none"}
  */
-export function layoutFor(item) {
-  if (!item) return "none";
+export function layoutFor(item, overlayEnabled = true) {
+  if (!item || !overlayEnabled) return "none";
   switch (item.content) {
     case "song":
       return item.state === "paused" ? "progress" : "full";
@@ -96,4 +99,13 @@ export function parseNowPlaying(value) {
     durationMs: number(item.durationMs),
     position: number(item.position),
   };
+}
+
+/**
+ * The brightness setting as a number the dim layer can use: 0.5 to 1, or the default for anything else.
+ * @param {unknown} value
+ */
+export function clampBrightness(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_BRIGHTNESS;
+  return Math.min(Math.max(value, 0.5), 1);
 }
