@@ -105,25 +105,25 @@ final class PresetLibrary {
             scanning = false
             if scanAgain {
                 scanAgain = false
-                Task { await scan() }
+                Task { await self.scan() }
             }
         }
 
         let folder = folder
         let bundled = Self.bundledPlugins()
         let known = milkKeys
-        var scan = await Task.detached(priority: .utility) { Self.read(folder, bundled: bundled, known: known) }.value
-        milkKeys = scan.keys
-        versions = scan.versions
+        var found = await Task.detached(priority: .utility) { Self.read(folder, bundled: bundled, known: known) }.value
+        milkKeys = found.keys
+        versions = found.versions
 
-        let failures = scan.unreadable + (await convertMilkFiles(in: &scan))
-        Self.removeStaleCache(in: folder, keeping: Set(scan.keys.values.map(\.key)))
+        let failures = found.unreadable + (await convertMilkFiles(in: &found))
+        Self.removeStaleCache(in: folder, keeping: Set(found.keys.values.map(\.key)))
 
         // A file that changed since it hung the page gets another chance.
-        hung = hung.filter { id, version in !id.hasPrefix("custom:") || scan.versions[id] == version }
+        hung = hung.filter { id, version in !id.hasPrefix("custom:") || found.versions[id] == version }
         conversionFailures = failures
-        customCount = scan.entries.count { $0.source == "custom" }
-        publish(scan.entries)
+        customCount = found.entries.count { $0.source == "custom" }
+        publish(found.entries)
     }
 
     /// Converts the `.milk` files that have no cached result, adding the ones that work to `scan`.
