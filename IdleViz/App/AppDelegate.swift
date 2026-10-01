@@ -15,12 +15,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         openNow: { [weak self] in self?.open(from: .settings) }
     )
     private var triggers: Triggers?
+    private let power = PowerSource()
+    private lazy var keepAwake = KeepAwake(
+        limit: { [power] in TimingSettings(defaults: .standard).keepAwakeLimit(onBattery: power.onBattery) },
+        onLimit: { [weak self] in
+            // The Mac is still idle, so the idle trigger has to wait for new input.
+            self?.triggers?.idle.waitForInput()
+            self?.windowController.close(.keepAwakeLimit)
+        }
+    )
     private var spotify: SpotifyInfo?
     private let audio = AudioPump()
     private var observers: [NSObjectProtocol] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        UserDefaults.standard.register(defaults: [IdleTimeoutSetting.key: IdleTimeoutSetting.defaultMinutes])
+        UserDefaults.standard.register(defaults: [
+            IdleTimeoutSetting.key: IdleTimeoutSetting.defaultMinutes,
+            KeepAwakeSetting.key: KeepAwakeSetting.defaultMinutes,
+        ])
         // Created at launch, so the stored preset controls reach the page as soon as it loads.
         _ = presets
         _ = audioDelay
@@ -42,7 +54,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             spotify.startResync()
             self?.audio.start()
             self?.windowController.page.startStatusChecks()
+            self?.keepAwake.start()
         }
+        // The Mac may sleep again as soon as the fade-out starts.
+        windowController.onClosing = { [weak self] in self?.keepAwake.stop() }
         windowController.onClose = { [weak self] in
             spotify.stopResync()
             self?.audio.stop()
@@ -51,7 +66,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         closeWhenTheDisplayMayHaveChanged()
         // Before anything can open settings, which makes the app regular.
         if let screen = NSScreen.screens.first { windowController.prepare(on: screen) }
-        triggers = Triggers(onTrigger: { [weak self] source in self?.open(from: source) })
+        startTriggers()
+        runDebugLaunchArguments()
+    }
+
+    private func startTriggers() {
+        triggers = Triggers(
+            idleTimeout: { [power] in TimingSettings(defaults: .standard).idleTimeout(onBattery: power.onBattery) },
+            onTrigger: { [weak self] source in self?.open(from: source) }
+        )
+        power.onChange = { [weak self] in
+            guard let self else { return }
+            self.log.notice("Now on \(self.power.onBattery ? "battery" : "mains power", privacy: .public)")
+            self.triggers?.idle.timeoutMayHaveChanged()
+            self.keepAwake.limitMayHaveChanged()
+        }
+    }
+
+    private func runDebugLaunchArguments() {
         #if DEBUG
         // Launch argument `-IdleVizShowSettings YES` opens the settings window at launch, for working on it.
         if UserDefaults.standard.bool(forKey: "IdleVizShowSettings") { showSettings() }
@@ -89,7 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// instead of staying on a screen that may be gone.
     private func closeWhenTheDisplayMayHaveChanged() {
         let close: @Sendable (Notification) -> Void = { [weak self] _ in
-            MainActor.assumeIsolated { self?.windowController.close() }
+            MainActor.assumeIsolated { self?.windowController.close(.displayChanged) }
         }
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.willSleepNotification, object: nil, queue: .main, using: close
@@ -106,7 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func open(from source: TriggerSource) {
         // With dismiss turned off (debug switch), a second manual trigger is the only way to close.
         if windowController.isOpen {
-            if source.isManual && !windowController.dismissEnabled { windowController.close() }
+            if source.isManual && !windowController.dismissEnabled { windowController.close(.input) }
             return
         }
         // Manual triggers mean someone is at the Mac, so only the idle trigger checks these.

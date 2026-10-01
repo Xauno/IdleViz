@@ -40,6 +40,12 @@ public struct IdleScheduler: Sendable, Equatable {
         attemptedPeriod = lastInput
         return .fire
     }
+
+    /// Call when the keep-awake limit closes the visualizer. The Mac is still idle, so without
+    /// this the trigger would open it again at once. The current idle period counts as used.
+    public mutating func waitForInput(now: TimeInterval, idle: TimeInterval) {
+        attemptedPeriod = now - idle
+    }
 }
 
 /// The "Start after idle" setting, stored in minutes. 0 means off.

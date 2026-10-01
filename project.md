@@ -7,6 +7,7 @@ A menu-bar app that opens a fullscreen music visualizer with a Spotify now-playi
 - **Opens** after N idle minutes, or from a global hotkey / terminal command, but only if Spotify is running and has a current track (playing or paused). Otherwise it doesn't open, and a manual trigger flashes the menu-bar icon.
 - **Doesn't open on idle** while the screen is locked, or while another app is keeping the display awake (a video, a call, a presentation). Manual triggers skip that second check, since you're clearly there.
 - **Closes** on any input (mouse/trackpad movement, click, scroll, key, gesture), as sensitive as a macOS screensaver. If Spotify quits or the track disappears while it's open, the visualizer stays and only the overlay fades out; it comes back when a track does.
+- **Fades.** It fades in over about 0.6 s. Input fades it out quickly (about 0.25 s), like the macOS screensaver. The keep-awake limit fades it out slowly (about 1.5 s).
 - **Stays awake, up to a limit.** While it's showing, the display doesn't sleep. After the keep-awake limit (default 1 hour, adjustable in settings) it fades out and the Mac goes back to its normal sleep, screensaver and lock schedule.
 - **Works on battery too.** Optionally, the idle timeout and keep-awake limit can be set differently for when the Mac is on battery.
 - **Audio delay.** With Bluetooth or AirPlay speakers the sound arrives late, so the visuals can be delayed to match. Set it by hand, or press **Detect delay** and the app measures it with the microphone for a few seconds. It's saved for each speaker or pair of headphones.
@@ -115,16 +116,18 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 - Ignore input for the first ~300–500 ms after opening so the trigger itself doesn't close it.
 - Backup: while open, check `secondsSinceLastEventType` every ~100 ms; if it's less than the time since opening (minus the grace period), close. This needs no permissions and also catches keys when the window isn't key.
 - Hide the cursor while open, restore on close.
+- **Fades** animate the window's `alphaValue`: in over 0.6 s, out over 0.25 s on input and 1.5 s at the keep-awake limit (`CloseReason` in `IdleVizCore`). Sleep and display changes close it with no fade. When a fade-out starts, the Mac is handed back at once: the cursor returns, the previous app is reactivated, the window ignores clicks and the keep-awake assertion is released. The page, the tap and the status checks keep running until the fade ends, so the visuals don't freeze. A trigger during a fade-out finishes the close and opens again.
 - **Debug switch:** in Debug builds, the launch argument `-IdleVizNoDismiss YES` turns dismiss off, so the page can be inspected while it's open.
 
 ### Keep awake
 - While the window is open, hold a `kIOPMAssertionTypePreventUserIdleDisplaySleep` assertion (`IOPMAssertionCreateWithName`, named "IdleViz visualizer"). Release it on close.
-- The limit (setting `keepAwakeLimit`, default 60 min) counts from when the window opened. When it's reached, fade out, close and release the assertion, so the normal display sleep, screensaver and lock take over.
+- The limit (setting `keepAwakeLimit`, in minutes, default 60) counts from when the window opened. When it's reached, fade out, close and release the assertion, so the normal display sleep, screensaver and lock take over.
+- A changed setting applies at once to an open window, still counted from when it opened.
 - Security tradeoff, accepted: during the limit the Mac doesn't lock on its own.
 
 ### Battery
 - The app opens on battery like it does when plugged in.
-- Settings `useBatteryTimes` (default off), `idleTimeoutBattery` and `keepAwakeLimitBattery`. While `useBatteryTimes` is on and the Mac is on battery, those two replace `idleTimeout` and `keepAwakeLimit`.
+- Settings `useBatteryTimes` (default off), `idleTimeoutBattery` and `keepAwakeLimitBattery`, in minutes. While `useBatteryTimes` is on and the Mac is on battery, those two replace `idleTimeout` and `keepAwakeLimit`. A battery value that was never set counts as a copy of the plugged-in one. A UPS doesn't count as a battery.
 - Read the power source with `IOPSGetProvidingPowerSourceType(nil)` and watch for changes with `IOPSNotificationCreateRunLoopSource`. No polling.
 - On a power-source change: reschedule the next idle check with the new timeout. If the window is open, apply the new limit, still counted from when it opened (close right away if it's already past).
 - On a Mac with no battery (Mac mini, iMac, Mac Studio, Mac Pro), hide the **Different times on battery** switch and its two rows entirely. Detect this by checking `IOPSCopyPowerSourcesInfo` for an internal battery (`kIOPSInternalBatteryType`).
@@ -394,7 +397,7 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
 IdleViz.xcodeproj                # app target (bundle ID com.xauno.IdleViz), synchronized with IdleViz/; web/ is an explicit folder so it's copied with its subfolders
 Config/                          # IdleViz.xcconfig; Local.xcconfig (gitignored) holds DEVELOPMENT_TEAM
 Package.swift                    # IdleVizCore package (testable logic)
-Sources/IdleVizCore/             # open rules, idle/skip rules, keep-awake + battery timing, Spotify parsing, content type, FFT/bands, delay detection
+Sources/IdleVizCore/             # open rules, idle/skip rules, keep-awake + battery timing, fade times, Spotify parsing, content type, FFT/bands, delay detection
 tests/IdleVizCoreTests/          # XCTest, runs in CI with swift test (shares tests/ with the JS suite; Package.swift names the path)
 IdleViz/
 ├─ App/
@@ -408,7 +411,7 @@ IdleViz/
 │  ├─ DismissWatcher.swift
 │  ├─ KeepAwake.swift            # display-sleep assertion + time limit
 │  ├─ PowerSource.swift          # plugged in / battery, change notifications
-│  ├─ WindowController.swift     # key-capable borderless window
+│  ├─ WindowController.swift     # key-capable borderless window, fades in and out
 │  ├─ PageView.swift             # WKWebView, nowPlaying and audio frames, status check and recovery, media capture denied
 │  ├─ AppSchemeHandler.swift     # serves idleviz-app://app/ with the CSP header
 │  ├─ SpotifyInfo.swift          # launch/quit tracking, notifications, AppleScript, artwork
@@ -454,7 +457,10 @@ Each step is one pull request. At the end of each step, update the README (Roadm
    - **7c.** Preset controls (mode, shuffle, timing, blend, favorites, blocklist). Done.
    - **7d.** Custom preset folder: `.json` loading, folder watching, `.js` plugins in sandboxed frames (with the audio, CSP and status-check rules), Import/Open/Reload controls in settings, then `.milk` conversion with caching and failure handling. Done.
    - **7e.** Audio delay: per-device delay line, the settings slider, and **Detect delay** with the microphone. Test with built-in speakers, Bluetooth headphones and speakers, and AirPlay if available. Done. Tested with the built-in speakers, AirPlay and Bluetooth headphones; no Bluetooth speaker was available.
-8. **Polish:** fades, launch at login, brightness slider in settings, keep awake with its time limit setting (and the idle rule to wait for input after the limit), different times on battery, first-launch welcome window for permissions, yellow icon and popup error rows for missing permissions.
+8. **Polish**, split into three PRs:
+   - **8a.** Keep awake with its time limit setting (and the idle rule to wait for input after the limit), different times on battery, and the window fades. Done.
+   - **8b.** Permissions: first-launch welcome window, yellow icon and popup error rows for missing permissions.
+   - **8c.** Brightness slider, Show Spotify overlay switch and launch at login in settings.
 
 ## Later
 
