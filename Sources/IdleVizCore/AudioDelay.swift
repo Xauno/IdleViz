@@ -71,106 +71,35 @@ public struct DelayLine<Element> {
 
 /// Measures how far the sound from the speakers lags behind the audio Spotify sent, from two
 /// recordings of the same few seconds: the tap's signal and the microphone's.
+///
+/// The two waveforms are cross-correlated with a softened phase transform (GCC-PHAT): every
+/// frequency counts nearly the same however loud it is, so the tone of the speakers and the room
+/// matters little and the right lag shows up as a sharp spike with its echoes just behind it.
 public enum DelayDetector {
-    /// Loudness envelopes are sampled this many times a second, so lags are in milliseconds.
-    public static let envelopeRate = 1000.0
+    /// Only these frequencies are compared: small speakers play little below, and above the
+    /// microphone hears mostly noise.
+    static let band = 300.0...6000.0
     /// The peak has to stand this many standard deviations above the other lags…
-    static let minimumZScore: Float = 6
+    static let minimumZScore = 10.0
     /// …and this far above the best lag elsewhere, or a steady beat could match one beat late.
-    static let minimumPeakRatio: Float = 1.15
-    /// Lags this close to the peak belong to it.
-    static let peakWidth = 30
-
-    public struct Estimate: Sendable, Equatable {
-        /// Seconds the heard recording lags behind the sent one.
-        public var delay: Double
-        /// How far the peak stands above the other lags, in standard deviations.
-        public var clarity: Double
-    }
-
-    /// Onset strength: how much the loudness rises in each millisecond. Beats and note starts
-    /// stand out, and the tone of the speakers and the room matters little.
-    public static func envelope(_ samples: [Float], sampleRate: Double) -> [Float] {
-        let hop = sampleRate / envelopeRate
-        let count = Int(Double(samples.count) / hop)
-        guard count > 2, hop >= 1 else { return [] }
-        var loudness = [Float](repeating: 0, count: count)
-        samples.withUnsafeBufferPointer { pointer in
-            for index in 0..<count {
-                let start = Int(Double(index) * hop)
-                let end = min(Int(Double(index + 1) * hop), samples.count)
-                var meanSquare: Float = 0
-                vDSP_measqv(pointer.baseAddress! + start, 1, &meanSquare, vDSP_Length(end - start))
-                // Decibels, so a quiet recording and a loud one give the same shape.
-                loudness[index] = 10 * log10(meanSquare + 1e-9)
-            }
-        }
-        // Smooth over 10 ms: single milliseconds are too noisy to compare.
-        let window = 10
-        var smoothed = [Float](repeating: 0, count: count)
-        var sum: Float = 0
-        for index in 0..<count {
-            sum += loudness[index]
-            if index >= window { sum -= loudness[index - window] }
-            smoothed[index] = sum / Float(min(index + 1, window))
-        }
-        var onsets = [Float](repeating: 0, count: count)
-        for index in 1..<count {
-            onsets[index] = max(smoothed[index] - smoothed[index - 1], 0)
-        }
-        let mean = vDSP.mean(onsets)
-        return vDSP.add(-mean, onsets)
-    }
-
-    /// Finds the lag between two envelopes by cross-correlation over 0 to 2.5 s.
-    /// - Parameters:
-    ///   - sent: Envelope of the tap's recording.
-    ///   - heard: Envelope of the microphone's recording.
-    ///   - heardStartOffset: Seconds between the first sample of `sent` and the first sample of `heard`
-    ///     (positive if the microphone recording started later).
-    /// - Returns: Nil if no lag stands out clearly: too quiet, a noisy room, or headphones.
-    public static func estimate(sent: [Float], heard: [Float], heardStartOffset: Double = 0) -> Estimate? {
-        let offset = Int((heardStartOffset * envelopeRate).rounded())
-        let maxLag = Int(AudioDelaySetting.range.upperBound * envelopeRate)
-        guard sent.count > maxLag, heard.count > maxLag else { return nil }
-
-        var correlation = [Float](repeating: 0, count: maxLag + 1)
-        sent.withUnsafeBufferPointer { sentPointer in
-            heard.withUnsafeBufferPointer { heardPointer in
-                for lag in 0...maxLag {
-                    // sent[t] lines up with heard[t + lag - offset].
-                    let shift = lag - offset
-                    let sentStart = max(0, -shift)
-                    let heardStart = max(0, shift)
-                    let length = min(sent.count - sentStart, heard.count - heardStart)
-                    guard length > 0 else { continue }
-                    var dot: Float = 0
-                    let sentSlice = sentPointer.baseAddress! + sentStart
-                    let heardSlice = heardPointer.baseAddress! + heardStart
-                    vDSP_dotpr(sentSlice, 1, heardSlice, 1, &dot, vDSP_Length(length))
-                    correlation[lag] = dot / Float(length)
-                }
-            }
-        }
-
-        guard let peak = correlation.indices.max(by: { correlation[$0] < correlation[$1] }), correlation[peak] > 0 else { return nil }
-        let others = correlation.indices.filter { abs($0 - peak) > peakWidth }.map { correlation[$0] }
-        guard others.count > 2 else { return nil }
-        let mean = vDSP.mean(others)
-        let deviation = sqrt(vDSP.meanSquare(vDSP.add(-mean, others)))
-        guard deviation > 0 else { return nil }
-        let zScore = (correlation[peak] - mean) / deviation
-        let runnerUp = others.max() ?? 0
-        guard zScore >= minimumZScore, runnerUp <= 0 || correlation[peak] / runnerUp >= minimumPeakRatio else { return nil }
-        return Estimate(delay: Double(peak) / envelopeRate, clarity: Double(zScore))
-    }
+    static let minimumPeakRatio = 1.5
+    /// How much of each frequency's loudness is divided away. 1 is the pure phase transform;
+    /// a little less keeps frequencies the microphone barely hears from adding only noise.
+    static let whitening: Float = 0.8
+    /// The correlation is averaged over this many seconds, which adds a spike's closest echoes to it.
+    static let echoWindow = 0.005
+    /// Lags this close to the peak, in seconds, belong to it: echoes off the desk and the walls.
+    static let peakWidth = 0.1
+    /// The search starts a little below zero: built-in speakers can sound slightly before the tap
+    /// hands the audio over. Such a result is saved as no delay.
+    static let earliestLag = -0.1
 
     /// A few seconds of audio from one source.
     public struct Recording: Sendable {
         /// Mono samples.
         public var samples: [Float]
         public var sampleRate: Double
-        /// When the first sample was captured, in seconds on a clock both recordings share.
+        /// The time of the first sample, in seconds on a clock both recordings share.
         public var start: TimeInterval
 
         public init(samples: [Float], sampleRate: Double, start: TimeInterval = 0) {
@@ -180,14 +109,176 @@ public enum DelayDetector {
         }
     }
 
-    /// The whole measurement: both recordings in, the delay to save out.
-    /// - Parameter inputLatency: The microphone's own latency in seconds, which is not part of the speakers' delay.
-    public static func delay(sent: Recording, heard: Recording, inputLatency: Double = 0) -> Double? {
-        let estimate = estimate(
-            sent: envelope(sent.samples, sampleRate: sent.sampleRate),
-            heard: envelope(heard.samples, sampleRate: heard.sampleRate),
-            heardStartOffset: heard.start - sent.start
-        )
-        return estimate.map { AudioDelaySetting.normalized($0.delay - inputLatency) }
+    /// The best lag found, and how clearly it stands out.
+    public struct Peak: Sendable, Equatable {
+        /// Seconds the heard recording lags behind the sent one.
+        public var delay: Double
+        /// How far the peak stands above the other lags, in standard deviations.
+        public var zScore: Double
+        /// The peak over the best lag elsewhere.
+        public var ratio: Double
+
+        /// Whether the peak is clear enough to trust.
+        public var isClear: Bool {
+            zScore >= DelayDetector.minimumZScore && ratio >= DelayDetector.minimumPeakRatio
+        }
     }
+
+    /// Cross-correlates the two recordings over lags of just below 0 to 2.5 s and returns the best one, clear or not.
+    /// - Parameter inputLatency: The microphone's own latency in seconds, which is not part of the speakers' delay.
+    /// - Returns: Nil if the recordings are too short or one of them is silent.
+    public static func peak(sent: Recording, heard: Recording, inputLatency: Double = 0) -> Peak? {
+        let rate = sent.sampleRate
+        let maxLag = AudioDelaySetting.range.upperBound
+        guard rate > 0, heard.sampleRate > 0 else { return nil }
+        let heardSamples = resample(heard.samples, from: heard.sampleRate, to: rate)
+        guard Double(sent.samples.count) > maxLag * rate, Double(heardSamples.count) > maxLag * rate else { return nil }
+
+        // Long enough that the correlation doesn't wrap around.
+        let log2n = vDSP_Length((Double(sent.samples.count + heardSamples.count)).logC2())
+        let count = 1 << Int(log2n)
+        guard let correlation = phaseCorrelation(sent: sent.samples, heard: heardSamples, log2n: log2n, sampleRate: rate) else {
+            return nil
+        }
+
+        // correlation[shift] compares sent[t] with heard[t + shift]; a negative shift wraps to the end.
+        // The microphone recording started `offset` seconds after the tap's, so a lag is `shift / rate + offset`.
+        // The sound reached the microphone `inputLatency` before it reached the recording.
+        let offset = heard.start - inputLatency - sent.start
+        let firstShift = Int(((earliestLag - offset) * rate).rounded())
+        let shifts = Int((maxLag - earliestLag) * rate) + 1
+        var values = [Float](repeating: 0, count: shifts)
+        for index in 0..<shifts {
+            let shift = firstShift + index
+            guard abs(shift) < count / 2 else { continue }
+            let value = correlation[(shift + count) % count]
+            values[index] = value * value
+        }
+        values = smoothedRoot(values, window: max(1, Int(echoWindow * rate)))
+
+        guard let peak = values.indices.max(by: { values[$0] < values[$1] }), values[peak] > 0 else { return nil }
+        let width = Int(peakWidth * rate)
+        var others = [Float]()
+        others.reserveCapacity(values.count)
+        if peak - width > 0 { others.append(contentsOf: values[..<(peak - width)]) }
+        if peak + width + 1 < values.count { others.append(contentsOf: values[(peak + width + 1)...]) }
+        guard others.count > 2 else { return nil }
+        let mean = vDSP.mean(others)
+        let deviation = sqrt(vDSP.meanSquare(vDSP.add(-mean, others)))
+        let runnerUp = vDSP.maximum(others)
+        guard deviation > 0, runnerUp > 0 else { return nil }
+        return Peak(
+            delay: Double(firstShift + peak) / rate + offset,
+            zScore: Double((values[peak] - mean) / deviation),
+            ratio: Double(values[peak] / runnerUp)
+        )
+    }
+
+    /// The whole measurement: both recordings in, the delay to save out.
+    /// - Returns: Nil if no lag stands out clearly: too quiet, a noisy room, or headphones.
+    public static func delay(sent: Recording, heard: Recording, inputLatency: Double = 0) -> Double? {
+        delay(from: peak(sent: sent, heard: heard, inputLatency: inputLatency))
+    }
+
+    /// The delay to save for a peak, or nil if there is none or it isn't clear enough.
+    public static func delay(from peak: Peak?) -> Double? {
+        guard let peak, peak.isClear else { return nil }
+        return AudioDelaySetting.normalized(peak.delay)
+    }
+
+    /// The cross-correlation of the two signals with every frequency in `band` weighted equally.
+    /// Nil if there is nothing to compare, for example silence.
+    private static func phaseCorrelation(sent: [Float], heard: [Float], log2n: vDSP_Length, sampleRate: Double) -> [Float]? {
+        let count = 1 << Int(log2n)
+        let half = count / 2
+        guard let setup = vDSP_create_fftsetup(log2n, FFTRadix(kFFTRadix2)) else { return nil }
+        defer { vDSP_destroy_fftsetup(setup) }
+
+        var sentReal = [Float](repeating: 0, count: half)
+        var sentImaginary = [Float](repeating: 0, count: half)
+        var heardReal = [Float](repeating: 0, count: half)
+        var heardImaginary = [Float](repeating: 0, count: half)
+        var result = [Float](repeating: 0, count: count)
+        var found = false
+
+        sentReal.withUnsafeMutableBufferPointer { sentRealPointer in
+            sentImaginary.withUnsafeMutableBufferPointer { sentImaginaryPointer in
+                heardReal.withUnsafeMutableBufferPointer { heardRealPointer in
+                    heardImaginary.withUnsafeMutableBufferPointer { heardImaginaryPointer in
+                        var sentSplit = DSPSplitComplex(realp: sentRealPointer.baseAddress!, imagp: sentImaginaryPointer.baseAddress!)
+                        var heardSplit = DSPSplitComplex(realp: heardRealPointer.baseAddress!, imagp: heardImaginaryPointer.baseAddress!)
+                        transform(sent, into: &sentSplit, count: count, log2n: log2n, setup: setup)
+                        transform(heard, into: &heardSplit, count: count, log2n: log2n, setup: setup)
+
+                        // heard × conj(sent), scaled to length one inside the band and zero outside it.
+                        let binWidth = sampleRate / Double(count)
+                        let lowest = max(1, Int((band.lowerBound / binWidth).rounded(.up)))
+                        let highest = min(half - 1, Int(band.upperBound / binWidth))
+                        for bin in 0..<half {
+                            guard bin >= lowest, bin <= highest else {
+                                heardSplit.realp[bin] = 0
+                                heardSplit.imagp[bin] = 0
+                                continue
+                            }
+                            let real = heardSplit.realp[bin] * sentSplit.realp[bin] + heardSplit.imagp[bin] * sentSplit.imagp[bin]
+                            let imaginary = heardSplit.imagp[bin] * sentSplit.realp[bin] - heardSplit.realp[bin] * sentSplit.imagp[bin]
+                            let magnitude = (real * real + imaginary * imaginary).squareRoot()
+                            if magnitude > 0 { found = true }
+                            let weight = magnitude > 0 ? 1 / pow(magnitude, whitening) : 0
+                            heardSplit.realp[bin] = real * weight
+                            heardSplit.imagp[bin] = imaginary * weight
+                        }
+
+                        vDSP_fft_zrip(setup, &heardSplit, 1, log2n, FFTDirection(kFFTDirection_Inverse))
+                        result.withUnsafeMutableBytes { bytes in
+                            vDSP_ztoc(&heardSplit, 1, bytes.bindMemory(to: DSPComplex.self).baseAddress!, 2, vDSP_Length(half))
+                        }
+                    }
+                }
+            }
+        }
+        return found ? result : nil
+    }
+
+    /// The square root of the average of `squares` over `window` values centred on each one.
+    private static func smoothedRoot(_ squares: [Float], window: Int) -> [Float] {
+        var sums = [Double](repeating: 0, count: squares.count + 1)
+        for index in squares.indices { sums[index + 1] = sums[index] + Double(squares[index]) }
+        return squares.indices.map { index in
+            let first = max(0, index - window / 2)
+            let last = min(squares.count, first + window)
+            return Float(((sums[last] - sums[first]) / Double(last - first)).squareRoot())
+        }
+    }
+
+    /// The forward transform of `samples`, padded with zeros to `count`.
+    private static func transform(
+        _ samples: [Float], into split: inout DSPSplitComplex, count: Int, log2n: vDSP_Length, setup: FFTSetup
+    ) {
+        var padded = [Float](repeating: 0, count: count)
+        padded.replaceSubrange(0..<min(samples.count, count), with: samples.prefix(count))
+        padded.withUnsafeBytes { bytes in
+            vDSP_ctoz(bytes.bindMemory(to: DSPComplex.self).baseAddress!, 2, &split, 1, vDSP_Length(count / 2))
+        }
+        vDSP_fft_zrip(setup, &split, 1, log2n, FFTDirection(kFFTDirection_Forward))
+    }
+
+    /// Straight-line resampling. Good enough here: the comparison stops at 6 kHz.
+    static func resample(_ samples: [Float], from rate: Double, to target: Double) -> [Float] {
+        guard rate != target, samples.count > 1 else { return samples }
+        let step = rate / target
+        let count = Int(Double(samples.count - 1) / step) + 1
+        return (0..<count).map { index in
+            let position = Double(index) * step
+            let lower = Int(position)
+            let fraction = Float(position - Double(lower))
+            let upper = min(lower + 1, samples.count - 1)
+            return samples[lower] + (samples[upper] - samples[lower]) * fraction
+        }
+    }
+}
+
+private extension Double {
+    /// The power of two that holds this many samples, as an exponent.
+    func logC2() -> Double { Foundation.log2(self).rounded(.up) }
 }

@@ -15,7 +15,7 @@ public final class SampleRing: Sendable {
         /// Mono samples kept for Detect delay while it runs, or nil.
         var recording: [Float]?
         var recordingLimit = 0
-        /// Host time of the first recorded sample.
+        /// Host time at which the first recorded buffer arrived.
         var recordingStart: UInt64 = 0
     }
 
@@ -24,7 +24,7 @@ public final class SampleRing: Sendable {
     public init() {}
 
     /// Adds one buffer of interleaved samples. Mono is copied to both sides; channels past the second are ignored.
-    /// - Parameter hostTime: When the buffer's first sample was captured, for Detect delay.
+    /// - Parameter hostTime: When the buffer arrived, for Detect delay.
     public func append(interleaved samples: UnsafePointer<Float>, channels: Int, frames: Int, hostTime: UInt64 = 0) {
         let channels = max(channels, 1)
         state.withLockUnchecked { state in
@@ -80,7 +80,7 @@ public final class SampleRing: Sendable {
         }
     }
 
-    /// Stops recording and returns the samples and the host time of the first one.
+    /// Stops recording and returns the samples and the host time at which the first of them arrived.
     public func stopRecording() -> (samples: [Float], startHostTime: UInt64) {
         state.withLockUnchecked { state in
             defer { state.recording = nil }

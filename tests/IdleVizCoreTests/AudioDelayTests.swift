@@ -162,10 +162,30 @@ final class DelayDetectorTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(measure(0.25, inputLatency: 0.04)), 0.21, accuracy: 0.011)
     }
 
+    func testSoundThatComesBeforeTheTapHandsItOverCountsAsNoDelay() throws {
+        // Built-in speakers: the microphone hears the music 40 ms before the tap delivers it.
+        let sent = music(seed: 42)
+        let mic = heard(sent, delay: 0.06)
+        let found = DelayDetector.delay(sent: recording(sent, start: 100.1), heard: recording(mic, start: 100))
+        XCTAssertEqual(try XCTUnwrap(found), 0)
+        let peak = try XCTUnwrap(DelayDetector.peak(sent: recording(sent, start: 100.1), heard: recording(mic, start: 100)))
+        XCTAssertEqual(peak.delay, -0.04, accuracy: 0.002)
+    }
+
+    func testEchoesDoNotHideThePeak() throws {
+        // A speaker across the room: the direct sound, then reflections 35 and 60 ms behind it.
+        let sent = music(seed: 42)
+        let direct = heard(sent, delay: 1.95, gain: 0.05, noise: 0)
+        let first = heard(sent, delay: 1.985, gain: 0.04, noise: 0)
+        let second = heard(sent, delay: 2.01, gain: 0.03, noise: 0.01)
+        let mic = zip(zip(direct, first), second).map { $0.0 + $0.1 + $1 }
+        XCTAssertEqual(try XCTUnwrap(DelayDetector.delay(sent: recording(sent), heard: recording(mic))), 1.95, accuracy: 0.011)
+    }
+
     func testAMicrophoneAtAnotherSampleRate() throws {
         let sent = music(seed: 7)
         let delayed = heard(sent, delay: 0.3)
-        // Resample 48 kHz to 44.1 kHz by picking the nearest sample; good enough for an envelope.
+        // Resample 48 kHz to 44.1 kHz by picking the nearest sample; rough, as a real one is never exact.
         let ratio = 48_000.0 / 44_100.0
         let resampled = (0..<Int(Double(delayed.count) / ratio)).map { delayed[Int(Double($0) * ratio)] }
         let found = DelayDetector.delay(sent: recording(sent), heard: Recording(samples: resampled, sampleRate: 44_100))
@@ -191,20 +211,23 @@ final class DelayDetectorTests: XCTestCase {
         XCTAssertNil(DelayDetector.delay(sent: recording(music(seed: 42)), heard: recording(zeros)))
     }
 
-    func testGivesUpOnASteadyBeatThatMatchesAtSeveralLags() {
-        // Identical clicks exactly 0.5 s apart line up just as well one beat later.
-        let count = Int(6 * rate)
-        var sent = [Float](repeating: 0, count: count)
-        for beat in stride(from: 0.25, to: 5.75, by: 0.5) {
-            let start = Int(beat * rate)
-            for offset in 0..<480 { sent[start + offset] = 0.8 * Float(exp(-Double(offset) / 100)) }
+    func testALoopStillGivesTheRightLag() throws {
+        // Half a second of sound repeated exactly lines up nearly as well one repeat later. Both
+        // recordings are cut from the middle of a longer stretch, as a real measurement is.
+        var random = Random(state: 5)
+        let loop = (0..<Int(0.5 * rate)).map { _ in Float.random(in: -0.5...0.5, using: &random) }
+        let long = (0..<Int(8 * rate)).map { loop[$0 % loop.count] }
+        let sent = Array(long[Int(1 * rate)..<Int(7 * rate)])
+        for (delay, micStart) in [(0.2, 1.0), (0.2, 1.15), (0.31, 0.9), (0.04, 1.3)] {
+            let mic = Array(heard(long, delay: delay)[Int(micStart * rate)..<Int(7 * rate)])
+            let found = DelayDetector.delay(sent: recording(sent, start: 1), heard: recording(mic, start: micStart))
+            XCTAssertEqual(try XCTUnwrap(found), delay, accuracy: 0.011, "for \(delay) s, microphone from \(micStart) s")
         }
-        XCTAssertNil(DelayDetector.delay(sent: recording(sent), heard: recording(heard(sent, delay: 0.2))))
     }
 
     func testRecordingsThatAreTooShortGiveNothing() {
         let short = music(seed: 42, seconds: 2)
         XCTAssertNil(DelayDetector.delay(sent: recording(short), heard: recording(short)))
-        XCTAssertEqual(DelayDetector.envelope([], sampleRate: rate), [])
+        XCTAssertNil(DelayDetector.peak(sent: recording([]), heard: recording([])))
     }
 }

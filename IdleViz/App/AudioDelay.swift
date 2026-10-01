@@ -134,9 +134,11 @@ final class AudioDelayController {
         let heard = microphone.stop()
         let sent = pump.stopRecording()
         let inputLatency = microphone.inputLatency
-        let result = await Task.detached(priority: .userInitiated) {
-            DelayDetector.delay(sent: sent, heard: heard, inputLatency: inputLatency)
+        let peak = await Task.detached(priority: .userInitiated) {
+            DelayDetector.peak(sent: sent, heard: heard, inputLatency: inputLatency)
         }.value
+        logDiagnostics(sent: sent, heard: heard, inputLatency: inputLatency, peak: peak)
+        let result = DelayDetector.delay(from: peak)
 
         if let result {
             log.notice("Detected a delay of \(AudioDelaySetting.label(result), privacy: .public) for \(self.deviceName, privacy: .public)")
@@ -152,6 +154,27 @@ final class AudioDelayController {
                 """)
             hint = .text("Couldn't hear the music clearly (too quiet, or headphones). Kept \(AudioDelaySetting.label(delay)).")
         }
+    }
+
+    /// Only visible with `log stream --level debug`: what the two recordings looked like and the
+    /// best lag between them, whether or not it was clear enough to use.
+    private func logDiagnostics(
+        sent: DelayDetector.Recording, heard: DelayDetector.Recording, inputLatency: Double, peak: DelayDetector.Peak?
+    ) {
+        func level(_ samples: [Float]) -> Float {
+            guard !samples.isEmpty else { return -.infinity }
+            return 10 * log10(samples.reduce(0) { $0 + $1 * $1 } / Float(samples.count) + 1e-12)
+        }
+        let now = AVAudioTime.seconds(forHostTime: mach_absolute_time())
+        log.debug("""
+            Tap: \(sent.samples.count, privacy: .public) samples at \(sent.sampleRate, privacy: .public) Hz, \
+            \(level(sent.samples), privacy: .public) dB, started \(now - sent.start, privacy: .public) s ago. \
+            Microphone: \(heard.samples.count, privacy: .public) samples at \(heard.sampleRate, privacy: .public) Hz, \
+            \(level(heard.samples), privacy: .public) dB, started \(now - heard.start, privacy: .public) s ago, \
+            latency \(inputLatency, privacy: .public) s. \
+            Peak: lag \(peak?.delay ?? -1, privacy: .public) s, z-score \(peak?.zScore ?? 0, privacy: .public), \
+            ratio \(peak?.ratio ?? 0, privacy: .public)
+            """)
     }
 }
 
@@ -179,7 +202,9 @@ final class MicrophoneRecorder: @unchecked Sendable {
         } else if let device = AudioDevices.defaultInput() {
             inputLatency = AudioDevices.latency(of: device, scope: kAudioObjectPropertyScopeInput)
         }
-        let format = input.outputFormat(forBus: 0)
+        // The microphone's own format. The node's output format follows the output device's sample
+        // rate instead, and a tap in that format hears nothing when the two rates differ (AirPlay).
+        let format = input.inputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else {
             throw NSError(domain: "IdleViz", code: 1, userInfo: [NSLocalizedDescriptionKey: "No microphone found"])
         }

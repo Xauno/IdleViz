@@ -137,6 +137,12 @@ final class SpotifyAudioTap {
             "AudioHardwareCreateAggregateDevice"
         )
         aggregateID = aggregate
+        // The tap's own format can name another rate than it delivers: the samples arrive at the
+        // aggregate's rate, which is the output device's (44,100 Hz on AirPlay, for example).
+        var rate = Float64(0)
+        var rateSize = UInt32(MemoryLayout<Float64>.size)
+        var rateAddress = Self.address(kAudioDevicePropertyNominalSampleRate)
+        if AudioObjectGetPropertyData(aggregate, &rateAddress, 0, nil, &rateSize, &rate) == noErr, rate > 0 { sampleRate = rate }
 
         var procID: AudioDeviceIOProcID?
         let block = Self.ioBlock(ring: ring)
@@ -148,8 +154,10 @@ final class SpotifyAudioTap {
     /// Built outside the main actor: a closure formed in a `@MainActor` method inherits that
     /// isolation, and Swift 6 traps when Core Audio calls it on its I/O thread.
     private nonisolated static func ioBlock(ring: SampleRing) -> AudioDeviceIOBlock {
-        { _, input, inputTime, _, _ in
-            let hostTime = inputTime.pointee.mFlags.contains(.hostTimeValid) ? inputTime.pointee.mHostTime : 0
+        { now, input, _, _, _ in
+            // When the buffer is handed over, not when its samples are stamped: the visuals are
+            // delayed from the moment they get the audio, so Detect delay measures from there too.
+            let hostTime = now.pointee.mFlags.contains(.hostTimeValid) ? now.pointee.mHostTime : mach_absolute_time()
             let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
             if buffers.count >= 2 {
                 // One buffer per channel.

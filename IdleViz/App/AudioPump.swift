@@ -62,7 +62,7 @@ final class AudioPump {
         tap.ring.startRecording(maxSamples: Int(seconds * tap.sampleRate))
     }
 
-    /// Stops and returns what the tap delivered, with the time of its first sample in host-clock seconds.
+    /// Stops and returns what the tap delivered, with the time it handed over the first sample in host-clock seconds.
     func stopRecording() -> DelayDetector.Recording {
         let (samples, startHostTime) = tap.ring.stopRecording()
         let sampleRate = tap.sampleRate
