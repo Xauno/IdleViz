@@ -113,6 +113,26 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         webView.evaluateJavaScript(presetSettingsScript)
     }
 
+    /// Asks the page for the next preset (the skip key).
+    func skipPreset() {
+        guard loaded else { return }
+        webView.evaluateJavaScript(VisualizerKeys.skipScript)
+    }
+
+    /// Shows the heart that confirms the like key.
+    func showLike(_ liked: Bool) {
+        guard loaded else { return }
+        webView.evaluateJavaScript(VisualizerKeys.likeScript(liked: liked))
+    }
+
+    /// Asks the page which preset is on screen right now. No answer if the page isn't up.
+    func currentPreset(_ answer: @escaping @MainActor (String?) -> Void) {
+        guard loaded else { return }
+        webView.evaluateJavaScript("window.idlevizStatus?.()") { reply, _ in
+            MainActor.assumeIsolated { answer(PageStatus(reply: reply)?.preset) }
+        }
+    }
+
     /// Hands one packed audio frame to the page. Frames are dropped, not queued, while the page is busy or loading.
     func send(audioFrame: Data) {
         guard loaded, framesInFlight < 2 else { return }

@@ -68,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.audio.stop()
             self?.windowController.page.stopStatusChecks()
         }
+        windowController.onAction = { [weak self] action in self?.presets.perform(action) }
         closeWhenTheDisplayMayHaveChanged()
         startPermissions(spotify)
         // Before anything can open settings, which makes the app regular.

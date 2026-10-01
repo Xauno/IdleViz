@@ -43,6 +43,8 @@ final class WindowController {
     /// Called when the fade-out starts. The page keeps running until `onClose`, so the visuals don't freeze mid-fade.
     var onClosing: (() -> Void)?
     var onClose: (() -> Void)?
+    /// Called when the like or skip key is pressed while the window is open.
+    var onAction: ((VisualizerAction) -> Void)?
 
     let dismissEnabled: Bool = {
         #if DEBUG
@@ -87,7 +89,12 @@ final class WindowController {
         if dismissEnabled {
             NSCursor.hide()
             cursorHidden = true
-            let watcher = DismissWatcher(tracker: DismissTracker()) { [weak self] in self?.close(.input) }
+            // Read at each open: settings can't change while the visualizer is up, since any input closes it.
+            let watcher = DismissWatcher(
+                keys: VisualizerKeys(defaults: .standard),
+                onAction: { [weak self] action in self?.onAction?(action) },
+                onDismiss: { [weak self] in self?.close(.input) }
+            )
             watcher.start()
             dismissWatcher = watcher
         }

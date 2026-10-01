@@ -17,15 +17,20 @@ public enum InputEvent: Sendable, Equatable {
 /// (the hotkey, the click on "Open now") doesn't close the window again. Keys still
 /// held when the grace period ends are "stuck": letting go of them, or their key
 /// repeat, is ignored too. Pressing one again closes the window.
+///
+/// The like and skip keys (`passKeys`) never close the window when the event monitors see them.
 public struct DismissTracker: Sendable {
     public let gracePeriod: TimeInterval
+    /// Key codes that do something else than close the window.
+    public let passKeys: Set<UInt16>
     public private(set) var stuckKeys: Set<UInt16> = []
     private var armed = false
-    /// Elapsed time up to which the backup check treats input as explained by stuck keys.
+    /// Elapsed time up to which the backup check treats input as explained by stuck or pass keys.
     private var ignoreInputUntil: TimeInterval = 0
 
-    public init(gracePeriod: TimeInterval = 0.4) {
+    public init(gracePeriod: TimeInterval = 0.4, passKeys: Set<UInt16> = []) {
         self.gracePeriod = gracePeriod
+        self.passKeys = passKeys
     }
 
     /// Call once when the grace period ends, with the key codes held at that moment.
@@ -46,6 +51,12 @@ public struct DismissTracker: Sendable {
         case .mouseDown, .scroll, .gesture:
             return true
         case let .key(code, isDown, isRepeat):
+            if passKeys.contains(code) {
+                // Pressed, repeating or let go, it's input the backup check shouldn't close on either.
+                stuckKeys.remove(code)
+                ignoreInputUntil = max(ignoreInputUntil, elapsed)
+                return false
+            }
             guard stuckKeys.contains(code) else { return isDown }
             if isDown && !isRepeat {
                 // A fresh press means the release was missed; it counts as new input.
@@ -59,7 +70,8 @@ public struct DismissTracker: Sendable {
     }
 
     /// Backup for input the event monitors can't see (keys while the window isn't key).
-    /// `heldKeys` are the key codes down right now.
+    /// `heldKeys` are the key codes down right now. A pass key the monitors didn't see
+    /// went to another app, so it closes the window like any other key.
     public mutating func shouldDismiss(
         secondsSinceLastInput: TimeInterval,
         heldKeys: Set<UInt16>,

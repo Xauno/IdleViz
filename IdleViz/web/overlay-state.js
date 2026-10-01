@@ -42,6 +42,16 @@ export function layoutFor(item, overlayEnabled = true) {
 }
 
 /**
+ * Where the heart that confirms the like key goes: beside the title while the track block is
+ * showing, and in the top-right corner in every other layout.
+ * @param {ReturnType<typeof layoutFor>} layout
+ * @returns {"title" | "corner"}
+ */
+export function likePlacement(layout) {
+  return layout === "full" ? "title" : "corner";
+}
+
+/**
  * Current position in seconds, advanced locally from the last reading while playing.
  * @param {NowPlaying} item
  * @param {number} receivedAt  `performance.now()` when the reading arrived.

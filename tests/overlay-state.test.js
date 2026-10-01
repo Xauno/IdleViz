@@ -4,6 +4,7 @@ import {
   formatTime,
   fraction,
   layoutFor,
+  likePlacement,
   parseNowPlaying,
   positionAt,
 } from "../IdleViz/web/overlay-state.js";
@@ -36,6 +37,17 @@ describe("layoutFor", () => {
     expect(layoutFor({ ...song, state: "paused" }, false)).toBe("none");
     expect(layoutFor({ ...song, content: "musicAd" }, false)).toBe("none");
     expect(layoutFor(song, true)).toBe("full");
+  });
+});
+
+describe("likePlacement", () => {
+  it("puts the heart beside the title only while the track block is showing", () => {
+    expect(likePlacement(layoutFor(song))).toBe("title");
+    expect(likePlacement(layoutFor({ ...song, state: "paused" }))).toBe("corner");
+    expect(likePlacement(layoutFor({ ...song, content: "musicAd" }))).toBe("corner");
+    expect(likePlacement(layoutFor({ ...song, content: "podcast" }))).toBe("corner");
+    expect(likePlacement(layoutFor(null))).toBe("corner");
+    expect(likePlacement(layoutFor(song, false))).toBe("corner");
   });
 });
 
