@@ -22,14 +22,11 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     func show() {
         let window = window ?? makeWindow()
         self.window = window
-        // A regular app while the window is open, so it can take focus and ⌘Q works.
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
+        RegularWindows.show(window)
     }
 
     func windowWillClose(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        if let window { RegularWindows.closed(window) }
     }
 
     private func makeWindow() -> NSWindow {

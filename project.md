@@ -47,9 +47,13 @@ A menu-bar app that opens a fullscreen music visualizer with a Spotify now-playi
 
 The app needs two permissions: **Automation** (to ask Spotify what's playing) and **System Audio Recording** (the process tap). A third, **Microphone**, is optional and only used by **Detect delay** (see "Audio delay").
 
-- On first launch, a small welcome window explains the two required ones and triggers the prompts on purpose: one AppleScript query (if Spotify is running) and a short tap. That way a prompt never pops up during an idle open while nobody is at the Mac. Both prompts need Spotify running, so if it isn't, the window asks you to open Spotify and continues by itself once it launches. The microphone prompt only appears the first time you press **Detect delay**.
-- Check Automation without prompting with `AEDeterminePermissionToAutomateTarget(..., askUserIfNeeded: false)`.
-- There's no public API to check the audio permission. Treat several seconds (5, in `TapHealth`) of exact-zero buffers, or no buffers at all, while Spotify reports "playing" as "probably denied" and log it. Spotify playing on another device (Spotify Connect) looks the same, and the log line says so. (A paused Spotify sends exact-zero buffers, and one that hasn't played since launch sends none, so only count time while it's playing.)
+- A small welcome window explains the two required ones and triggers the prompts on purpose. That way a prompt never pops up during an idle open while nobody is at the Mac. It appears at launch whenever macOS hasn't been asked about one of them yet (not just on the very first launch, so it returns if a new signature or a reset makes macOS forget), and from the popup's error rows. The microphone prompt only appears the first time you press **Detect delay**.
+  - One **Continue** button asks for Automation and then System Audio Recording, each only if it was never asked. Each row shows Not asked, Asking…, Allowed, or Not allowed with a link to System Settings. Once nothing is left to ask, the button reads **Done**.
+  - Automation is asked with `AEDeterminePermissionToAutomateTarget(..., askUserIfNeeded: true)`, off the main thread, since it waits for the answer. System Audio Recording is asked by starting the tap, which stays up until macOS has an answer (two minutes at most).
+  - Both prompts need Spotify running. If it isn't, Continue waits, the window asks you to open Spotify, and it carries on by itself once Spotify is running.
+- **No prompt outside the welcome window.** While Automation was never asked, the AppleScript query isn't sent (the runner checks first), and while System Audio Recording was never asked, opening the visualizer doesn't start the tap. Detect delay still starts it, since that is a button press.
+- Check Automation without prompting with `AEDeterminePermissionToAutomateTarget(..., askUserIfNeeded: false)`: 0 is allowed, -1743 denied, -1744 never asked. It only answers while Spotify runs (-600 otherwise), and it doesn't launch Spotify; until then the state is unknown, which doesn't count as missing.
+- There's no public API to check the audio permission, so the app asks the private `TCCAccessPreflight("kTCCServiceAudioCapture")` (0 allowed, 1 denied, 2 never asked), loaded with `dlopen` so a macOS without it just skips the check. Checked in step 8b: it answers for the app itself only when the app was launched through LaunchServices; a binary started from a terminal gets the terminal's answer. Only when that function is missing does the silent-tap check below decide. Treat several seconds (5, in `TapHealth`) of exact-zero buffers, or no buffers at all, while Spotify reports "playing" as "probably denied" and log it. Spotify playing on another device (Spotify Connect) looks the same, and the log line says so. (A paused Spotify sends exact-zero buffers, and one that hasn't played since launch sends none, so only count time while it's playing.)
 - No camera permission, ever.
 
 ### When a permission is missing
@@ -58,7 +62,8 @@ The app needs two permissions: **Automation** (to ask Spotify what's playing) an
   - Automation: `x-apple.systempreferences:com.apple.preference.security?Privacy_Automation`
   - System Audio Recording: `x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture` (the "Screen & System Audio Recording" page)
   - Check once on macOS 26 that each link lands on the right page. If one doesn't, System Settings just opens on a nearby page, so nothing breaks.
-- Re-check each time the popup opens, when the app becomes active, and whenever an AppleScript call fails with a permission error (`-1743`).
+  - A permission that was never asked counts as missing too, but its row opens the welcome window instead ("Allow access ›"), because the app isn't listed in System Settings until macOS has asked once.
+- Re-check each time the popup opens, when the app becomes active, when Spotify launches, when the visualizer opens, and whenever an AppleScript query is held back or fails with a permission error (`-1743`).
 - The microphone is optional, so a missing microphone permission doesn't turn the icon yellow. It only shows as a hint next to **Detect delay** in settings.
 
 ---
@@ -397,16 +402,18 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
 IdleViz.xcodeproj                # app target (bundle ID com.xauno.IdleViz), synchronized with IdleViz/; web/ is an explicit folder so it's copied with its subfolders
 Config/                          # IdleViz.xcconfig; Local.xcconfig (gitignored) holds DEVELOPMENT_TEAM
 Package.swift                    # IdleVizCore package (testable logic)
-Sources/IdleVizCore/             # open rules, idle/skip rules, keep-awake + battery timing, fade times, Spotify parsing, content type, FFT/bands, delay detection
+Sources/IdleVizCore/             # open rules, idle/skip rules, keep-awake + battery timing, fade times, permission states, Spotify parsing, content type, FFT/bands, delay detection
 tests/IdleVizCoreTests/          # XCTest, runs in CI with swift test (shares tests/ with the JS suite; Package.swift names the path)
 IdleViz/
 ├─ App/
-│  ├─ AppDelegate.swift          # menu bar (Settings… + hotkey row + error rows), icon flash, yellow icon
-│  ├─ Permissions.swift          # check Automation / audio / mic, open System Settings pages
+│  ├─ AppDelegate.swift          # wires everything together at launch, open rules
+│  ├─ MenuBarView.swift          # the popup: Settings…, hotkey row, error rows
+│  ├─ MenuBarIcon.swift          # icon flash, yellow icon
+│  ├─ Permissions.swift          # check Automation and audio, run the welcome window's prompts, open System Settings pages
 │  ├─ SettingsWindow.swift       # separate settings UI (one scrolling page, per mockups.html)
 │  ├─ PresetControls.swift       # the preset rows in settings, and the favorites and blocklist sheets
 │  ├─ PresetController.swift     # preset settings in UserDefaults → page; preset list and last-shown preset from the page
-│  ├─ WelcomeWindow.swift        # first launch: explains and triggers the two permission prompts
+│  ├─ WelcomeWindow.swift        # explains and triggers the two permission prompts
 │  ├─ Triggers.swift             # idle, hotkey, URL scheme, open rules
 │  ├─ DismissWatcher.swift
 │  ├─ KeepAwake.swift            # display-sleep assertion + time limit
@@ -459,7 +466,7 @@ Each step is one pull request. At the end of each step, update the README (Roadm
    - **7e.** Audio delay: per-device delay line, the settings slider, and **Detect delay** with the microphone. Test with built-in speakers, Bluetooth headphones and speakers, and AirPlay if available. Done. Tested with the built-in speakers, AirPlay and Bluetooth headphones; no Bluetooth speaker was available.
 8. **Polish**, split into three PRs:
    - **8a.** Keep awake with its time limit setting (and the idle rule to wait for input after the limit), different times on battery, and the window fades. Done.
-   - **8b.** Permissions: first-launch welcome window, yellow icon and popup error rows for missing permissions.
+   - **8b.** Permissions: welcome window, yellow icon and popup error rows for missing permissions. Done. The macOS prompts themselves weren't triggered, since both permissions were already granted on the test Mac.
    - **8c.** Brightness slider, Show Spotify overlay switch and launch at login in settings.
 
 ## Later

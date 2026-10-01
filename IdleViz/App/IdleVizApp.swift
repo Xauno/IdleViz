@@ -6,10 +6,10 @@ struct IdleVizApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(openSettings: { appDelegate.showSettings() })
+            MenuBarView(permissions: appDelegate.permissions, openSettings: { appDelegate.showSettings() })
         } label: {
-            Image(systemName: appDelegate.menuBarIcon.symbol)
-                .accessibilityLabel("IdleViz")
+            Image(nsImage: appDelegate.menuBarIcon.image)
+                .accessibilityLabel(appDelegate.menuBarIcon.warning ? "IdleViz, a permission is missing" : "IdleViz")
         }
         .menuBarExtraStyle(.window)
     }
