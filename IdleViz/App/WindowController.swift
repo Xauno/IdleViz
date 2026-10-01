@@ -50,7 +50,7 @@ final class WindowController {
 
     func open(on screen: NSScreen, source: TriggerSource) {
         guard !isOpen else { return }
-        let window = window ?? VisualizerWindow.make(on: screen, content: page.webView)
+        let window = window ?? VisualizerWindow.make(on: screen, content: page.view)
         self.window = window
         window.setFrame(screen.frame, display: false)
 
