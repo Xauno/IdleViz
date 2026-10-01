@@ -102,7 +102,9 @@ The app is built from source for personal use. There is no download.
 
    Always sign with the same certificate. macOS ties the app's permissions to its signature, so a changing signature makes permission prompts come back.
 
-2. Open `IdleViz.xcodeproj` in Xcode and run the **IdleViz** scheme, or build from Terminal:
+2. Double-click `IdleViz.command` in Finder (or run `./IdleViz.command`). It builds the Release app, replaces `/Applications/IdleViz.app` with it, quitting a running copy first, and opens it. Run it again after pulling changes to update. Then skip to step 4.
+
+   To do it by hand instead, open `IdleViz.xcodeproj` in Xcode and run the **IdleViz** scheme, or build from Terminal:
 
    ```bash
    xcodebuild build -project IdleViz.xcodeproj -scheme IdleViz -configuration Release -derivedDataPath .build/xcode
@@ -185,6 +187,7 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ project.md              Design and build order
 ├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
+├─ IdleViz.command         Builds the app, installs it in /Applications and opens it
 ├─ Package.swift           IdleVizCore Swift package (testable logic)
 ├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, keep-awake and battery times, fade times, permission states, brightness and overlay settings, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks), the audio delay (per-device setting, delay line, delay detection)
 ├─ IdleViz.xcodeproj       App target: bundle, Info.plist, entitlements, signing
