@@ -17,7 +17,7 @@ export const meta = { name: "My Visual" };   // optional
 - **`init(canvas)`** is called once when the preset is selected. The app gives you a fresh `<canvas>` that nothing has drawn on, so you can call `canvas.getContext("webgl2")` or `canvas.getContext("2d")` yourself. Throw an `Error` if you can't get what you need (for example no WebGL2). The app skips the plugin and moves to the next preset.
 - **`frame(audio, time)`** is called once per display refresh (about 60 times a second). `time` is seconds since `init`. Draw the whole frame every call.
 - **`dispose()`** is called when the preset is switched away or the window closes. Free every GPU resource you created (textures, buffers, programs, framebuffers) and drop references. Dispose may run many times over a long session, so leaks add up.
-- **`meta.name`** is the display name. If it's missing, the file name is used.
+- **`meta.name`** is the display name. If it's missing, the file name is used. The app reads it from the file's text without running the plugin, so write it as a plain string: `export const meta = { name: "My Visual" };`.
 
 Don't run your own `requestAnimationFrame` loop or timers that outlive `dispose()`. The app owns the loop.
 
@@ -76,7 +76,8 @@ Plugins are code, not just data. Only install ones from sources you trust.
 
 ## Errors
 
-- A throw in `init` or `frame` disables the plugin for this session. It appears in **Settings > Presets** with the error message.
+- A throw in `init` or `frame` disables the plugin until its file changes. It appears in **Settings > Presets** under **Failed to load** with the error message. Save a fixed version and it is tried again.
+- A plugin that takes more than 5 s to start, or hangs the page, is disabled the same way, with "The plugin didn't start" or "Stopped responding".
 - Compile WebGL shaders in `init` and check `COMPILE_STATUS` and `LINK_STATUS`. Throw with `gl.getShaderInfoLog(...)` so the error shows up in settings (`aurora.js` does this).
 - Handle a lost WebGL context by throwing from `frame`. The app moves to the next preset.
 
@@ -130,7 +131,7 @@ export function dispose() {
 2. Test with **silence** (all zeros), a quiet track and a loud one.
 3. Test at both a small window and a large one (resize the window, and try a 4K display if you have one).
 4. Switch away and back, or reload the page, several times and watch the memory and GPU usage to make sure `dispose` really frees things.
-5. Put your file in the presets folder and check that it appears in the list and shows no error in **Settings > Presets**.
+5. Put your file in the presets folder and check that it appears in the list and shows no error in **Settings > Presets**. Set **Mode** to **Single** and pick it to keep it on screen. The folder is watched, so saving the file again reloads the plugin while the visualizer is open.
 
 ## Checklist
 

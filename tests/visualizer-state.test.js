@@ -4,10 +4,14 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SETTINGS,
+  FailureLog,
   MAX_RENDER_WIDTH,
   Rotation,
   ShuffleBag,
   collectPresets,
+  isPreset,
+  mergeLibrary,
+  parseCustomPresets,
   parsePresetSettings,
   renderSize,
   shouldRender,
@@ -27,7 +31,13 @@ describe("collectPresets", () => {
   it("merges packs, sorted by name without regard to case", () => {
     const list = collectPresets([{ beta: { b: 1 }, Alpha: { a: 1 } }, { gamma: { c: 1 } }]);
     expect(list.map((p) => p.name)).toEqual(["Alpha", "beta", "gamma"]);
-    expect(list[0]).toEqual({ id: "bundled:Alpha", name: "Alpha", source: "bundled", preset: { a: 1 } });
+    expect(list[0]).toEqual({
+      id: "bundled:Alpha",
+      name: "Alpha",
+      source: "bundled",
+      kind: "preset",
+      preset: { a: 1 },
+    });
   });
 
   it("keeps a repeated name once, from the first pack", () => {
@@ -42,6 +52,137 @@ describe("collectPresets", () => {
 
   it("tags the source", () => {
     expect(collectPresets([{ mine: {} }], "custom")[0]).toMatchObject({ id: "custom:mine", source: "custom" });
+  });
+});
+
+describe("parseCustomPresets", () => {
+  const preset = {
+    id: "custom:Pack/Tunnel.json",
+    name: "Tunnel",
+    source: "custom",
+    kind: "preset",
+    url: "idleviz-app://presets/Pack/Tunnel.json",
+    version: "120-5",
+  };
+  const plugin = {
+    id: "bundled:visuals/aurora.js",
+    name: "Aurora Ring",
+    source: "bundled",
+    kind: "plugin",
+    url: "idleviz-app://app/visuals/aurora.js",
+    version: "1",
+  };
+
+  it("keeps well-formed entries and the hung list", () => {
+    expect(parseCustomPresets({ entries: [preset, plugin], hung: ["custom:loop.js"] })).toEqual({
+      entries: [preset, plugin],
+      hung: ["custom:loop.js"],
+    });
+  });
+
+  it("drops entries of the wrong shape and repeated ids", () => {
+    const entries = [
+      null,
+      "text",
+      { ...preset, id: "" },
+      { ...preset, name: 5 },
+      { ...preset, kind: "milk" },
+      { ...preset, source: "elsewhere" },
+      preset,
+      { ...preset, name: "Tunnel again" },
+    ];
+    expect(parseCustomPresets({ entries }).entries).toEqual([preset]);
+  });
+
+  it("only lets each source load from its own place", () => {
+    const entries = [
+      { ...preset, url: "https://example.com/x.json" },
+      { ...preset, url: "idleviz-app://app/overlay.js" },
+      { ...plugin, url: "idleviz-app://presets/aurora.js" },
+      { ...preset, id: "bundled:Tunnel" },
+      { ...plugin, id: "custom:aurora.js" },
+    ];
+    expect(parseCustomPresets({ entries }).entries).toEqual([]);
+  });
+
+  it("reads anything else as empty", () => {
+    expect(parseCustomPresets(null)).toEqual({ entries: [], hung: [] });
+    expect(parseCustomPresets({ entries: "x", hung: [3, "", "custom:a.js"] })).toEqual({
+      entries: [],
+      hung: ["custom:a.js"],
+    });
+    expect(parseCustomPresets({ entries: [{ ...preset, version: 7 }] }).entries[0].version).toBe("");
+  });
+});
+
+describe("isPreset", () => {
+  it("wants baseVals, shapes and waves", () => {
+    expect(isPreset({ baseVals: {}, shapes: [], waves: [] })).toBe(true);
+    expect(isPreset({ baseVals: {}, shapes: [] })).toBe(false);
+    expect(isPreset({ baseVals: 1, shapes: [], waves: [] })).toBe(false);
+    expect(isPreset([])).toBe(false);
+    expect(isPreset(null)).toBe(false);
+    expect(isPreset("preset")).toBe(false);
+  });
+});
+
+describe("mergeLibrary", () => {
+  const bundled = collectPresets([{ Beta: {}, delta: {} }]);
+  const entry = (name, version = "1") => ({
+    id: `custom:${name}.json`,
+    name,
+    source: /** @type {const} */ ("custom"),
+    kind: /** @type {const} */ ("preset"),
+    url: `idleviz-app://presets/${name}.json`,
+    version,
+  });
+
+  it("sorts bundled and custom together by name", () => {
+    expect(mergeLibrary(bundled, [entry("gamma"), entry("Alpha")]).map((p) => p.name)).toEqual([
+      "Alpha",
+      "Beta",
+      "delta",
+      "gamma",
+    ]);
+  });
+
+  it("keeps a fetched preset while its file is unchanged", () => {
+    const loaded = { ...entry("Alpha"), preset: { baseVals: {} } };
+    const previous = new Map([[loaded.id, loaded]]);
+    expect(mergeLibrary(bundled, [entry("Alpha")], previous)[0].preset).toBe(loaded.preset);
+    expect(mergeLibrary(bundled, [entry("Alpha", "2")], previous)[0].preset).toBeUndefined();
+  });
+
+  it("never lets a custom entry replace a bundled one", () => {
+    const imposter = { ...entry("x"), id: "bundled:Beta", name: "Imposter" };
+    expect(mergeLibrary(bundled, [imposter]).map((p) => p.name)).toEqual(["Beta", "delta"]);
+  });
+});
+
+describe("FailureLog", () => {
+  const entry = (id, version) => ({ id, name: id, source: "custom", kind: "preset", url: "", version });
+
+  it("lists failures with their errors, cut short", () => {
+    const log = new FailureLog();
+    log.add(entry("custom:a.json", "1"), "Not a Butterchurn preset");
+    log.add(entry("custom:b.js", "1"), "x".repeat(1000));
+    expect(log.has("custom:a.json")).toBe(true);
+    expect(log.has("custom:c.json")).toBe(false);
+    expect(log.list()[0]).toEqual({ id: "custom:a.json", error: "Not a Butterchurn preset" });
+    expect(log.list()[1].error).toHaveLength(300);
+  });
+
+  it("forgets a failure when the file changes or goes away, and keeps it otherwise", () => {
+    const log = new FailureLog();
+    log.add(entry("custom:same.json", "1"), "bad");
+    log.add(entry("custom:edited.json", "1"), "bad");
+    log.add(entry("custom:deleted.json", "1"), "bad");
+    log.add({ id: "bundled:Old", name: "Old", source: "bundled", kind: "preset", preset: {} }, "bad");
+    const library = new Map(
+      [entry("custom:same.json", "1"), entry("custom:edited.json", "2"), { id: "bundled:Old" }].map((e) => [e.id, e]),
+    );
+    log.prune(/** @type {any} */ (library));
+    expect(log.list().map((f) => f.id)).toEqual(["custom:same.json", "bundled:Old"]);
   });
 });
 

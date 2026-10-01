@@ -24,6 +24,12 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
     private var nowPlayingScript = OverlayPayload.script(for: nil)
     /// The latest preset controls, replayed the same way.
     private var presetSettingsScript = PresetSettings().script
+    /// The latest list of bundled plugins and custom presets, replayed the same way.
+    private var customPresetsScript = CustomPresetPayload().script
+    /// Called with the presets the page reports as failed, each time that list changes.
+    var onFailures: (([PresetFailure]) -> Void)?
+    /// Called with the preset that was on screen when the page stopped answering.
+    var onHung: ((String) -> Void)?
     /// Called with the page's preset list each time the page has loaded.
     var onPresets: (([PresetInfo]) -> Void)?
     /// Called when a different preset comes on screen.
@@ -38,7 +44,8 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
     private static func makeWebView() -> WKWebView {
         let config = WKWebViewConfiguration()
         let root = Bundle.main.resourceURL!.appending(path: "web")
-        config.setURLSchemeHandler(AppSchemeHandler(root: root), forURLScheme: AppScheme.scheme)
+        let handler = AppSchemeHandler(root: root, presetsRoot: PresetFolder.defaultURL)
+        config.setURLSchemeHandler(handler, forURLScheme: AppScheme.scheme)
         config.mediaTypesRequiringUserActionForPlayback = []
         config.websiteDataStore = .nonPersistent()
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -62,6 +69,19 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         nowPlayingScript = OverlayPayload.script(for: payload)
         guard loaded else { return }
         webView.evaluateJavaScript(nowPlayingScript)
+    }
+
+    func send(customPresets: CustomPresetPayload) {
+        customPresetsScript = customPresets.script
+        guard loaded else { return }
+        webView.evaluateJavaScript(customPresetsScript)
+        fetchPresetList()
+    }
+
+    private func fetchPresetList() {
+        webView.evaluateJavaScript("window.idlevizPresets?.()") { [weak self] reply, _ in
+            MainActor.assumeIsolated { self?.onPresets?(PresetInfo.list(reply: reply)) }
+        }
     }
 
     func send(presetSettings: PresetSettings) {
@@ -99,8 +119,11 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     private func checkStatus() {
         if watchdog.shouldReload(at: ProcessInfo.processInfo.systemUptime) {
-            log.error("The page stopped answering; replacing it (last preset: \(self.lastStatus?.preset ?? "none", privacy: .public))")
+            let preset = lastStatus?.preset
+            log.error("The page stopped answering; replacing it (last preset: \(preset ?? "none", privacy: .public))")
             replaceWebView()
+            // Whatever was on screen is the likely cause. Keep it out, or the new page would hang on it too.
+            if let preset { onHung?(preset) }
             return
         }
         guard loaded else { return }
@@ -117,9 +140,12 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
                     let audio = status.audioFrames - last.audioFrames
                     self.log.debug("Page: \(frames, privacy: .public) frames, \(audio, privacy: .public) audio frames")
                 }
-                let newFailures = Set(status.failed).subtracting(self.lastStatus?.failed ?? [])
-                for failure in newFailures.sorted() {
-                    self.log.error("Preset failed to load: \(failure, privacy: .public)")
+                if status.failed != self.lastStatus?.failed {
+                    let known = Set((self.lastStatus?.failed ?? []).map(\.id))
+                    for failure in status.failed where !known.contains(failure.id) {
+                        self.log.error("Failed to load \(failure.id, privacy: .public): \(failure.error, privacy: .public)")
+                    }
+                    self.onFailures?(status.failed)
                 }
                 self.lastStatus = status
             }
@@ -168,7 +194,7 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
     /// about one launch in five in step 7c), and a call made then is silently lost. So ask the
     /// page whether its functions exist yet, and only then send it the current state.
     private func waitUntilReady(load: Int, attempt: Int) {
-        let check = "typeof window.nowPlaying === 'function' && typeof window.setPresetSettings === 'function'"
+        let check = "['nowPlaying', 'setPresetSettings', 'setCustomPresets'].every((name) => typeof window[name] === 'function')"
         webView.evaluateJavaScript(check) { [weak self] reply, _ in
             MainActor.assumeIsolated {
                 guard let self, load == self.loadID, !self.loaded else { return }
@@ -187,11 +213,11 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     private func pageBecameReady() {
         loaded = true
+        // The library goes first, so the settings can pick from all of it.
+        webView.evaluateJavaScript(customPresetsScript)
         webView.evaluateJavaScript(presetSettingsScript)
         webView.evaluateJavaScript(nowPlayingScript)
-        webView.evaluateJavaScript("window.idlevizPresets?.()") { [weak self] reply, _ in
-            MainActor.assumeIsolated { self?.onPresets?(PresetInfo.list(reply: reply)) }
-        }
+        fetchPresetList()
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
