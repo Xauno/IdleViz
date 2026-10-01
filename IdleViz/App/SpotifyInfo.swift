@@ -214,6 +214,14 @@ final class AppleScriptRunner: SpotifyQueryRunning, @unchecked Sendable {
         let running = NSRunningApplication.runningApplications(withBundleIdentifier: SpotifyInfo.bundleID)
         guard running.contains(where: { !$0.isTerminated }) else { return nil }
 
+        // The query itself would make macOS show the Automation prompt, possibly during an idle open
+        // with nobody there. The welcome window asks instead, so hold back until macOS has an answer.
+        let permission = PermissionChecks.automation(ask: false)
+        if PermissionStatus.automation(status: permission, previous: .unknown).isMissing {
+            NotificationCenter.default.post(name: Permissions.automationBlocked, object: nil)
+            return nil
+        }
+
         if script == nil {
             let compiled = NSAppleScript(source: SpotifyQuery.source)
             var error: NSDictionary?
@@ -230,6 +238,7 @@ final class AppleScriptRunner: SpotifyQueryRunning, @unchecked Sendable {
             let message = error[NSAppleScript.errorMessage] as? String ?? ""
             // -1743: Automation permission denied. -1712: Spotify didn't answer within the timeout.
             log.error("AppleScript error \(number, privacy: .public): \(message, privacy: .public)")
+            if number == -1743 { NotificationCenter.default.post(name: Permissions.automationBlocked, object: nil) }
             return nil
         }
         return result?.stringValue

@@ -1,8 +1,10 @@
+import IdleVizCore
 import KeyboardShortcuts
 import SwiftUI
 
 /// The small glass popup under the menu-bar icon. See mockups.html, section 1.
 struct MenuBarView: View {
+    var permissions: Permissions
     let openSettings: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -33,11 +35,35 @@ struct MenuBarView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .foregroundStyle(.secondary)
+
+            // One row per missing permission. A never-asked one opens the welcome window, which can
+            // show the macOS prompt; a denied one can only be switched on in System Settings.
+            ForEach(permissions.status.missing) { permission in
+                Button {
+                    dismiss()
+                    permissions.resolve(permission)
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(permission.errorTitle)
+                            Text(permissions.status.action(for: permission) == .showWelcome ? "Allow access ›" : "Open System Settings ›")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                }
+                .buttonStyle(MenuRowButtonStyle())
+            }
         }
         .padding(6)
         .frame(width: 260)
-        // Re-read each time the popup appears so a changed shortcut shows up.
-        .onAppear { shortcut = KeyboardShortcuts.getShortcut(for: .openVisualizer) }
+        // Re-read each time the popup appears so a changed shortcut or permission shows up.
+        .onAppear {
+            shortcut = KeyboardShortcuts.getShortcut(for: .openVisualizer)
+            permissions.refresh()
+        }
     }
 }
 

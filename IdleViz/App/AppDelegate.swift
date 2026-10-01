@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let log = Logger(subsystem: "com.xauno.IdleViz", category: "app")
     private let windowController = WindowController()
     let menuBarIcon = MenuBarIcon()
+    let permissions = Permissions()
+    private lazy var welcome = WelcomeWindowController(permissions: permissions)
     private lazy var presets = PresetController(page: windowController.page, library: PresetLibrary())
     private lazy var audioDelay = AudioDelayController(pump: audio)
     private lazy var settings = SettingsWindowController(
@@ -55,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.audio.start()
             self?.windowController.page.startStatusChecks()
             self?.keepAwake.start()
+            self?.permissions.refresh()
         }
         // The Mac may sleep again as soon as the fade-out starts.
         windowController.onClosing = { [weak self] in self?.keepAwake.stop() }
@@ -64,10 +67,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.windowController.page.stopStatusChecks()
         }
         closeWhenTheDisplayMayHaveChanged()
+        startPermissions(spotify)
         // Before anything can open settings, which makes the app regular.
         if let screen = NSScreen.screens.first { windowController.prepare(on: screen) }
         startTriggers()
         runDebugLaunchArguments()
+    }
+
+    private func startPermissions(_ spotify: SpotifyInfo) {
+        permissions.spotifyIsRunning = { spotify.isRunning }
+        permissions.startTap = { [audio] in audio.startPermissionTap() }
+        permissions.stopTap = { [audio] in audio.stopPermissionTap() }
+        permissions.onAutomationAnswered = { spotify.refresh() }
+        permissions.showWelcome = { [weak self] in self?.welcome.show() }
+        permissions.onChange = { [weak self] status in self?.menuBarIcon.warning = !status.missing.isEmpty }
+        menuBarIcon.warning = !permissions.status.missing.isEmpty
+        audio.mayTap = { [permissions] in permissions.status.audio != .notAsked }
+        audio.onSuspected = { [permissions] suspected in permissions.tapSuspected(suspected) }
+        permissions.startObserving()
+        // Ask for anything macOS hasn't asked about now, while someone is at the Mac.
+        Task { [weak self] in
+            await self?.permissions.check()
+            if self?.permissions.status.needsWelcome == true { self?.welcome.show() }
+        }
     }
 
     private func startTriggers() {
@@ -87,6 +109,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         // Launch argument `-IdleVizShowSettings YES` opens the settings window at launch, for working on it.
         if UserDefaults.standard.bool(forKey: "IdleVizShowSettings") { showSettings() }
+        // `-IdleVizShowWelcome YES` does the same for the welcome window.
+        if UserDefaults.standard.bool(forKey: "IdleVizShowWelcome") { welcome.show() }
         // `-IdleVizDetectDelay YES` runs Detect delay a few seconds after launch, as the button would.
         if UserDefaults.standard.bool(forKey: "IdleVizDetectDelay") {
             Task { [weak self] in

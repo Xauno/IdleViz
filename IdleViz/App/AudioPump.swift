@@ -20,6 +20,7 @@ final class AudioPump {
     private var lastHealthCheck = ContinuousClock.now
     private var lastLevels = (rms: Float(0), bass: Float(0))
     private var delayLine = DelayLine<Data>()
+    private var tapping = false
 
     /// How long each frame waits before it goes to the page, so the visuals match what the speakers play.
     var delay: TimeInterval = 0
@@ -28,10 +29,16 @@ final class AudioPump {
     var onFrame: ((Data) -> Void)?
     /// Whether Spotify says it's playing, for telling a paused Spotify from a tap without permission.
     var spotifyIsPlaying: () -> Bool = { false }
+    /// False while macOS hasn't been asked about System Audio Recording. Starting the tap then would
+    /// show the prompt, possibly during an idle open with nobody there; the welcome window asks instead.
+    var mayTap: () -> Bool = { true }
+    /// Called when the tap starts or stops looking like it has no permission.
+    var onSuspected: ((Bool) -> Void)?
 
     func start() {
         guard timer == nil else { return }
-        tap.retain()
+        tapping = mayTap()
+        if tapping { tap.retain() }
         // Frames from the last time the window was open are stale; start from silence.
         delayLine.removeAll()
         onFrame?(AudioFrame.silence(sequence: 0, sampleRate: Float(tap.sampleRate)).packed())
@@ -51,6 +58,18 @@ final class AudioPump {
         guard let timer else { return }
         timer.invalidate()
         self.timer = nil
+        if tapping { tap.release() }
+        tapping = false
+    }
+
+    // MARK: Permission prompt
+
+    /// Runs the tap for the welcome window: its first start makes macOS ask for System Audio Recording.
+    func startPermissionTap() {
+        tap.retain()
+    }
+
+    func stopPermissionTap() {
         tap.release()
     }
 
@@ -96,6 +115,10 @@ final class AudioPump {
             bass \(self.lastLevels.bass, privacy: .public)
             """)
         guard tap.isTapping else { return }
+        let suspected = health.suspected
+        defer {
+            if health.suspected != suspected { onSuspected?(health.suspected) }
+        }
         if health.record(buffers: counts.buffers, zeroBuffers: counts.zero, spotifyPlaying: spotifyIsPlaying()) {
             log.warning("""
                 Spotify is playing but the tap has heard only silence for \(TapHealth.suspectAfterSeconds, privacy: .public) s. \
