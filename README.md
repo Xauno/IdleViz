@@ -9,7 +9,7 @@ A macOS menu-bar app that turns your Mac into a music display. When the Mac goes
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: in development.** The menu-bar app opens a fullscreen window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input. It shows a Butterchurn visualizer that reacts to Spotify's audio and shuffles through 395 bundled presets, with what Spotify is playing in an overlay styled after the Spotify TV app. The audio delay for Bluetooth and AirPlay speakers isn't built yet. See [Roadmap](#roadmap) for progress.
+> **Status: in development.** The menu-bar app opens a fullscreen window after a few idle minutes, from a hotkey or from a URL, but only while Spotify has a track loaded, and closes it on any input. It shows a Butterchurn visualizer that reacts to Spotify's audio and shuffles through 395 bundled presets, with what Spotify is playing in an overlay styled after the Spotify TV app. See [Roadmap](#roadmap) for progress.
 
 ## Contents
 
@@ -42,6 +42,7 @@ Working now:
 - Reacts to Spotify's audio only, through a Core Audio process tap that runs while the window is open. The visuals never hear the microphone or other system audio. A slow automatic gain keeps the visuals lively when Spotify's volume is low, and silence stays silent: paused, quit, or playing on another device, the visuals just drift.
 - Bring your own presets: drop Butterchurn `.json` or original Milkdrop `.milk` files, or custom `.js` visual plugins, into the presets folder, or use **Import…** in settings. Subfolders work, so a downloaded pack can go in as it is. The folder is watched, so new files show up without a restart. `.milk` files are converted once and cached.
 - Custom plugins run in a sandboxed frame with no network, no storage and no access to the rest of the app. A plugin that throws, runs too slowly or hangs is dropped and listed under **Failed to load** in settings, next to presets that couldn't be read or converted.
+- Audio delay for Bluetooth and AirPlay speakers, which play the sound later than the Mac sends it: the visuals and the progress bar wait to match. Set it with a slider (0 to 2.5 s), or press **Detect** and the app measures it with the microphone for about 5 seconds. It is saved for each speaker or pair of headphones, and a device used for the first time starts at the delay macOS reports for it.
 - If the page ever stops responding, the app replaces it within a few seconds. The window also closes when the Mac goes to sleep or the displays change.
 - Reads what Spotify is playing (title, artist, album, playing or paused, position, length) and whether it's a song, a podcast or an ad, and downloads the album art. It never launches Spotify: it only asks while Spotify is running, and updates when Spotify says something changed rather than polling.
 
@@ -49,7 +50,6 @@ Planned:
 
 - Keeps the screen awake while it's showing, up to a limit you set (1 hour by default). After that the Mac sleeps and locks as usual.
 - Optional separate idle and keep-awake times for when the Mac is on battery.
-- Audio delay for Bluetooth and AirPlay speakers, set by hand or measured with a quick microphone check, saved per device.
 - The menu-bar icon turns yellow when a permission is missing, and the popup says what to fix.
 - Adjustable visualizer brightness, launch at login, and a small settings window.
 - Never launches Spotify and never uses Spotify's web API or a login.
@@ -71,7 +71,7 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | 7b   | Visualizer: real Spotify audio through the process tap                            | Done    |
 | 7c   | Visualizer: preset controls                                                       | Done    |
 | 7d   | Visualizer: custom preset folder and sandboxed plugins                            | Done    |
-| 7e   | Visualizer: audio delay, with a microphone-based detector                         | Planned |
+| 7e   | Visualizer: audio delay, with a microphone-based detector                         | Done    |
 | 8    | Polish: fades, launch at login, brightness, keep-awake, battery, permission setup  | Planned |
 
 ## Requirements
@@ -110,6 +110,8 @@ The app is built from source for personal use. There is no download.
 
 5. The first time the visualizer opens, macOS asks whether IdleViz may record system audio. Click **Allow**; the app listens to Spotify's audio only, and only while the visualizer is open. If you denied it, turn it on in System Settings → Privacy & Security → Screen & System Audio Recording, under **System Audio Recording Only**. Without it the visualizer still opens but doesn't react to the music.
 
+6. The first time you press **Detect** next to **Detect delay** in settings, macOS asks for the microphone. This one is optional. The app listens only while it says **Listening…**, about 5 seconds, and keeps nothing.
+
 ## Usage
 
 - **Menu bar:** click the waveform icon for a small popup with **Settings…** (⌘,) and the current open hotkey.
@@ -127,6 +129,7 @@ The app is built from source for personal use. There is no download.
 - **Visualizer:** it moves to whatever Spotify is playing on this Mac, and a new preset blends in every 30 seconds. With Spotify paused, or playing on another device, the visuals get silence and drift slowly.
 - **Presets:** in settings, **Mode** is **Shuffle** or **Single**. Shuffle has **Shuffle from** (all, bundled, custom or favorites), **Seconds per preset** and **Blend time**. Single has one **Visualizer** picker, and that preset stays on screen. Any input closes the visualizer, so presets are rated afterwards: **Last shown** names the preset that was just on screen, with a heart to add it to your favorites and a block button to leave it out of shuffle. **Favorites** and **Blocklist** open a list where you can remove entries or search all presets to add more.
 
+- **Audio delay:** with Bluetooth or AirPlay speakers the picture runs ahead of the sound. In settings, drag **Audio delay** until they match, or play something out loud and press **Detect**. The row names the speakers the value is for, and it changes by itself when you switch devices. Detect can't work with headphones, since the microphone can't hear them; it then says so and keeps the old value.
 - **Your own presets:** the presets folder is `~/Library/Application Support/IdleViz/Presets/`. In settings under **Presets**, **Import…** copies files or whole folders into it (`.json`, `.milk`, `.js`), **Open** shows it in Finder, and **Reload** reads it again, though it also notices changes by itself. Custom presets appear in the **Visualizer** picker and the favorites and blocklist sheets, and **Shuffle from** can be set to **Custom**. Anything that couldn't be loaded is listed under **Failed to load** with the reason and a **Reveal** button; fix or replace the file and it is tried again. Custom plugins and presets are code, so only import ones you trust.
 
 ## Custom visualizers
@@ -155,7 +158,7 @@ swift build && swift test
 swiftlint lint --strict
 ```
 
-In Debug builds, the launch argument `-IdleVizNoDismiss YES` keeps the window open so it can be inspected; trigger it again to close. `-IdleVizShowSettings YES` opens the settings window at launch, and `-IdleVizOpenAtLaunch YES` opens the visualizer three seconds after launch (unlike `open idleviz://open`, that can't end up in another copy of the app). The page is inspectable in Debug builds: with the window open, attach Safari's Web Inspector from **Develop → [your Mac] → IdleViz**. The scheme has this argument ready to tick. Each open logs whether macOS let the app activate, and each preset change is logged too:
+In Debug builds, the launch argument `-IdleVizNoDismiss YES` keeps the window open so it can be inspected; trigger it again to close. `-IdleVizShowSettings YES` opens the settings window at launch, `-IdleVizDetectDelay YES` runs Detect delay four seconds after launch, and `-IdleVizOpenAtLaunch YES` opens the visualizer three seconds after launch (unlike `open idleviz://open`, that can't end up in another copy of the app). The page is inspectable in Debug builds: with the window open, attach Safari's Web Inspector from **Develop → [your Mac] → IdleViz**. The scheme has this argument ready to tick. Each open logs whether macOS let the app activate, and each preset change is logged too:
 
 ```bash
 log stream --predicate 'subsystem == "com.xauno.IdleViz"'
@@ -173,7 +176,7 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ LICENSE                 MIT license
 ├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
 ├─ Package.swift           IdleVizCore Swift package (testable logic)
-├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks)
+├─ Sources/IdleVizCore/    Dismiss rules, open rules, idle timing and skip rules, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks), the audio delay (per-device setting, delay line, delay detection)
 ├─ IdleViz.xcodeproj       App target: bundle, Info.plist, entitlements, signing
 ├─ IdleViz/App/            Menu-bar app, settings window, triggers, fullscreen window, dismiss, Spotify info, Spotify audio tap, web view, presets folder and Milkdrop converter
 ├─ IdleViz/web/            The page: visualizer and overlay HTML, CSS and JS, the plugin frame and its runner, the converter page, Figtree font (served from idleviz-app://)

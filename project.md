@@ -285,10 +285,21 @@ The tap hears Spotify's audio before it reaches the speakers. With built-in spea
   1. Only works while Spotify is playing out loud. Otherwise the hint explains why and nothing happens.
   2. Asks for microphone permission the first time (`NSMicrophoneUsageDescription`, "Used only when you press Detect delay, to match the visuals to your speakers.").
   3. For about 5 s, record the mic with `AVAudioEngine` while also recording the tap's signal.
-  4. Turn both into loudness envelopes (onset strength) and cross-correlate them over lags of 0–2.5 s. Subtract the mic's own input latency (`kAudioDevicePropertyLatency` + safety offset of the input device).
+  4. Cross-correlate the two recordings over lags of 0–2.5 s (see "As built" for the method). Subtract the mic's own input latency (`kAudioDevicePropertyLatency` + safety offset + stream latency of the input device).
   5. If the correlation peak is clear, save the result for the current device and move the slider. If not (too quiet, noisy room, or headphones, where the mic can't hear the music), keep the old value and say so in the hint.
   6. Stop the mic immediately after. The mic audio is only held in memory during those few seconds.
 - The correlation math lives in `IdleVizCore` and is tested with synthetic signals (a known delay plus noise).
+- **As built (step 7e):**
+  - `DelayLine` holds the packed frames with their capture time; each timer tick sends the newest frame that is at least `delay` old. Opening the window clears it and sends one frame of silence.
+  - The page gets the delay with `window.setAudioDelay(seconds)` and subtracts it from the progress bar's position while playing.
+  - `DelayDetector` cross-correlates the two waveforms with a softened phase transform (GCC-PHAT with the magnitude raised to 0.8, 300 Hz to 6 kHz), averages the result over 5 ms so a spike's closest echoes add to it, and takes the best lag from -0.1 to 2.5 s. A result counts only if its peak is at least 10 standard deviations above the lags more than 100 ms away and 1.5 times the best of them, which rejects headphones, noise and other music. A lag below zero is saved as no delay. The first version correlated loudness envelopes instead; with real speakers it succeeded about half the time, read about 30 ms late, and once returned 320 ms for the built-in speakers.
+  - The two recordings are lined up on the host clock: the tap's by when its first buffer was handed to the app (`inNow` in the I/O block), the microphone's by `AVAudioTime.hostTime` of its first buffer minus its input latency. The tap is measured from the hand-over, not from the samples' own timestamps, because the delay line also counts from the hand-over.
+  - The tap delivers audio at the aggregate device's sample rate, which is the output device's, whatever `kAudioTapPropertyFormat` says: 44,100 Hz on AirPlay while the format says 48,000. `SpotifyAudioTap` reads the rate from the aggregate.
+  - The microphone is tapped in the input node's input format. Its output format follows the output device's sample rate, and a tap in that format gets no audio when the rates differ (AirPlay).
+  - Measured on a MacBook Pro: the built-in speakers sound about 40 ms before the tap hands the audio over, so they measure as 0 ms and the visuals trail the music by about that much, which no delay can fix. An AirPlay speaker measured 1,950 ms, five runs within 1.5 ms of each other, and matched by eye on track changes.
+  - The tap's signal is recorded inside `SampleRing` while Detect delay runs, and the tap runs for it even when the window is closed.
+  - The microphone is the Mac's built-in one when it has one, whatever the default input is: recording from a Bluetooth headset's own microphone would switch the headset to call mode and change the delay being measured.
+  - A measured value is saved even when it equals the reported latency. A device that was never measured or adjusted keeps following what macOS reports.
 
 ### Audio spike findings (step 2)
 Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024 × 1964 built-in display, built-in speakers) with macOS 26 and the Spotify desktop app. The spike used a Spotify process tap, a vDSP analysis in Swift, one packed frame per display frame sent with `evaluateJavaScript`, and Butterchurn 2.6.7 in a `WKWebView` loaded with `loadFileURL` (no custom scheme or CSP yet).
@@ -403,7 +414,7 @@ IdleViz/
 │  ├─ SpotifyInfo.swift          # launch/quit tracking, notifications, AppleScript, artwork
 │  ├─ SpotifyAudioTap.swift      # process tap on Spotify only, rebuilt when its processes or the output device change
 │  ├─ AudioPump.swift            # while open: tap → IdleVizCore analysis → page, 60×/s; tap health check
-│  ├─ AudioDelay.swift           # per-device delay line, Detect delay (mic, ~5 s)
+│  ├─ AudioDelay.swift           # per-device delay, device lookups, Detect delay (mic, ~5 s)
 │  ├─ PresetLibrary.swift        # scan/watch custom preset folder, import, send list to page
 │  ├─ FolderWatcher.swift        # FSEvents wrapper
 │  ├─ MilkConverter.swift        # hidden page that converts .milk files
@@ -442,7 +453,7 @@ Each step is one pull request. At the end of each step, update the README (Roadm
    - **7b.** Real audio: process tap (with process-list changes), analysis in Swift, automatic gain, silence rules, web view recovery. Done.
    - **7c.** Preset controls (mode, shuffle, timing, blend, favorites, blocklist). Done.
    - **7d.** Custom preset folder: `.json` loading, folder watching, `.js` plugins in sandboxed frames (with the audio, CSP and status-check rules), Import/Open/Reload controls in settings, then `.milk` conversion with caching and failure handling. Done.
-   - **7e.** Audio delay: per-device delay line, the settings slider, and **Detect delay** with the microphone. Test with built-in speakers, Bluetooth headphones and speakers, and AirPlay if available.
+   - **7e.** Audio delay: per-device delay line, the settings slider, and **Detect delay** with the microphone. Test with built-in speakers, Bluetooth headphones and speakers, and AirPlay if available. Done. Tested with the built-in speakers, AirPlay and Bluetooth headphones; no Bluetooth speaker was available.
 8. **Polish:** fades, launch at login, brightness slider in settings, keep awake with its time limit setting (and the idle rule to wait for input after the limit), different times on battery, first-launch welcome window for permissions, yellow icon and popup error rows for missing permissions.
 
 ## Later

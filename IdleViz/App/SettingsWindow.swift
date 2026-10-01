@@ -4,15 +4,18 @@ import KeyboardShortcuts
 import SwiftUI
 
 /// Separate settings window, per mockups.html section 2. So far it has the idle timeout, the hotkey,
-/// Open now, the preset controls and the presets folder; the other rows arrive with the features they control.
+/// Open now, the audio delay, the preset controls and the presets folder; the other rows arrive with
+/// the features they control.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let presets: PresetController
+    private let audioDelay: AudioDelayController
     private let openNow: () -> Void
     private var window: NSWindow?
 
-    init(presets: PresetController, openNow: @escaping () -> Void) {
+    init(presets: PresetController, audioDelay: AudioDelayController, openNow: @escaping () -> Void) {
         self.presets = presets
+        self.audioDelay = audioDelay
         self.openNow = openNow
     }
 
@@ -30,7 +33,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow {
-        let hosting = NSHostingController(rootView: SettingsView(presets: presets, openNow: openNow))
+        let view = SettingsView(presets: presets, audioDelay: audioDelay, openNow: openNow)
+        let hosting = NSHostingController(rootView: view)
         hosting.sizingOptions = []
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 340, height: 560),
@@ -52,6 +56,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
 struct SettingsView: View {
     @Bindable var presets: PresetController
+    @Bindable var audioDelay: AudioDelayController
     let openNow: () -> Void
     @AppStorage(IdleTimeoutSetting.key) private var idleTimeout = IdleTimeoutSetting.defaultMinutes
 
@@ -70,7 +75,10 @@ struct SettingsView: View {
                     Button("Open", action: openNow)
                 }
             }
-            PresetControls(presets: presets)
+            Section("Visualizer") {
+                AudioDelayControls(audioDelay: audioDelay)
+                PresetControls(presets: presets)
+            }
             PresetFolderControls(presets: presets)
         }
         .formStyle(.grouped)
