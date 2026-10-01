@@ -1,3 +1,4 @@
+import AVFAudio
 import Foundation
 import IdleVizCore
 import os
@@ -18,6 +19,10 @@ final class AudioPump {
     private var lastFrame: ContinuousClock.Instant?
     private var lastHealthCheck = ContinuousClock.now
     private var lastLevels = (rms: Float(0), bass: Float(0))
+    private var delayLine = DelayLine<Data>()
+
+    /// How long each frame waits before it goes to the page, so the visuals match what the speakers play.
+    var delay: TimeInterval = 0
 
     /// Receives each packed frame.
     var onFrame: ((Data) -> Void)?
@@ -26,7 +31,10 @@ final class AudioPump {
 
     func start() {
         guard timer == nil else { return }
-        tap.start()
+        tap.retain()
+        // Frames from the last time the window was open are stale; start from silence.
+        delayLine.removeAll()
+        onFrame?(AudioFrame.silence(sequence: 0, sampleRate: Float(tap.sampleRate)).packed())
         _ = tap.ring.takeCounts()
         health = TapHealth()
         lastFrame = nil
@@ -43,7 +51,23 @@ final class AudioPump {
         guard let timer else { return }
         timer.invalidate()
         self.timer = nil
-        tap.stop()
+        tap.release()
+    }
+
+    // MARK: Detect delay
+
+    /// Starts keeping the tap's signal for Detect delay. The tap runs for this even while the window is closed.
+    func startRecording(seconds: Double) {
+        tap.retain()
+        tap.ring.startRecording(maxSamples: Int(seconds * tap.sampleRate))
+    }
+
+    /// Stops and returns what the tap delivered, with the time of its first sample in host-clock seconds.
+    func stopRecording() -> DelayDetector.Recording {
+        let (samples, startHostTime) = tap.ring.stopRecording()
+        let sampleRate = tap.sampleRate
+        tap.release()
+        return DelayDetector.Recording(samples: samples, sampleRate: sampleRate, start: AVAudioTime.seconds(forHostTime: startHostTime))
     }
 
     private func tick() {
@@ -53,7 +77,10 @@ final class AudioPump {
         tap.ring.latest(left: &left, right: &right)
         let frame = analyzer.analyze(left: left, right: right, sampleRate: tap.sampleRate, seconds: min(seconds, 0.25))
         lastLevels = (frame.rms, frame.bass)
-        onFrame?(frame.packed())
+        let uptime = ProcessInfo.processInfo.systemUptime
+        delayLine.push(frame.packed(), at: uptime)
+        // Until a frame is old enough, the page keeps showing the last one it got.
+        if let due = delayLine.pop(at: uptime, delay: delay) { onFrame?(due) }
         if lastHealthCheck.duration(to: now) >= .seconds(1) {
             lastHealthCheck = now
             checkHealth()

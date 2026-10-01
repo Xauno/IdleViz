@@ -288,6 +288,13 @@ The tap hears Spotify's audio before it reaches the speakers. With built-in spea
   5. If the correlation peak is clear, save the result for the current device and move the slider. If not (too quiet, noisy room, or headphones, where the mic can't hear the music), keep the old value and say so in the hint.
   6. Stop the mic immediately after. The mic audio is only held in memory during those few seconds.
 - The correlation math lives in `IdleVizCore` and is tested with synthetic signals (a known delay plus noise).
+- **As built (step 7e):**
+  - `DelayLine` holds the packed frames with their capture time; each timer tick sends the newest frame that is at least `delay` old. Opening the window clears it and sends one frame of silence.
+  - The page gets the delay with `window.setAudioDelay(seconds)` and subtracts it from the progress bar's position while playing.
+  - `DelayDetector` turns each recording into an onset-strength envelope at 1,000 points a second (loudness in dB per millisecond, smoothed over 10 ms, rises only), then correlates them for every lag from 0 to 2.5 s. The two recordings are lined up by the host-clock time of their first samples. A result counts only if its peak is at least 6 standard deviations above the other lags and 15% above the best lag elsewhere, which rejects a steady beat that matches one beat late as well as headphones and noise.
+  - The tap's signal is recorded inside `SampleRing` while Detect delay runs, and the tap runs for it even when the window is closed.
+  - The microphone is the Mac's built-in one when it has one, whatever the default input is: recording from a Bluetooth headset's own microphone would switch the headset to call mode and change the delay being measured.
+  - A measured value is saved even when it equals the reported latency. A device that was never measured or adjusted keeps following what macOS reports.
 
 ### Audio spike findings (step 2)
 Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024 × 1964 built-in display, built-in speakers) with macOS 26 and the Spotify desktop app. The spike used a Spotify process tap, a vDSP analysis in Swift, one packed frame per display frame sent with `evaluateJavaScript`, and Butterchurn 2.6.7 in a `WKWebView` loaded with `loadFileURL` (no custom scheme or CSP yet).
@@ -402,7 +409,7 @@ IdleViz/
 │  ├─ SpotifyInfo.swift          # launch/quit tracking, notifications, AppleScript, artwork
 │  ├─ SpotifyAudioTap.swift      # process tap on Spotify only, rebuilt when its processes or the output device change
 │  ├─ AudioPump.swift            # while open: tap → IdleVizCore analysis → page, 60×/s; tap health check
-│  ├─ AudioDelay.swift           # per-device delay line, Detect delay (mic, ~5 s)
+│  ├─ AudioDelay.swift           # per-device delay, device lookups, Detect delay (mic, ~5 s)
 │  ├─ PresetLibrary.swift        # scan/watch custom preset folder, import, send list to page
 │  ├─ FolderWatcher.swift        # FSEvents wrapper
 │  ├─ MilkConverter.swift        # hidden page that converts .milk files
@@ -441,7 +448,7 @@ Each step is one pull request. At the end of each step, update the README (Roadm
    - **7b.** Real audio: process tap (with process-list changes), analysis in Swift, automatic gain, silence rules, web view recovery. Done.
    - **7c.** Preset controls (mode, shuffle, timing, blend, favorites, blocklist). Done.
    - **7d.** Custom preset folder: `.json` loading, folder watching, `.js` plugins in sandboxed frames (with the audio, CSP and status-check rules), Import/Open/Reload controls in settings, then `.milk` conversion with caching and failure handling. Done.
-   - **7e.** Audio delay: per-device delay line, the settings slider, and **Detect delay** with the microphone. Test with built-in speakers, Bluetooth headphones and speakers, and AirPlay if available.
+   - **7e.** Audio delay: per-device delay line, the settings slider, and **Detect delay** with the microphone. Test with built-in speakers, Bluetooth headphones and speakers, and AirPlay if available. Built; the tests with real speakers and the microphone are still to do.
 8. **Polish:** fades, launch at login, brightness slider in settings, keep awake with its time limit setting (and the idle rule to wait for input after the limit), different times on battery, first-launch welcome window for permissions, yellow icon and popup error rows for missing permissions.
 
 ## Later

@@ -43,6 +43,28 @@ describe("positionAt", () => {
   });
 });
 
+describe("positionAt with an audio delay", () => {
+  const item = /** @type {any} */ ({ state: "playing", position: 60, durationMs: 200_000 });
+
+  it("shows the position you hear while playing", () => {
+    expect(positionAt(item, 1000, 3000, 0.25)).toBeCloseTo(61.75);
+    expect(positionAt(item, 1000, 3000)).toBeCloseTo(62);
+  });
+
+  it("never goes below zero at the start of a track", () => {
+    expect(positionAt({ ...item, position: 0.5 }, 1000, 1000, 2)).toBe(0);
+  });
+
+  it("shows the exact position while paused", () => {
+    expect(positionAt({ ...item, state: "paused" }, 1000, 9000, 2)).toBe(60);
+  });
+
+  it("ignores a delay that isn't a sensible number", () => {
+    expect(positionAt(item, 1000, 1000, NaN)).toBe(60);
+    expect(positionAt(item, 1000, 1000, -3)).toBe(60);
+  });
+});
+
 describe("fraction", () => {
   it("is the played share, clamped", () => {
     expect(fraction(57, 228000)).toBeCloseTo(0.25);

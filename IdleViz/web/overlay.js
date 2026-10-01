@@ -16,6 +16,8 @@ let receivedAt = 0;
 let currentTrack = null;
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let hideTimer;
+/** Seconds the speakers lag behind Spotify, from Swift. */
+let audioDelay = 0;
 
 function fitStage() {
   stage.style.transform = `scale(${window.innerWidth / STAGE_WIDTH})`;
@@ -88,7 +90,7 @@ function showTrack(item) {
 
 function renderProgress() {
   if (!current) return;
-  const position = positionAt(current, receivedAt, performance.now());
+  const position = positionAt(current, receivedAt, performance.now(), audioDelay);
   played.style.transform = `scaleX(${fraction(position, current.durationMs)})`;
   elapsedLabel.textContent = formatTime(position);
   durationLabel.textContent = formatTime(current.durationMs / 1000);
@@ -141,4 +143,13 @@ fitStage();
 // Only the time labels and bar move between readings; a few updates a second is plenty.
 setInterval(renderProgress, 250);
 
-Object.assign(window, { nowPlaying });
+/**
+ * Called by Swift with the audio delay of the current speakers or headphones.
+ * @param {unknown} seconds
+ */
+function setAudioDelay(seconds) {
+  audioDelay = typeof seconds === "number" && Number.isFinite(seconds) ? Math.min(Math.max(seconds, 0), 2.5) : 0;
+  renderProgress();
+}
+
+Object.assign(window, { nowPlaying, setAudioDelay });

@@ -1,6 +1,45 @@
 import IdleVizCore
 import SwiftUI
 
+/// The audio delay rows of the Visualizer section in settings: the slider for the current
+/// speakers or headphones, and Detect delay.
+struct AudioDelayControls: View {
+    @Bindable var audioDelay: AudioDelayController
+
+    var body: some View {
+        LabeledContent {
+            HStack(spacing: 6) {
+                Slider(value: $audioDelay.delay, in: AudioDelaySetting.range)
+                    .frame(width: 96)
+                    .accessibilityLabel("Audio delay")
+                Text(AudioDelaySetting.label(audioDelay.delay))
+                    .font(.callout)
+                    .monospacedDigit()
+                    .frame(width: 58, alignment: .trailing)
+            }
+        } label: {
+            Text("Audio delay")
+            Text("For \(audioDelay.deviceName)").lineLimit(1)
+        }
+        LabeledContent {
+            Button(audioDelay.detecting ? "Listening…" : "Detect") { audioDelay.detect() }
+                .disabled(audioDelay.detecting)
+        } label: {
+            Text("Detect delay")
+            switch audioDelay.hint {
+            case let .text(text):
+                Text(text)
+            case .microphoneDenied:
+                // The microphone is optional, so a missing permission only shows here.
+                Link("Microphone access is off. Open System Settings…", destination: AudioDelayController.microphoneSettingsURL)
+                    .font(.caption)
+            case nil:
+                Text("Listens with the mic for a few seconds")
+            }
+        }
+    }
+}
+
 /// The preset rows of the Visualizer section in settings: mode, the rows for that mode,
 /// the last-shown preset, and the favorites and blocklist sheets.
 struct PresetControls: View {
@@ -10,26 +49,24 @@ struct PresetControls: View {
     private var settings: PresetSettings { presets.settings }
 
     var body: some View {
-        Section("Visualizer") {
-            Picker("Mode", selection: $presets.settings.mode) {
-                Text("Shuffle").tag(PresetSettings.Mode.shuffle)
-                Text("Single").tag(PresetSettings.Mode.single)
-            }
-            if settings.mode == .shuffle {
-                shuffleRows
-            } else {
-                singleRow
-            }
-            lastShownRow
-            LabeledContent("Favorites") {
-                Button("Manage (\(settings.favorites.count))") { sheet = .favorites }
-            }
-            LabeledContent("Blocklist") {
-                Button("Manage (\(settings.blocked.count))") { sheet = .blocklist }
-            }
+        Picker("Mode", selection: $presets.settings.mode) {
+            Text("Shuffle").tag(PresetSettings.Mode.shuffle)
+            Text("Single").tag(PresetSettings.Mode.single)
         }
-        .sheet(item: $sheet) { list in
-            PresetListSheet(list: list, presets: presets)
+        if settings.mode == .shuffle {
+            shuffleRows
+        } else {
+            singleRow
+        }
+        lastShownRow
+        LabeledContent("Favorites") {
+            Button("Manage (\(settings.favorites.count))") { sheet = .favorites }
+        }
+        LabeledContent("Blocklist") {
+            Button("Manage (\(settings.blocked.count))") { sheet = .blocklist }
+                .sheet(item: $sheet) { list in
+                    PresetListSheet(list: list, presets: presets)
+                }
         }
     }
 

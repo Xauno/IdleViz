@@ -26,6 +26,8 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
     private var presetSettingsScript = PresetSettings().script
     /// The latest list of bundled plugins and custom presets, replayed the same way.
     private var customPresetsScript = CustomPresetPayload().script
+    /// The latest audio delay, replayed the same way. The progress bar needs it to show the position you hear.
+    private var audioDelayScript = AudioDelaySetting.script(for: 0)
     /// Called with the presets the page reports as failed, each time that list changes.
     var onFailures: (([PresetFailure]) -> Void)?
     /// Called with the preset that was on screen when the page stopped answering.
@@ -82,6 +84,12 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         webView.evaluateJavaScript("window.idlevizPresets?.()") { [weak self] reply, _ in
             MainActor.assumeIsolated { self?.onPresets?(PresetInfo.list(reply: reply)) }
         }
+    }
+
+    func send(audioDelay: TimeInterval) {
+        audioDelayScript = AudioDelaySetting.script(for: audioDelay)
+        guard loaded else { return }
+        webView.evaluateJavaScript(audioDelayScript)
     }
 
     func send(presetSettings: PresetSettings) {
@@ -216,6 +224,7 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         // The library goes first, so the settings can pick from all of it.
         webView.evaluateJavaScript(customPresetsScript)
         webView.evaluateJavaScript(presetSettingsScript)
+        webView.evaluateJavaScript(audioDelayScript)
         webView.evaluateJavaScript(nowPlayingScript)
         fetchPresetList()
     }

@@ -236,6 +236,30 @@ final class SampleRingTests: XCTestCase {
         XCTAssertEqual(counts.zero, 1)
     }
 
+    func testRecordsMonoSamplesWithTheirStartTime() {
+        let ring = SampleRing()
+        ring.append(interleaved: [9, 9], channels: 2, frames: 1, hostTime: 50)
+        ring.startRecording(maxSamples: 3)
+        ring.append(interleaved: [1, 0, 0.5, 0.5], channels: 2, frames: 2, hostTime: 100)
+        ring.append(left: [0.25, 8], right: [0.75, 8], frames: 2, hostTime: 200)
+        let recording = ring.stopRecording()
+        // Left and right are averaged, the limit holds, and the time is the first recorded buffer's.
+        XCTAssertEqual(recording.samples, [0.5, 0.5, 0.5])
+        XCTAssertEqual(recording.startHostTime, 100)
+        // The ring itself is unaffected.
+        XCTAssertEqual(latest(ring, 2).left, [0.25, 8])
+    }
+
+    func testNotRecordingReturnsNothing() {
+        let ring = SampleRing()
+        ring.append(interleaved: [1, 1], channels: 2, frames: 1, hostTime: 5)
+        XCTAssertEqual(ring.stopRecording().samples, [])
+        ring.startRecording(maxSamples: 10)
+        _ = ring.stopRecording()
+        ring.append(interleaved: [1, 1], channels: 2, frames: 1, hostTime: 6)
+        XCTAssertEqual(ring.stopRecording().samples, [])
+    }
+
     func testClearLeavesSilence() {
         let ring = SampleRing()
         ring.append(interleaved: [1, 1, 1, 1], channels: 2, frames: 2)

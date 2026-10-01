@@ -8,8 +8,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let windowController = WindowController()
     let menuBarIcon = MenuBarIcon()
     private lazy var presets = PresetController(page: windowController.page, library: PresetLibrary())
+    private lazy var audioDelay = AudioDelayController(pump: audio)
     private lazy var settings = SettingsWindowController(
         presets: presets,
+        audioDelay: audioDelay,
         openNow: { [weak self] in self?.open(from: .settings) }
     )
     private var triggers: Triggers?
@@ -21,11 +23,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.register(defaults: [IdleTimeoutSetting.key: IdleTimeoutSetting.defaultMinutes])
         // Created at launch, so the stored preset controls reach the page as soon as it loads.
         _ = presets
+        _ = audioDelay
         let spotify = SpotifyInfo()
         self.spotify = spotify
         spotify.onOverlay = { [weak self] payload in self?.windowController.page.show(payload) }
         audio.onFrame = { [weak self] frame in self?.windowController.page.send(audioFrame: frame) }
         audio.spotifyIsPlaying = { spotify.current?.nowPlaying.state == .playing }
+        audioDelay.spotifyIsPlaying = audio.spotifyIsPlaying
+        // The same delay holds back the audio frames and the progress bar.
+        audioDelay.onChange = { [weak self] delay in
+            self?.audio.delay = delay
+            self?.windowController.page.send(audioDelay: delay)
+        }
+        audio.delay = audioDelay.delay
+        windowController.page.send(audioDelay: audioDelay.delay)
         // The tap and the status checks only run while the window is open.
         windowController.onOpen = { [weak self] in
             spotify.startResync()
@@ -42,6 +53,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         // Launch argument `-IdleVizShowSettings YES` opens the settings window at launch, for working on it.
         if UserDefaults.standard.bool(forKey: "IdleVizShowSettings") { showSettings() }
+        // `-IdleVizDetectDelay YES` runs Detect delay a few seconds after launch, as the button would.
+        if UserDefaults.standard.bool(forKey: "IdleVizDetectDelay") {
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(4))
+                self?.audioDelay.detect()
+            }
+        }
         // `-IdleVizOpenAtLaunch YES` opens the visualizer a moment after launch. Unlike `open idleviz://open`,
         // it can't be routed to another copy of the app that happens to be on disk.
         if UserDefaults.standard.bool(forKey: "IdleVizOpenAtLaunch") {

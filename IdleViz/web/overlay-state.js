@@ -43,10 +43,14 @@ export function layoutFor(item) {
  * @param {NowPlaying} item
  * @param {number} receivedAt  `performance.now()` when the reading arrived.
  * @param {number} now         `performance.now()`.
+ * @param {number} [audioDelay]  Seconds the speakers lag behind Spotify (Bluetooth, AirPlay). While
+ *   playing, what you hear is that far behind the position Spotify reports.
  */
-export function positionAt(item, receivedAt, now) {
-  const elapsed = item.state === "playing" ? Math.max(0, now - receivedAt) / 1000 : 0;
-  const position = Math.max(0, item.position + elapsed);
+export function positionAt(item, receivedAt, now, audioDelay = 0) {
+  const playing = item.state === "playing";
+  const elapsed = playing ? Math.max(0, now - receivedAt) / 1000 : 0;
+  const lag = playing && Number.isFinite(audioDelay) ? Math.max(0, audioDelay) : 0;
+  const position = Math.max(0, item.position + elapsed - lag);
   const duration = item.durationMs / 1000;
   return duration > 0 ? Math.min(position, duration) : position;
 }

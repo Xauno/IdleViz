@@ -29,11 +29,24 @@ final class SpotifyAudioTap {
     private let ioQueue = DispatchQueue(label: "com.xauno.IdleViz.audio", qos: .userInteractive)
     private var listeners: [(AudioObjectPropertySelector, AudioObjectPropertyListenerBlock)] = []
     private var running = false
+    /// Who needs the tap right now: the open window, Detect delay, or both.
+    private var users = 0
+
+    /// Starts the tap for one more user. Balance with `release()`.
+    func retain() {
+        users += 1
+        if users == 1 { start() }
+    }
+
+    func release() {
+        users = max(users - 1, 0)
+        if users == 0 { stop() }
+    }
 
     /// True while Spotify has an audio process and the tap on it is running.
     var isTapping: Bool { ioProcID != nil }
 
-    func start() {
+    private func start() {
         guard !running else { return }
         running = true
         rebuild()
@@ -49,7 +62,7 @@ final class SpotifyAudioTap {
         }
     }
 
-    func stop() {
+    private func stop() {
         guard running else { return }
         running = false
         for (selector, listener) in listeners {
@@ -135,18 +148,19 @@ final class SpotifyAudioTap {
     /// Built outside the main actor: a closure formed in a `@MainActor` method inherits that
     /// isolation, and Swift 6 traps when Core Audio calls it on its I/O thread.
     private nonisolated static func ioBlock(ring: SampleRing) -> AudioDeviceIOBlock {
-        { _, input, _, _, _ in
+        { _, input, inputTime, _, _ in
+            let hostTime = inputTime.pointee.mFlags.contains(.hostTimeValid) ? inputTime.pointee.mHostTime : 0
             let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
             if buffers.count >= 2 {
                 // One buffer per channel.
                 guard let left = buffers[0].mData?.assumingMemoryBound(to: Float.self),
                       let right = buffers[1].mData?.assumingMemoryBound(to: Float.self) else { return }
                 let frames = Int(min(buffers[0].mDataByteSize, buffers[1].mDataByteSize)) / MemoryLayout<Float>.size
-                ring.append(left: left, right: right, frames: frames)
+                ring.append(left: left, right: right, frames: frames, hostTime: hostTime)
             } else if buffers.count == 1, let samples = buffers[0].mData?.assumingMemoryBound(to: Float.self) {
                 let channels = max(Int(buffers[0].mNumberChannels), 1)
                 let frames = Int(buffers[0].mDataByteSize) / MemoryLayout<Float>.size / channels
-                ring.append(interleaved: samples, channels: channels, frames: frames)
+                ring.append(interleaved: samples, channels: channels, frames: frames, hostTime: hostTime)
             }
         }
     }
@@ -173,7 +187,7 @@ final class SpotifyAudioTap {
 
     // MARK: Core Audio lookups
 
-    static func address(_ selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
+    nonisolated static func address(_ selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
         AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
     }
 
@@ -205,7 +219,7 @@ final class SpotifyAudioTap {
         return uid
     }
 
-    static func string(_ selector: AudioObjectPropertySelector, of object: AudioObjectID) -> String? {
+    nonisolated static func string(_ selector: AudioObjectPropertySelector, of object: AudioObjectID) -> String? {
         var address = address(selector)
         var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         var value: Unmanaged<CFString>?
