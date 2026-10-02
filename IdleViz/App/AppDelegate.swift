@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var spotify: SpotifyInfo?
     private let audio = AudioPump()
     private var observers: [NSObjectProtocol] = []
+    private var displays = DisplayTracker(layout: .current)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: [
@@ -147,15 +148,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// After sleep or a change of displays the main display may be a different one, so close
     /// instead of staying on a screen that may be gone.
     private func closeWhenTheDisplayMayHaveChanged() {
-        let close: @Sendable (Notification) -> Void = { [weak self] _ in
-            MainActor.assumeIsolated { self?.windowController.close(.displayChanged) }
-        }
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.willSleepNotification, object: nil, queue: .main, using: close
-        ))
+            forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.windowController.close(.displayChanged) }
+        })
+        // Also posted when the Dock or the menu bar changes size, which a notification can cause
+        // (a Handoff tile joins the Dock). Only a change to the displays themselves closes the window.
         observers.append(NotificationCenter.default.addObserver(
-            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main, using: close
-        ))
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                guard self.displays.shouldClose(on: .current) else {
+                    self.log.info("Screen parameters changed, displays unchanged")
+                    return
+                }
+                self.windowController.close(.displayChanged)
+            }
+        })
     }
 
     func showSettings() {
@@ -184,5 +195,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard !windowController.isOpen, let screen = NSScreen.screens.first else { return }
             windowController.open(on: screen, source: source)
         }
+    }
+}
+
+extension DisplayLayout {
+    /// The displays as they are right now.
+    @MainActor static var current: DisplayLayout {
+        DisplayLayout(displays: NSScreen.screens.map { screen in
+            let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+            return Display(id: number?.uint32Value ?? 0, frame: screen.frame, scale: screen.backingScaleFactor)
+        })
     }
 }
