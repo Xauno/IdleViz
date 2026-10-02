@@ -28,6 +28,7 @@ internal sealed class SpikeRunner
     private readonly List<DispatcherQueueTimer> _timers = [];
     private volatile bool _pageReady;
     private int _pending;
+    private readonly List<float> _levels = [];
     private long _sent;
     private long _dropped;
     private long _scriptTicks;
@@ -50,8 +51,11 @@ internal sealed class SpikeRunner
         try
         {
             Log.Info("spike", $"Start: {string.Join(' ', _args)}");
-            _window.SetOpacity(1);
-            _window.Show();
+            if (!Has("--spike-nowindow"))
+            {
+                _window.SetOpacity(1);
+                _window.Show();
+            }
 
             if (!Has("--spike-nomedia"))
             {
@@ -180,6 +184,7 @@ internal sealed class SpikeRunner
             _loopback.Latest(_analyzer.Left, _analyzer.Right);
             var script = "window.audioFrame?.(\"" + _analyzer.Frame(_loopback.SampleRate) + "\")";
             Interlocked.Add(ref _buildTicks, Stopwatch.GetTimestamp() - build);
+            lock (_levels) { _levels.Add(_analyzer.Rms); }
             if (!_pageReady) { continue; }
             if (Interlocked.CompareExchange(ref _pending, 1, 0) != 0)
             {
@@ -212,11 +217,22 @@ internal sealed class SpikeRunner
     private readonly Dictionary<int, TimeSpan> _lastBrowserCpu = [];
     private int _second;
 
+    // The level over the whole second, in dB-friendly form: the root of the mean of the squared frame levels.
+    private double MeanLevel()
+    {
+        lock (_levels)
+        {
+            var mean = _levels.Count == 0 ? 0 : Math.Sqrt(_levels.Sum(v => (double)v * v) / _levels.Count);
+            _levels.Clear();
+            return mean;
+        }
+    }
+
     private async void Stats()
     {
         _second++;
         var ownCpu = Process.GetCurrentProcess().TotalProcessorTime;
-        var line = string.Create(CultureInfo.InvariantCulture, $"t={_second}s rms={_analyzer.Rms:F4} peak={_analyzer.Peak:F4} packets/s={_loopback.Packets - _lastPackets} captured/s={_loopback.Frames - _lastCaptured} silentPackets={_loopback.SilentPackets} ownCpu={(ownCpu - _lastOwnCpu).TotalMilliseconds / 10:F1}%");
+        var line = string.Create(CultureInfo.InvariantCulture, $"t={_second}s rms={MeanLevel():F4} peak={_analyzer.Peak:F4} packets/s={_loopback.Packets - _lastPackets} captured/s={_loopback.Frames - _lastCaptured} silentPackets={_loopback.SilentPackets} ownCpu={(ownCpu - _lastOwnCpu).TotalMilliseconds / 10:F1}%");
         _lastOwnCpu = ownCpu;
         _lastPackets = _loopback.Packets;
         _lastCaptured = _loopback.Frames;
