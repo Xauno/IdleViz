@@ -18,6 +18,7 @@ public partial class App : Application
     private VisualizerController? _visualizer;
     private TrayIcon? _trayIcon;
     private SettingsWindow? _settingsWindow;
+    private Spike.SpikeRunner? _spike;
 
     public App(LaunchOptions launchOptions)
     {
@@ -39,6 +40,15 @@ public partial class App : Application
     {
         _dispatcher = DispatcherQueue.GetForCurrentThread();
         Log.Info("app", $"Started, version {typeof(App).Assembly.GetName().Version}");
+
+        // SPIKE (W2): its own window and nothing else of the app.
+        var spikeArgs = Environment.GetCommandLineArgs();
+        if (spikeArgs.Contains("--spike"))
+        {
+            _spike = new Spike.SpikeRunner(_dispatcher, new VisualizerWindow(), spikeArgs);
+            _spike.Start();
+            return;
+        }
 
         // The debug switches are ignored in Release builds.
 #if DEBUG
