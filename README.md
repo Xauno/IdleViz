@@ -1,6 +1,6 @@
-# Spotify Music Visualizer
+# IdleViz
 
-[![CI](https://github.com/Xauno/Spotify-Music-Visualizer/actions/workflows/ci.yml/badge.svg)](https://github.com/Xauno/Spotify-Music-Visualizer/actions/workflows/ci.yml)
+[![CI](https://github.com/Xauno/IdleViz/actions/workflows/ci.yml/badge.svg)](https://github.com/Xauno/IdleViz/actions/workflows/ci.yml)
 ![Platform: macOS 26+](https://img.shields.io/badge/platform-macOS%2026%2B-lightgrey)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 ![Status: in development](https://img.shields.io/badge/status-in%20development-orange)
@@ -57,7 +57,7 @@ Working now:
 - Adjustable visualizer brightness (50 to 100%, 70% by default), a switch to hide the now-playing overlay and show only the visualizer, and launch at login.
 - Never launches Spotify and never uses Spotify's web API or a login.
 
-Not built: more than one display. The visualizer opens on the main display only.
+Not built: more than one display. The visualizer opens on the main display only, and other displays keep showing the desktop. See [Planned](#planned).
 
 ## Roadmap
 
@@ -80,6 +80,10 @@ Each step from [project.md](project.md) becomes one pull request, and this table
 | 8a   | Polish: keep-awake limit, battery times, fades                                    | Done    |
 | 8b   | Polish: permission setup (welcome window, yellow icon, error rows)                | Done    |
 | 8c   | Polish: brightness, overlay switch, launch at login                               | Done    |
+
+### Planned
+
+- **Multi-monitor support.** One visualizer window per display instead of the main display only. Still to decide: whether each display runs its own visualizer or they mirror one, and whether the now-playing overlay shows on the main display only or on all of them. Displays being plugged in or removed while it's open will be handled too. No step in `project.md` covers this yet; it's listed there under "Later".
 
 ## Requirements
 
