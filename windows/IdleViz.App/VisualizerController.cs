@@ -19,6 +19,7 @@ internal sealed class VisualizerController : IDisposable
     private readonly VisualizerWindow _window = new();
     private readonly DispatcherQueue _dispatcher;
     private readonly DispatcherQueueTimer _fadeTimer;
+    private readonly DispatcherQueueTimer _cursorTimer;
     private readonly Stopwatch _fadeClock = new();
     private readonly bool _dismissEnabled;
     private State _state = State.Closed;
@@ -38,6 +39,9 @@ internal sealed class VisualizerController : IDisposable
         _fadeTimer = dispatcher.CreateTimer();
         _fadeTimer.Interval = TimeSpan.FromMilliseconds(8);
         _fadeTimer.Tick += (_, _) => OnFadeTick();
+        _cursorTimer = dispatcher.CreateTimer();
+        _cursorTimer.Interval = TimeSpan.FromMilliseconds(50);
+        _cursorTimer.Tick += (_, _) => _window.HideRestingCursor();
     }
 
     /// <summary>False again as soon as it starts to fade out.</summary>
@@ -69,6 +73,7 @@ internal sealed class VisualizerController : IDisposable
         _window.Show();
         var focused = _window.TakeFocus();
         _state = State.Open;
+        _cursorTimer.Start();
         Fade(to: 1, seconds: VisualizerFade.OpenSeconds);
         Log.Info("window", $"Opened via {source}: {(focused ? "has focus" : "focus refused")}");
 
@@ -99,6 +104,7 @@ internal sealed class VisualizerController : IDisposable
         _dismissWatcher = null;
         _window.SetClickThrough(true);
         _window.HidesCursor = false;
+        _cursorTimer.Stop();
 
         // Only if focus is still here: someone may have switched apps while it was open (no-dismiss mode).
         if (PInvoke.GetForegroundWindow() == _window.Handle && PInvoke.IsWindow(_previousWindow))
@@ -121,6 +127,7 @@ internal sealed class VisualizerController : IDisposable
     public void Dispose()
     {
         _fadeTimer.Stop();
+        _cursorTimer.Stop();
         _dismissWatcher?.Dispose();
         _window.Dispose();
     }
