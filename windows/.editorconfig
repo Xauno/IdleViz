@@ -25,7 +25,24 @@ dotnet_style_qualification_for_method = false:warning
 dotnet_style_readonly_field = true:warning
 dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
 
-# Private fields are _camelCase.
+# Private static fields are s_camelCase, constants PascalCase, other private fields _camelCase.
+# The first rule that matches wins, so the narrower ones come first.
+dotnet_naming_rule.constants_pascal.symbols = constants
+dotnet_naming_rule.constants_pascal.style = pascal
+dotnet_naming_rule.constants_pascal.severity = warning
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.required_modifiers = const
+dotnet_naming_style.pascal.capitalization = pascal_case
+
+dotnet_naming_rule.private_static_fields_s.symbols = private_static_fields
+dotnet_naming_rule.private_static_fields_s.style = s_camel
+dotnet_naming_rule.private_static_fields_s.severity = warning
+dotnet_naming_symbols.private_static_fields.applicable_kinds = field
+dotnet_naming_symbols.private_static_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_fields.required_modifiers = static
+dotnet_naming_style.s_camel.capitalization = camel_case
+dotnet_naming_style.s_camel.required_prefix = s_
+
 dotnet_naming_rule.private_fields_underscore.symbols = private_fields
 dotnet_naming_rule.private_fields_underscore.style = underscore_camel
 dotnet_naming_rule.private_fields_underscore.severity = warning

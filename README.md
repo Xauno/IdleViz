@@ -167,12 +167,12 @@ One borderless window holds one web page. The page stacks the Butterchurn canvas
 
 A Windows 11 version is being built in [`windows/`](windows/): the same page in WebView2, with the helper around it rewritten in C# and WinUI 3. The brief is [windows-port.html](windows-port.html), and what has been built and decided so far is in [docs/windows.md](docs/windows.md).
 
-> **Status: only the scaffold exists.** The Windows app is a tray icon with an **Exit** menu. It doesn't open a visualizer, has no hotkey and no settings, and doesn't talk to Spotify yet. Everything under [Features](#features) and [Usage](#usage) describes the Mac app.
+> **Status: an open/close shell.** The Windows app lives in the tray and opens a fullscreen **black** window from a hotkey, a URL or its menu, and closes it on any input. There is no visualizer or overlay in the window yet, it doesn't talk to Spotify (so it opens whether or not anything is playing), and it doesn't open by itself when the PC is idle. Everything under [Features](#features) and [Usage](#usage) describes the Mac app.
 
 | Step | What                                                                                              | Status |
 | ---- | ------------------------------------------------------------------------------------------------- | ------ |
 | W0   | Scaffold: solution, `IdleViz.Core` with its first tests, CI job, installer script, empty tray app | Done   |
-| W1   | Open/close shell: tray flyout and menu, hotkey, URL, black fullscreen window, dismiss             |        |
+| W1   | Open/close shell: tray flyout and menu, hotkey, URL, black fullscreen window, dismiss             | Done   |
 | W2   | Spike: Spotify-only audio capture, the page in WebView2, what the media controls report (findings only) |  |
 | W3   | Spotify now-playing from the Windows media controls, content type, artwork                        |        |
 | W4   | Open rules and tray icon flash                                                                    |        |
@@ -197,7 +197,14 @@ cd windows
 
 This builds the app and `windows\artifacts\IdleViz-Setup.exe`, runs it without questions, and starts IdleViz. It installs for your user only, in `%LOCALAPPDATA%\Programs\IdleViz`, so there is no admin prompt, and adds a Start menu entry. Run it again after pulling changes to update. Without `-Install` it only builds the setup file, which you can run yourself. Uninstall from **Settings → Apps → Installed apps**.
 
-**Use:** IdleViz appears in the notification area, possibly behind the **^** overflow arrow. Right-click the icon and choose **Exit** to quit. That is all it does so far.
+**Use:** what works so far.
+
+- **Tray icon:** IdleViz appears in the notification area, possibly behind the **^** overflow arrow. Left-click it for a small flyout with **Settings** and the current open hotkey. Right-click it for a menu with **Settings**, **Open visualizer** and **Exit**. Exit is the only way to quit; closing the settings window leaves the app running.
+- **Open:** press the hotkey (Ctrl + Alt + V by default), run `start idleviz://open` in a terminal, choose **Open visualizer** in the right-click menu, or click **Open** next to **Open now** in settings. A black window fades in over the whole primary display, taskbar included.
+- **Close:** move the mouse, click, scroll or press any key. The window fades out quickly and focus returns to the window you were in. The key or click that closes it is not passed on to that window. Input in the first 0.4 s after opening is ignored, so the hotkey itself doesn't close it, and keys you're still holding after that are ignored until you let go; pressing one again closes it.
+- **Media keys:** mute, volume, play/pause, next and previous do their usual job and leave it open.
+- **Settings:** click **Open hotkey**, then press a key together with Ctrl, Alt, Shift or the Windows key to change it. Esc cancels, and the **✕** button clears it. If another app already has the stored combination, the row says so.
+- **Log:** `%LOCALAPPDATA%\IdleViz\logs\idleviz.log` records each start, open and close, and what closed it.
 
 **Develop:** in `windows/`, `dotnet format --verify-no-changes`, `dotnet build` and `dotnet test`. The build treats warnings as errors. Details are in [docs/windows.md](docs/windows.md).
 
@@ -266,5 +273,5 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 
 - [Butterchurn](https://github.com/jberg/butterchurn), [butterchurn-presets](https://github.com/jberg/butterchurn-presets), [milkdrop-preset-converter](https://github.com/jberg/milkdrop-preset-converter) and [Milkdrop](https://www.geisswerks.com/milkdrop/), the visualizer engine and the presets it plays
 - [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) for the global hotkey
-- [H.NotifyIcon](https://github.com/HavenDV/H.NotifyIcon) for the tray icon on Windows
+- [H.NotifyIcon](https://github.com/HavenDV/H.NotifyIcon) for the tray icon, and the [Windows Community Toolkit](https://github.com/CommunityToolkit/Windows) for the settings cards, on Windows
 - [Figtree](https://github.com/erikdkennedy/figtree) for the overlay font
