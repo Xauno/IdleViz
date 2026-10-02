@@ -20,6 +20,8 @@ public partial class App : Application
     private SettingsWindow? _settingsWindow;
     private SpotifyInfo? _spotify;
     private DispatcherQueueTimer? _openAtLaunchTimer;
+    private DispatcherQueueTimer? _firstReadingTimer;
+    private TriggerSource? _waitingSource;
 
     public App(LaunchOptions launchOptions)
     {
@@ -93,7 +95,107 @@ public partial class App : Application
         }
     }
 
-    internal void OpenVisualizer(TriggerSource source) => _visualizer?.Open(source);
+    /// <summary>Opens the visualizer if the open rules allow it. A refused manual trigger flashes the tray icon.</summary>
+    internal void OpenVisualizer(TriggerSource source)
+    {
+        if (_visualizer is null || _spotify is null)
+        {
+            return;
+        }
+
+        // Already open: the window decides. In the no-dismiss mode a second trigger closes it.
+        if (_visualizer.IsOpen)
+        {
+            _visualizer.Open(source);
+            return;
+        }
+
+        var tracker = _spotify.Tracker;
+        switch (OpenRules.Refusal(tracker, DateTimeOffset.Now))
+        {
+            case OpenRefusal.NotKnownYet:
+                WaitForFirstReading(source);
+                return;
+            case { } refusal:
+                Refuse(source, refusal);
+                return;
+        }
+
+        if (tracker.Current is null)
+        {
+            Log.Info("open", "Spotify is between two tracks; opening anyway");
+        }
+
+        _visualizer.Open(source);
+    }
+
+    // The app has only just started and Windows hasn't said what Spotify is doing yet.
+    private void WaitForFirstReading(TriggerSource source)
+    {
+        // A manual trigger during the wait makes it manual, so a refusal still flashes the icon.
+        if (_waitingSource is null || source.IsManual())
+        {
+            _waitingSource = source;
+        }
+
+        if (_firstReadingTimer is not null || _dispatcher is null || _spotify is null)
+        {
+            return;
+        }
+
+        Log.Info("open", $"Waiting for Spotify's state before opening via {source}");
+        _firstReadingTimer = _dispatcher.CreateTimer();
+        _firstReadingTimer.Interval = TimeSpan.FromSeconds(OpenRules.FirstReadingWaitSeconds);
+        _firstReadingTimer.IsRepeating = false;
+        _firstReadingTimer.Tick += (_, _) =>
+        {
+            if (StopWaiting() is { } waiting)
+            {
+                Refuse(waiting, OpenRefusal.NotKnownYet);
+            }
+        };
+        _spotify.Tracker.Changed += OnFirstReading;
+        _firstReadingTimer.Start();
+    }
+
+    private void OnFirstReading(NowPlaying? item)
+    {
+        if (StopWaiting() is { } waiting)
+        {
+            OpenVisualizer(waiting);
+        }
+    }
+
+    /// <summary>Ends a wait for the first reading and returns the trigger that was waiting, if any.</summary>
+    private TriggerSource? StopWaiting()
+    {
+        var waiting = _waitingSource;
+        _waitingSource = null;
+        _firstReadingTimer?.Stop();
+        _firstReadingTimer = null;
+        if (_spotify is not null)
+        {
+            _spotify.Tracker.Changed -= OnFirstReading;
+        }
+
+        return waiting;
+    }
+
+    private void Refuse(TriggerSource source, OpenRefusal refusal)
+    {
+        var reason = refusal switch
+        {
+            OpenRefusal.SpotifyNotRunning => "Spotify isn't running, or has played nothing since it started",
+            OpenRefusal.NoTrack => "Spotify has no track",
+            _ => $"Windows hasn't said what Spotify is doing after {OpenRules.FirstReadingWaitSeconds} s",
+        };
+        Log.Info("open", $"Not opening via {source}: {reason}");
+        // A refused idle trigger does nothing visible.
+        if (source.IsManual())
+        {
+            _trayIcon?.Flash();
+        }
+    }
 
     internal void ShowSettings()
     {
@@ -132,6 +234,7 @@ public partial class App : Application
     {
         Log.Info("app", "Exit");
         _settingsWindow?.Close();
+        StopWaiting();
         _spotify?.Dispose();
         _visualizer?.Dispose();
         _hotkeyWindow?.Dispose();
