@@ -69,7 +69,84 @@ Answers the owner gave to the open points in section 9 of the brief, on 2 Octobe
 | App icon | The tray's five-bar waveform, white on a dark rounded square. |
 | Docs | The README has a Windows section with its own roadmap. This file holds the as-built design and the spike findings. The brief stays as it was written. |
 
-Still open, to be answered by the W2 spike: whether Spotify reports position and duration to the Windows media controls (R1), how to tell a podcast or an ad (R2), fading a window that holds WebView2 (R4), the custom scheme, sandboxed frame and CSP in WebView2 (R5), and the frame cap on displays faster than 120 Hz (R6).
+The W2 spike answered R1, R4 and R5, and gave the facts for R2. R6 could not be measured. See the next section.
+
+After the spike the owner approved one change to the shared page: it also accepts `https://app.idleviz.invalid/visuals/…` and `https://presets.idleviz.invalid/…` for plugin and preset URLs (R5 below).
+
+## Spike findings (W2)
+
+A throwaway build on the branch `spike/windows-w2`, which is not merged. It added a `--spike` mode to the app (`windows/IdleViz.App/Spike/`) and a small side test (`windows/Spike.Scheme/`). Measured on 2 October 2026 on one PC: Windows 11 build 26200, Spotify 1.301 from the Microsoft Store (Premium), WebView2 runtime 124.0.2478.51, an RTX 3080, primary display 3440 × 1440 at 120 Hz.
+
+### Answers
+
+| Point | Answer |
+| ----- | ------ |
+| R1: position and duration | **Yes.** Spotify reports both, and raises a timeline change about every 4.5 s while playing, and on every seek, pause and resume. |
+| R2: podcast or ad | **A podcast has an empty artist**, as on the Mac. Its album is the show's name and the track number is 0. Windows calls it "Music" like a song. **Ads were not seen** (Premium), so nothing is known about them. The rule is for W3 to settle with the owner. |
+| R4: fading with WebView2 | **Window opacity works.** With the page running in WebView2 inside the layered window, setting the window to half opacity showed the desktop through the page. Checked on a screenshot at one fixed opacity; nobody has watched a moving fade. |
+| R5: scheme, frame, CSP | **The host page works from `idleviz-app://` unchanged; the sandboxed plugin frame does not.** Details below. Fixed by serving the page from an `https:` address the app answers itself, plus the one approved page change. |
+| R6: frame cap above 120 Hz | **Not measured**: there is no display faster than 120 Hz here. On 120 Hz the page renders 60 fps. By the page's rule (skip a frame closer than 12 ms to the last) a 144 Hz display would give 72 fps, 165 Hz 82.5 and 240 Hz 80. |
+
+### Spotify-only audio
+
+- **Process loopback works on the Store version of Spotify.** `ActivateAudioInterfaceAsync` on `VAD\Process_Loopback`, in "include the process tree" mode, aimed at the Spotify process that owns the main window. Spotify runs as seven processes; the one with a window is their parent.
+- It needs no package. The interop is about 100 lines: the activation parameters go in as a `VT_BLOB` `PROPVARIANT`, and the completion handler is an ordinary C# class.
+- The capture format has to be given: `GetMixFormat` and `GetStreamLatency` return "not implemented". 32-bit float, 48 kHz, stereo was accepted, with the flags for loopback, event callback and automatic conversion.
+- Packets are 480 frames (10 ms), 100 a second. The first arrived 15 to 30 ms after the start. No permission prompt and no recording indicator appeared.
+- **It hears only Spotify.** With Spotify paused, a 440 Hz tone played by another program read as exact zero.
+- **While Spotify is paused, packets keep coming, filled with zeros.** So "no packets" is not the sign of a pause; the level is.
+- **Volume.** The capture is taken before the system volume (5 % and 52 % read the same) but after Spotify's volume in the Windows mixer (10 % read ten times lower) and after Spotify's own volume slider (raising it doubled the level). At the owner's usual slider position the level was about −42 dBFS, so the automatic gain has work to do.
+- **Spotify Connect:** with playback moved to another device the capture is silent, as expected, while the media controls keep reporting (below).
+
+### The page in WebView2
+
+- WebView2 can be created straight on the visualizer's plain window handle (`CoreWebView2ControllerWindowReference.CreateFromWindowHandle`), with no WinUI window. The environment took about 20 ms, the controller about 200 ms, and the page was loaded 700 to 800 ms after the start.
+- **It does not take focus**: the app in front stayed in front. The pointer was hidden over it, both at rest and after a move.
+- **Frames.** `ExecuteScriptAsync("window.audioFrame?.(\"…\")")` 60 times a second: all 60 arrived, none were dropped, and a call took 0.6 to 0.9 ms from send to completion. Building a frame (with a rough analysis) took 0.25 ms.
+- **Butterchurn held 59 to 60 fps** at 3440 × 1440 over 30 seconds.
+- **Cost:** the app used about 6 % of one core, the WebView2 processes together about 25 % of one core (renderer about 17 %, GPU process about 8 %).
+- From `idleviz-app://app/index.html` the unchanged page was a secure context with origin `idleviz-app://app`, loaded its ES modules, and `new Function` worked under the CSP sent as a response header.
+- The page logs one warning, "The AudioContext was not allowed to start" (`visualizer.js`, line 48). Butterchurn renders all the same.
+
+### R5 in detail: the plugin frame
+
+The plugin frame is sandboxed without `allow-same-origin`, so its origin is opaque. WebView2 refuses every request from an opaque origin to a custom scheme: the frame's `plugin-runner.js` failed with a CORS error and the request never reached the app. This held with the scheme's allowed origins empty, `*`, `null` and `idleviz-app://*`. Microsoft's documentation says the same.
+
+Served from `https://app.idleviz.invalid/` instead, the frame loaded its runner and the bundled Aurora plugin, with the sandbox attribute unchanged. The app answers these addresses in `WebResourceRequested` before anything goes to the network, and `.invalid` is a reserved name that never resolves. This needs no custom scheme at all.
+
+So the Windows app will serve:
+
+| Mac | Windows |
+| --- | ------- |
+| `idleviz-app://app/…` | `https://app.idleviz.invalid/…` |
+| `idleviz-app://presets/…` | `https://presets.idleviz.invalid/…` |
+
+The CSP is sent by each app, so Windows sends its own with these hosts in place of `idleviz-app:`. The only place where the page itself names the scheme is the list of URL prefixes it accepts for plugins and presets, and that list now holds both forms (the approved page change). The spike showed this working with the plain .NET WebView2 API; the WinUI flavour used by the app has not served an `https:` address yet.
+
+### What Spotify reports
+
+Through `GlobalSystemMediaTransportControlsSessionManager`. The Store version's session is `SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify`. The version from spotify.com identifies itself differently and was not tested.
+
+| Case | What was reported |
+| ---- | ----------------- |
+| Song, playing | Title, artist, album, album artist, track number. Playback type "Music". Status Playing. Position, and the duration as the timeline's end. Shuffle and repeat state. |
+| Artwork | A PNG thumbnail, 50 to 120 KB. |
+| Song, paused | Status Paused. The position stops. Timeline changes keep arriving with the same position. |
+| Seek | A timeline change at once with the new position. |
+| Track change | For about half a second: an empty title, no thumbnail and a duration of 0. Then the new track. This is the "no track for a moment" the page's 1.5 s wait is for. Each change arrives two or three times. |
+| Podcast | Title of the episode, **artist empty**, album is the show's name, track number 0, playback type still "Music", a thumbnail, position and duration. |
+| Spotify Connect (playing on another device) | The same as a song playing here: status Playing, position moving, seeks and pauses reported. Nothing says the sound is elsewhere. |
+| Local file | Not tested. |
+| Ad | Not seen (Premium). |
+
+There is no track ID or Spotify URL, so a track change has to be recognised from title, artist and album.
+
+### Things the spike ran into
+
+- **The WinUI flavour of WebView2 ignores `Add` on its lists.** `options.CustomSchemeRegistrations.Add(…)` and `scheme.AllowedOrigins.Add(…)` do nothing, with no error: the getters hand out copies. Assigning a whole list to `CustomSchemeRegistrations` works. `AllowedOrigins` cannot be set at all.
+- **A `DispatcherQueueTimer` kept only in a local variable is collected and stops** after a few seconds. Timers must live in fields. The `--open-at-launch` debug switch has this fault.
+- **The WebView2 runtime on this PC is old** (124, from April 2024) although Windows 11 is current. The app must not assume a recent one.
+- **A request handler that throws** makes the navigation fail with "connection aborted" and no other sign.
 
 ## As built
 

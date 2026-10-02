@@ -173,7 +173,7 @@ A Windows 11 version is being built in [`windows/`](windows/): the same page in 
 | ---- | ------------------------------------------------------------------------------------------------- | ------ |
 | W0   | Scaffold: solution, `IdleViz.Core` with its first tests, CI job, installer script, empty tray app | Done   |
 | W1   | Open/close shell: tray flyout and menu, hotkey, URL, black fullscreen window, dismiss             | Done   |
-| W2   | Spike: Spotify-only audio capture, the page in WebView2, what the media controls report (findings only) |  |
+| W2   | Spike: Spotify-only audio capture, the page in WebView2, what the media controls report (findings only) | Done |
 | W3   | Spotify now-playing from the Windows media controls, content type, artwork                        |        |
 | W4   | Open rules and tray icon flash                                                                    |        |
 | W5   | The page in the window: overlay, CSP, all overlay states                                          |        |
