@@ -538,6 +538,10 @@
                   <span class="ctl">Detect</span>
                 </div>
                 <div class="r">
+                  <div>Manual delay test<span class="d">Match a flash to a beep, no mic</span></div>
+                  <span class="ctl">Start</span>
+                </div>
+                <div class="r">
                   <div>Mode</div>
                   <span class="ctl">Shuffle ▾</span>
                 </div>
@@ -644,8 +648,8 @@
               <td>Visualizer</td>
               <td>
                 Show Spotify overlay, Brightness (50 to 100%), Audio delay (0 to 2.5 s, for the current speakers or
-                headphones), Detect delay, Mode (Single or Shuffle), then the rows for that mode (see below), Favorites,
-                Blocklist
+                headphones), Detect delay, Manual delay test, Mode (Single or Shuffle), then the rows for that mode (see
+                below), Favorites, Blocklist
               </td>
             </tr>
             <tr>
@@ -713,6 +717,12 @@
               slider jumps to the result. If it can't hear the music clearly (too quiet, or headphones), the hint says
               so and the value doesn't change. If microphone access is denied, the hint says so and links to System
               Settings.
+            </li>
+            <li>
+              Manual delay test: Start opens a sheet with a panel that lights up, the delay slider with −10 ms and +10
+              ms buttons, and Done. A beep plays every second and the panel lights up one audio delay later; the slider
+              is dragged until they land together. Every fourth beep is higher and its flash is orange. Spotify is
+              paused while the sheet is open.
             </li>
             <li>
               Dark mode: there is no setting. The window follows the macOS appearance, and native SwiftUI controls and

@@ -5,7 +5,7 @@ import Observation
 import os
 
 /// The audio delay for the current output device: loads and saves it per device, follows the
-/// default output device, and runs Detect delay.
+/// default output device, and runs Detect delay and the manual delay test.
 @MainActor
 @Observable
 final class AudioDelayController {
@@ -35,11 +35,18 @@ final class AudioDelayController {
     private(set) var deviceName = "this device"
     private(set) var detecting = false
     private(set) var hint: Hint?
+    /// True while the manual delay test is beeping.
+    private(set) var testing = false
+    /// Why the manual delay test couldn't start, for its sheet.
+    private(set) var testProblem: String?
 
     /// Called with the new delay whenever it changes, by hand, by Detect delay or with the device.
     @ObservationIgnored var onChange: ((Double) -> Void)?
     /// Whether Spotify says it's playing; Detect delay needs music.
     @ObservationIgnored var spotifyIsPlaying: () -> Bool = { false }
+    /// Pause and resume Spotify around the manual delay test.
+    @ObservationIgnored var pauseSpotify: () -> Void = {}
+    @ObservationIgnored var resumeSpotify: () -> Void = {}
 
     @ObservationIgnored private let log = Logger(subsystem: "com.xauno.IdleViz", category: "delay")
     @ObservationIgnored private let pump: AudioPump
@@ -47,6 +54,8 @@ final class AudioDelayController {
     @ObservationIgnored private var deviceUID = ""
     @ObservationIgnored private var loading = false
     @ObservationIgnored private var listener: AudioObjectPropertyListenerBlock?
+    @ObservationIgnored private let beeps = BeepTestPlayer()
+    @ObservationIgnored private var pausedSpotify = false
 
     init(pump: AudioPump, defaults: UserDefaults = .standard) {
         self.pump = pump
@@ -88,12 +97,51 @@ final class AudioDelayController {
         defaults.set(saved, forKey: AudioDelaySetting.key)
     }
 
+    // MARK: Manual delay test
+
+    /// Starts the beeps. The sheet lights its panel `delay` after each one, and the delay is
+    /// right when the two land together. Music would drown the beeps out, so Spotify is paused.
+    func startTest() {
+        guard !testing, !detecting else { return }
+        testProblem = nil
+        do {
+            try beeps.start()
+        } catch {
+            log.error("Couldn't play the test beeps: \(error.localizedDescription, privacy: .public)")
+            testProblem = "Couldn't play the test beeps"
+            return
+        }
+        testing = true
+        if spotifyIsPlaying() {
+            pausedSpotify = true
+            pauseSpotify()
+        }
+        log.notice("Manual delay test started for \(self.deviceName, privacy: .public)")
+    }
+
+    func stopTest() {
+        guard testing else { return }
+        beeps.stop()
+        testing = false
+        // Save it even when it wasn't moved, so this device counts as measured.
+        save()
+        if pausedSpotify { resumeSpotify() }
+        pausedSpotify = false
+        log.notice("Manual delay test ended at \(AudioDelaySetting.label(self.delay), privacy: .public)")
+    }
+
+    /// The flash the test's panel shows right now, or nil while it's dark.
+    var testFlash: BeepTest.Flash? {
+        guard let firstBeep = beeps.firstBeep else { return nil }
+        return BeepTest.flash(at: BeepTestPlayer.now, start: firstBeep, delay: delay)
+    }
+
     // MARK: Detect delay
 
     /// Listens with the microphone for a few seconds while Spotify plays, and sets the delay
     /// from how far the sound lags behind the audio Spotify sent.
     func detect() {
-        guard !detecting else { return }
+        guard !detecting, !testing else { return }
         guard spotifyIsPlaying() else {
             hint = .text("Play something in Spotify first, out loud")
             return

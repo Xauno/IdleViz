@@ -13,6 +13,7 @@ final class SpotifyInfo {
 
     private let log = Logger(subsystem: "com.xauno.IdleViz", category: "spotify")
     private let tracker: SpotifyTracker
+    private let runner = AppleScriptRunner()
     private var artwork = ArtworkCache(capacity: 5)
     private var artworkTask: Task<Void, Never>?
     private var artworkURL: String?
@@ -26,7 +27,7 @@ final class SpotifyInfo {
     var isRunning: Bool { tracker.isRunning }
 
     init() {
-        tracker = SpotifyTracker(runner: AppleScriptRunner(), isRunning: Self.spotifyIsRunning())
+        tracker = SpotifyTracker(runner: runner, isRunning: Self.spotifyIsRunning())
         tracker.onUpdate = { [weak self] snapshot in self?.didUpdate(snapshot) }
         observe()
         log.notice("Spotify is \(self.tracker.isRunning ? "running" : "not running", privacy: .public)")
@@ -59,6 +60,16 @@ final class SpotifyInfo {
 
     func refresh() {
         Task { await tracker.refresh() }
+    }
+
+    /// Pauses Spotify for the manual delay test. Like the query, it does nothing if Spotify isn't running.
+    func pause() {
+        Task { _ = await runner.run(SpotifyPlayback.pauseSource) }
+    }
+
+    /// Starts playback again after the manual delay test paused it.
+    func play() {
+        Task { _ = await runner.run(SpotifyPlayback.playSource) }
     }
 
     private func observe() {
@@ -170,14 +181,14 @@ final class SpotifyInfo {
     }
 }
 
-/// Runs the AppleScript query on one dedicated thread. `NSAppleScript` isn't thread-safe,
+/// Runs the AppleScript query, and the two playback commands, on one dedicated thread. `NSAppleScript` isn't thread-safe,
 /// and a hung Spotify must never block the main thread; the script's own 2 s timeout bounds each call.
 final class AppleScriptRunner: SpotifyQueryRunning, @unchecked Sendable {
     private let log = Logger(subsystem: "com.xauno.IdleViz", category: "spotify")
     private let condition = NSCondition()
     private var jobs: [() -> Void] = []
-    // Only touched on the script thread.
-    private var script: NSAppleScript?
+    // Compiled scripts by source. Only touched on the script thread.
+    private var scripts: [String: NSAppleScript] = [:]
 
     init() {
         let thread = Thread { [weak self] in self?.loop() }
@@ -187,8 +198,13 @@ final class AppleScriptRunner: SpotifyQueryRunning, @unchecked Sendable {
     }
 
     func run() async -> String? {
+        await run(SpotifyQuery.source)
+    }
+
+    /// Runs any of the app's scripts. They all talk to Spotify, so the same checks apply.
+    func run(_ source: String) async -> String? {
         await withCheckedContinuation { continuation in
-            enqueue { continuation.resume(returning: self.execute()) }
+            enqueue { continuation.resume(returning: self.execute(source)) }
         }
     }
 
@@ -209,7 +225,7 @@ final class AppleScriptRunner: SpotifyQueryRunning, @unchecked Sendable {
         }
     }
 
-    private func execute() -> String? {
+    private func execute(_ source: String) -> String? {
         // Last check right before sending: an Apple Event to a closed Spotify would launch it.
         let running = NSRunningApplication.runningApplications(withBundleIdentifier: SpotifyInfo.bundleID)
         guard running.contains(where: { !$0.isTerminated }) else { return nil }
@@ -222,17 +238,17 @@ final class AppleScriptRunner: SpotifyQueryRunning, @unchecked Sendable {
             return nil
         }
 
-        if script == nil {
-            let compiled = NSAppleScript(source: SpotifyQuery.source)
+        if scripts[source] == nil {
+            let compiled = NSAppleScript(source: source)
             var error: NSDictionary?
             if compiled?.compileAndReturnError(&error) != true {
                 log.error("AppleScript didn't compile: \(String(describing: error), privacy: .public)")
                 return nil
             }
-            script = compiled
+            scripts[source] = compiled
         }
         var error: NSDictionary?
-        let result = script?.executeAndReturnError(&error)
+        let result = scripts[source]?.executeAndReturnError(&error)
         if let error {
             let number = error[NSAppleScript.errorNumber] as? Int ?? 0
             let message = error[NSAppleScript.errorMessage] as? String ?? ""

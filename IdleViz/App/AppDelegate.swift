@@ -47,6 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         audio.onFrame = { [weak self] frame in self?.windowController.page.send(audioFrame: frame) }
         audio.spotifyIsPlaying = { spotify.current?.nowPlaying.state == .playing }
         audioDelay.spotifyIsPlaying = audio.spotifyIsPlaying
+        audioDelay.pauseSpotify = { spotify.pause() }
+        audioDelay.resumeSpotify = { spotify.play() }
         // The same delay holds back the audio frames and the progress bar.
         audioDelay.onChange = { [weak self] delay in
             self?.audio.delay = delay
