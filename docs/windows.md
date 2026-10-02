@@ -106,7 +106,7 @@ In `IdleViz.Core`: `DismissTracker.cs` (ported with its tests), `KeyboardInput.c
 - It is a layered window, so the fade is the window's own opacity and the desktop shows through, as on the Mac. In over 0.6 s, out over 0.25 s, eased. Whether this still works once the window holds WebView2 is the R4 question for the W2 spike.
 - When a fade-out starts the PC is handed back at once: the hooks are removed, the cursor returns, clicks pass through the window, and focus goes back to the window that had it. The window is hidden when the fade ends. A trigger during a fade-out finishes the close and opens again.
 - On open it asks for keyboard focus and logs whether Windows gave it. Nothing depends on it, since the hooks see input either way.
-- The cursor is hidden over the window by answering `WM_SETCURSOR`. A pointer on another display stays visible.
+- The cursor is hidden over the window by answering `WM_SETCURSOR`. Windows only sends that when the mouse moves over the window, and a move closes the visualizer, so a pointer at rest kept the arrow in about one open in four. While open, the window therefore checks every 50 ms whether a cursor is showing over it and, if so, sets the pointer to where it already is, which makes Windows send the message without moving anything. A pointer on another display stays visible.
 - A manual trigger while it is open does nothing.
 
 **Dismiss**
@@ -148,3 +148,5 @@ In `IdleViz.Core`: `DismissTracker.cs` (ported with its tests), `KeyboardInput.c
 | `--show-menu` | Opens the tray menu at the pointer. |
 
 **A second launch** with no URL (clicking the Start menu entry while it runs) opens the settings window, since there is no other window to bring forward. This was not asked; it is the usual behaviour of a Windows tray app.
+
+**The Debug copy and the installed copy are separate apps to Windows**: each keeps its own single running copy, and `idleviz://` always starts the installed one. With both running, a URL open goes to the installed copy and the second copy to start can't register the hotkey. Stop the installed copy before testing a Debug build, and test URL opens on an installed build.

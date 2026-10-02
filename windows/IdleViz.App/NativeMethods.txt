@@ -6,6 +6,7 @@ DestroyWindow
 DWM_WINDOW_CORNER_PREFERENCE
 DwmSetWindowAttribute
 GetAsyncKeyState
+GetCursorInfo
 GetCursorPos
 GetDpiForSystem
 GetDpiForWindow
@@ -23,6 +24,7 @@ MSLLHOOKSTRUCT
 RegisterClassEx
 RegisterHotKey
 SetCursor
+SetCursorPos
 SetForegroundWindow
 SetLayeredWindowAttributes
 SetWindowLongPtr
@@ -31,5 +33,6 @@ SetWindowsHookEx
 ShowWindow
 UnhookWindowsHookEx
 UnregisterHotKey
+WindowFromPoint
 WM_*
 IDC_ARROW

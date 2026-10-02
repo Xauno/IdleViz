@@ -18,6 +18,32 @@ internal sealed class VisualizerWindow() : NativeWindow(
     /// <summary>While true, the mouse pointer is invisible over the window.</summary>
     public bool HidesCursor { get; set; }
 
+    /// <summary>
+    /// Hides a pointer that is showing while at rest over the window, and returns whether it had to.
+    /// Windows shows the cursor of whichever window last got a mouse message, and only asks a window
+    /// for its cursor when the mouse moves over it. A move closes the visualizer, so a still pointer
+    /// would keep the shape the window underneath gave it, and Windows also puts the arrow back when
+    /// its "app starting" pointer ends after an open through the URL. Setting the pointer to where it
+    /// already is makes Windows send that message without moving anything. Call it repeatedly while
+    /// open: while the window is fully see-through, Windows treats the pointer as over the window underneath.
+    /// </summary>
+    public bool HideRestingCursor()
+    {
+        var cursor = new CURSORINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<CURSORINFO>() };
+        if (!HidesCursor || !PInvoke.GetCursorInfo(ref cursor) || cursor.hCursor.IsNull)
+        {
+            return false;
+        }
+
+        if (PInvoke.WindowFromPoint(cursor.ptScreenPos) != Handle)
+        {
+            return false;
+        }
+
+        PInvoke.SetCursorPos(cursor.ptScreenPos.X, cursor.ptScreenPos.Y);
+        return true;
+    }
+
     /// <summary>Shows the window over the primary display, on top, without taking focus.</summary>
     public void Show()
     {
