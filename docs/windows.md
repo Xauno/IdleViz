@@ -67,6 +67,8 @@ Answers the owner gave to the open points in section 9 of the brief, on 2 Octobe
 | Microphone | Detect delay uses the built-in microphone if there is one, otherwise the default input, unless that is Bluetooth: then it doesn't run and the hint says why. Settings also gets a microphone picker, a row the Mac app doesn't have. |
 | Battery | Battery times are built and unit-tested. The development PC has no battery, so they have not been run on one. |
 | Ads | Not recognised on Windows. Windows doesn't say what an item is and no ad could be observed (Premium), so nothing unverified is built: no artist means podcast, anything else is a song. To be revisited if someone with a free account reports what an ad looks like. |
+| Track gaps | A track seen in the last 1.5 s still counts as a track while Spotify is running, so an open during the brief "no track" between two items isn't refused. |
+| First reading | A trigger that comes before Windows has said anything about Spotify (the app has just started) waits up to 2 s for the first reading, then decides. |
 | App icon | The tray's five-bar waveform, white on a dark rounded square. |
 | Docs | The README has a Windows section with its own roadmap. This file holds the as-built design and the spike findings. The brief stays as it was written. |
 
@@ -134,7 +136,8 @@ Through `GlobalSystemMediaTransportControlsSessionManager`. The Store version's 
 | Artwork | A PNG thumbnail, 50 to 120 KB. |
 | Song, paused | Status Paused. The position stops. Timeline changes keep arriving with the same position. |
 | Seek | A timeline change at once with the new position. |
-| Track change | For about half a second: an empty title, no thumbnail and a duration of 0. Then the new track. This is the "no track for a moment" the page's 1.5 s wait is for. Each change arrives two or three times. |
+| Switching to something else (another album, a podcast) | For about half a second: an empty title, no thumbnail and a duration of 0. Then the new item. This is the "no track for a moment" the page's 1.5 s wait is for. Seen in W3 and W4 when switching from a song to a podcast. Spotify's crossfade is off on this PC, so crossfade isn't the cause. |
+| Next track, or a song ending by itself | The new track at once, no gap (checked in W4). Each change arrives two or three times. |
 | Podcast | Title of the episode, **artist empty**, album is the show's name, track number 0, playback type still "Music", a thumbnail, position and duration. |
 | Spotify Connect (playing on another device) | The same as a song playing here: status Playing, position moving, seeks and pauses reported. Nothing says the sound is elsewhere. |
 | Local file | Not tested. |
@@ -248,7 +251,7 @@ The app reads what Spotify is playing and writes it to the log. Nothing uses it 
 
 **The rules** (`NowPlaying.From`):
 
-- **No track** is: no session, any status other than Playing or Paused, or an empty title. Spotify reports an empty title for about half a second between two tracks, so "No track" appears in the log at most track changes. The page waits 1.5 s before it hides the overlay for exactly this reason.
+- **No track** is: no session, any status other than Playing or Paused, or an empty title. Spotify reports an empty title for about half a second when it switches to something else (a song to a podcast, say), so "No track" appears in the log then. A plain next track has no gap. The page waits 1.5 s before it hides the overlay for exactly this reason.
 - **A podcast is an item with no artist.** Everything else is a song. **Ads are not recognised** (owner's decision, since no ad could be observed on Premium): an ad is treated as whatever it looks like, most likely a podcast.
 - **Position.** Spotify reports its position only every few seconds, together with the time it was true. For a playing track the time since then is added, up to the track's length, so a reading between two reports isn't seconds behind. A report older than a minute, or from the future, adds nothing.
 - **Track identity.** Windows gives no track ID, so title, artist and album together stand in for one.
@@ -260,3 +263,29 @@ The app reads what Spotify is playing and writes it to the log. Nothing uses it 
 **Seen in the log during a track change:** Windows changes the timeline a few hundredths of a second before the title, so the old title can appear once with the new track's length, at 0:00. It corrects itself with the next event.
 
 **Log lines** (category `spotify`): the session being followed or lost, every change ("Song, Playing: …, at 0:29 of 5:25", "Podcast, Paused: …", "No track"), every seek, and each cover with its type and size.
+
+### W4: open rules and the tray icon flash
+
+Every trigger now goes through the open rules. A refused manual trigger flashes the tray icon.
+
+| File | What it does |
+| ---- | ------------ |
+| `IdleViz.Core/OpenRules.cs` | `OpenRules.Refusal`: why the visualizer may not open right now, or null. |
+| `IdleViz.Core/SpotifyTracker.cs` | Now also keeps `TrackLostAt`, when Spotify last went from a track to no track. |
+| `IdleViz.Core/IconFlash.cs` | The flash's steps and timing. |
+| `TrayGlyph.cs`, `TrayIcon.cs` | The slashed waveform and `TrayIcon.Flash`. |
+| `App.xaml.cs` | `OpenVisualizer` applies the rules, waits for the first reading, logs refusals and flashes the icon. |
+
+**The rules**, in this order:
+
+1. **Not known yet:** no reading of the media controls has arrived since the app started. The trigger waits up to 2 s for the first one, then decides. A manual trigger during the wait makes the whole wait manual. After 2 s with no reading it is refused.
+2. **Spotify isn't running:** Spotify has no media session. A track seen before Spotify quit doesn't count.
+3. **No track:** the session has no current track (see W3). Unless Spotify had one less than 1.5 s ago: the gap Spotify reports when it switches to something else isn't a refusal.
+
+Songs and podcasts, playing or paused, all open. An already open window ignores the rules (in the no-dismiss debug mode a second trigger closes it, as before).
+
+**Refusals.** Each is logged in category `open` with its trigger and reason. A refused manual trigger (hotkey, URL, menu, **Open now**) flashes the tray icon: the slashed waveform and the normal one in turn, 3 times in about 1 s (6 steps of 170 ms, the Mac's timing). A refused idle trigger (W6) will show nothing.
+
+**The tray icon library disposes the icon it had whenever it gets a new one,** so the icon is drawn again for every step. Swapping between two kept icons crashed the app on the second step.
+
+**Seen when checking:** a freshly started Spotify is reported with its restored, paused track within about a second, before anything plays, so the visualizer opens at once.
