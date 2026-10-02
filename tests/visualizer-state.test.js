@@ -106,6 +106,21 @@ describe("parseCustomPresets", () => {
     expect(parseCustomPresets({ entries }).entries).toEqual([]);
   });
 
+  it("accepts the addresses the Windows app serves, under the same rule", () => {
+    const windowsPreset = { ...preset, url: "https://presets.idleviz.invalid/Pack/Tunnel.json" };
+    const windowsPlugin = { ...plugin, url: "https://app.idleviz.invalid/visuals/aurora.js" };
+    const entries = [
+      windowsPreset,
+      windowsPlugin,
+      { ...preset, id: "custom:a.json", url: "https://app.idleviz.invalid/visuals/aurora.js" },
+      { ...plugin, id: "bundled:b.js", url: "https://presets.idleviz.invalid/aurora.js" },
+      { ...plugin, id: "bundled:c.js", url: "https://app.idleviz.invalid/overlay.js" },
+      { ...preset, id: "custom:d.json", url: "https://presets.idleviz.invalid.example.com/x.json" },
+      { ...preset, id: "custom:e.json", url: "http://presets.idleviz.invalid/x.json" },
+    ];
+    expect(parseCustomPresets({ entries }).entries).toEqual([windowsPreset, windowsPlugin]);
+  });
+
   it("reads anything else as empty", () => {
     expect(parseCustomPresets(null)).toEqual({ entries: [], hung: [] });
     expect(parseCustomPresets({ entries: "x", hung: [3, "", "custom:a.js"] })).toEqual({
