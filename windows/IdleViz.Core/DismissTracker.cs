@@ -82,6 +82,13 @@ public static class MediaKeys
 /// </summary>
 public sealed class DismissTracker
 {
+    /// <summary>
+    /// The backup check reads the time of the last input from Windows' tick count, which moves in
+    /// steps of about 16 ms, while the hooks are timed with a stopwatch. Input this soon after the
+    /// last one the hooks explained is the same input, not a new one.
+    /// </summary>
+    public const double ClockSlackSeconds = 0.05;
+
     private readonly HashSet<ushort> _stuckKeys = [];
     private bool _armed;
 
@@ -194,6 +201,6 @@ public sealed class DismissTracker
         }
 
         var inputAt = elapsed - secondsSinceLastInput;
-        return inputAt > Math.Max(GracePeriod, _ignoreInputUntil);
+        return inputAt > Math.Max(GracePeriod, _ignoreInputUntil + ClockSlackSeconds);
     }
 }

@@ -207,6 +207,19 @@ public class DismissTrackerTests
         Assert.True(tracker.ShouldDismiss(secondsSinceLastInput: 0.01, heldKeys: [], elapsed: 2.0));
     }
 
+    // Seen on the PC: a play key the hook had handled closed the window 2.4 s later. The tick count the
+    // backup check reads moves in 16 ms steps, so the same key press can look a few ms newer than it was.
+    [Fact]
+    public void BackupIgnoresAMediaKeyThatLooksAFewMillisecondsLater()
+    {
+        var tracker = Armed();
+        Assert.False(tracker.ShouldDismiss(InputEvent.MediaKey, elapsed: 1.0));
+        Assert.False(tracker.ShouldDismiss(secondsSinceLastInput: 0.484, heldKeys: [], elapsed: 1.5));
+        Assert.False(tracker.ShouldDismiss(secondsSinceLastInput: 2.384, heldKeys: [], elapsed: 3.4));
+        // A real key press 0.1 s after the media key is still new input.
+        Assert.True(tracker.ShouldDismiss(secondsSinceLastInput: 0.3, heldKeys: [], elapsed: 1.4));
+    }
+
     // Backup check
 
     [Fact]
