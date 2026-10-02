@@ -118,7 +118,15 @@ export function collectPresets(packs, source = "bundled") {
 }
 
 const MAX_CUSTOM_ENTRIES = 6000;
-const URL_PREFIXES = { custom: "idleviz-app://presets/", bundled: "idleviz-app://app/visuals/" };
+/**
+ * Where each source may load from. The Mac app serves the page from its own `idleviz-app:` scheme.
+ * The Windows app can't: WebView2 blocks a sandboxed frame from loading scripts off a custom
+ * scheme, so it answers these `https:` addresses itself. `.invalid` never exists on the network.
+ */
+const URL_PREFIXES = {
+  custom: ["idleviz-app://presets/", "https://presets.idleviz.invalid/"],
+  bundled: ["idleviz-app://app/visuals/", "https://app.idleviz.invalid/visuals/"],
+};
 
 /**
  * Checks the shape of a `setCustomPresets` payload: the plugins bundled with the app and the
@@ -137,7 +145,8 @@ export function parseCustomPresets(value) {
     if (!text(id) || !text(name) || !text(url, 2000) || entries.has(id)) continue;
     if (kind !== "preset" && kind !== "plugin") continue;
     // Each source may only load from its own place: the presets folder, or the app's bundled plugins.
-    if (!(source in URL_PREFIXES) || !url.startsWith(URL_PREFIXES[source]) || !id.startsWith(`${source}:`)) continue;
+    if (!(source in URL_PREFIXES) || !id.startsWith(`${source}:`)) continue;
+    if (!URL_PREFIXES[source].some((prefix) => url.startsWith(prefix))) continue;
     entries.set(id, { id, name, source, kind, url, version: typeof version === "string" ? version : "" });
   }
   const hung = Array.isArray(payload.hung) ? payload.hung.filter((item) => text(item)) : [];
