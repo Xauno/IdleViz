@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Windows.Input;
 using H.NotifyIcon;
+using IdleViz.Core;
+using Microsoft.UI.Dispatching;
 
 namespace IdleViz.App;
 
@@ -10,7 +12,9 @@ internal sealed partial class TrayIcon : IDisposable
     private readonly App _app;
     private readonly TaskbarIcon _icon;
     private readonly Stopwatch _sinceFlyoutClosed = new();
-    private System.Drawing.Icon? _image;
+    private readonly DispatcherQueueTimer _flashTimer;
+    private System.Drawing.Color _color;
+    private int _flashStep = IconFlash.Steps;
     private FlyoutWindow? _flyout;
     private TrayMenu? _menu;
 
@@ -26,6 +30,9 @@ internal sealed partial class TrayIcon : IDisposable
             // takes keyboard focus when the app starts, so TrayMenu builds one only when it is asked for.
             RightClickCommand = new ClickCommand(ShowMenu),
         };
+        _flashTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
+        _flashTimer.Interval = TimeSpan.FromMilliseconds(IconFlash.StepMilliseconds);
+        _flashTimer.Tick += (_, _) => FlashStep();
         RefreshIcon();
         _icon.ForceCreate();
     }
@@ -33,18 +40,25 @@ internal sealed partial class TrayIcon : IDisposable
     /// <summary>Redraws the icon, for when the taskbar switches between light and dark.</summary>
     public void RefreshIcon()
     {
-        var previous = _image;
-        _image = TrayGlyph.Create(TrayGlyph.TaskbarColor());
-        _icon.Icon = _image;
-        previous?.Dispose();
+        _color = TrayGlyph.TaskbarColor();
+        ShowGlyph();
+    }
+
+    /// <summary>Swaps to the slashed waveform and back 3 times over about 1 s: an open was refused.</summary>
+    public void Flash()
+    {
+        // A second refusal during a flash starts it again.
+        _flashStep = 0;
+        ShowGlyph();
+        _flashTimer.Start();
     }
 
     public void Dispose()
     {
+        _flashTimer.Stop();
         _flyout?.Dismiss();
         _menu?.Dismiss();
         _icon.Dispose();
-        _image?.Dispose();
     }
 
     public void ToggleFlyout()
@@ -72,6 +86,20 @@ internal sealed partial class TrayIcon : IDisposable
         _menu.Closed += (_, _) => _menu = null;
         _menu.ShowAtPointer();
     }
+
+    private void FlashStep()
+    {
+        _flashStep++;
+        if (_flashStep >= IconFlash.Steps)
+        {
+            _flashTimer.Stop();
+        }
+
+        ShowGlyph();
+    }
+
+    // A new icon every time: the library disposes the one it had when it is given another.
+    private void ShowGlyph() => _icon.Icon = TrayGlyph.Create(_color, IconFlash.IsSlashed(_flashStep));
 
     private sealed partial class ClickCommand(Action run) : ICommand
     {
