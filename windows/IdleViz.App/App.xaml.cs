@@ -18,6 +18,8 @@ public partial class App : Application
     private VisualizerController? _visualizer;
     private TrayIcon? _trayIcon;
     private SettingsWindow? _settingsWindow;
+    private SpotifyInfo? _spotify;
+    private DispatcherQueueTimer? _openAtLaunchTimer;
 
     public App(LaunchOptions launchOptions)
     {
@@ -57,6 +59,9 @@ public partial class App : Application
 
         _trayIcon = new TrayIcon(this);
 
+        _spotify = new SpotifyInfo(_dispatcher);
+        _spotify.Start();
+
         Program.Relaunched += options => _dispatcher.TryEnqueue(() =>
         {
             try
@@ -79,11 +84,12 @@ public partial class App : Application
 
         if (debug.OpenAtLaunch)
         {
-            var timer = _dispatcher.CreateTimer();
-            timer.Interval = TimeSpan.FromSeconds(3);
-            timer.IsRepeating = false;
-            timer.Tick += (_, _) => OpenVisualizer(TriggerSource.Settings);
-            timer.Start();
+            // In a field: a timer nothing refers to is collected, and then never fires.
+            _openAtLaunchTimer = _dispatcher.CreateTimer();
+            _openAtLaunchTimer.Interval = TimeSpan.FromSeconds(3);
+            _openAtLaunchTimer.IsRepeating = false;
+            _openAtLaunchTimer.Tick += (_, _) => OpenVisualizer(TriggerSource.Settings);
+            _openAtLaunchTimer.Start();
         }
     }
 
@@ -126,6 +132,7 @@ public partial class App : Application
     {
         Log.Info("app", "Exit");
         _settingsWindow?.Close();
+        _spotify?.Dispose();
         _visualizer?.Dispose();
         _hotkeyWindow?.Dispose();
         // Without this the icon stays in the tray until the mouse moves over it.

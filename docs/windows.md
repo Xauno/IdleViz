@@ -66,6 +66,7 @@ Answers the owner gave to the open points in section 9 of the brief, on 2 Octobe
 | R3 | The idle trigger is skipped while the session is locked, an app is fullscreen or presenting, or any app other than Spotify is producing sound. A silent video in a normal window is still missed. |
 | Microphone | Detect delay uses the built-in microphone if there is one, otherwise the default input, unless that is Bluetooth: then it doesn't run and the hint says why. Settings also gets a microphone picker, a row the Mac app doesn't have. |
 | Battery | Battery times are built and unit-tested. The development PC has no battery, so they have not been run on one. |
+| Ads | Not recognised on Windows. Windows doesn't say what an item is and no ad could be observed (Premium), so nothing unverified is built: no artist means podcast, anything else is a song. To be revisited if someone with a free account reports what an ad looks like. |
 | App icon | The tray's five-bar waveform, white on a dark rounded square. |
 | Docs | The README has a Windows section with its own roadmap. This file holds the as-built design and the spike findings. The brief stays as it was written. |
 
@@ -227,3 +228,35 @@ In `IdleViz.Core`: `DismissTracker.cs` (ported with its tests), `KeyboardInput.c
 **A second launch** with no URL (clicking the Start menu entry while it runs) opens the settings window, since there is no other window to bring forward. This was not asked; it is the usual behaviour of a Windows tray app.
 
 **The Debug copy and the installed copy are separate apps to Windows**: each keeps its own single running copy, and `idleviz://` always starts the installed one. With both running, a URL open goes to the installed copy and the second copy to start can't register the hotkey. Stop the installed copy before testing a Debug build, and test URL opens on an installed build.
+
+### W3: Spotify now-playing
+
+The app reads what Spotify is playing and writes it to the log. Nothing uses it yet: the open rules are W4 and the overlay is W5.
+
+| File | What it does |
+| ---- | ------------ |
+| `IdleViz.Core/NowPlaying.cs` | `MediaReading` (what Windows reported), `NowPlaying` (the current item, with the rules below), `SpotifySession` (which session is Spotify's). |
+| `IdleViz.Core/SpotifyTracker.cs` | Keeps the current item across readings and says when it changed or the position jumped. |
+| `IdleViz.Core/Artwork.cs` | `ArtworkCache` (the covers of the five most recent tracks) and the check that a cover is a JPEG, PNG or WebP, with its `data:` URL. |
+| `IdleViz.App/SpotifyInfo.cs` | Talks to the Windows media controls, feeds the tracker, reads the covers, writes the log lines. |
+
+**Reading Spotify.** Through `GlobalSystemMediaTransportControlsSessionManager`, the same source as the media flyout in Windows. It needs no Spotify login and cannot start Spotify: with Spotify closed there is simply no session.
+
+- Only Spotify's session is read: an ID starting with `SpotifyAB.SpotifyMusic_` (Microsoft Store) or equal to `Spotify.exe` (spotify.com). The second form is how Windows names an app that isn't from the Store (by its program file); it is assumed, not seen, since only the Store version is installed here.
+- It is driven by the session's three events (properties, playback, timeline). Nothing is polled. Events arrive on other threads and are handed to the UI thread. One reading runs at a time; events that arrive during a reading are merged into one more reading after it.
+- If a reading fails, the last track is kept and the failure is logged once.
+
+**The rules** (`NowPlaying.From`):
+
+- **No track** is: no session, any status other than Playing or Paused, or an empty title. Spotify reports an empty title for about half a second between two tracks, so "No track" appears in the log at most track changes. The page waits 1.5 s before it hides the overlay for exactly this reason.
+- **A podcast is an item with no artist.** Everything else is a song. **Ads are not recognised** (owner's decision, since no ad could be observed on Premium): an ad is treated as whatever it looks like, most likely a podcast.
+- **Position.** Spotify reports its position only every few seconds, together with the time it was true. For a playing track the time since then is added, up to the track's length, so a reading between two reports isn't seconds behind. A report older than a minute, or from the future, adds nothing.
+- **Track identity.** Windows gives no track ID, so title, artist and album together stand in for one.
+
+**What counts as a change** (`SpotifyTracker`): a different track, a different state, or a length that differs by 2 s or more. Windows raises two or three events per change and a timeline event every few seconds; those are not changes. Spotify also reports the same song's length a second longer or shorter now and then, which is why the length has a tolerance. A **seek** is a position more than 1.5 s away from where the track should have got to by itself, within the same track.
+
+**Artwork.** The cover comes from the session as a stream, not from the network. It is kept only if its first bytes say JPEG, PNG or WebP and it is no larger than 4 MB. Spotify's covers are PNG, 50 to 120 KB. A later cover for the same track replaces the first, because Spotify can hand over a new track with the previous cover for a moment.
+
+**Seen in the log during a track change:** Windows changes the timeline a few hundredths of a second before the title, so the old title can appear once with the new track's length, at 0:00. It corrects itself with the next event.
+
+**Log lines** (category `spotify`): the session being followed or lost, every change ("Song, Playing: …, at 0:29 of 5:25", "Podcast, Paused: …", "No track"), every seek, and each cover with its type and size.
