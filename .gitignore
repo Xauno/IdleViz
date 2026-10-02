@@ -11,3 +11,10 @@ design/reference/
 
 # Local signing team (see Config/Local.example.xcconfig)
 Config/Local.xcconfig
+
+# Windows build output (windows/)
+bin/
+obj/
+windows/artifacts/
+*.user
+.vs/

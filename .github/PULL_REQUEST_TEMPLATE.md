@@ -27,7 +27,7 @@ If this is a build step from project.md, say which one.
 
 ## Checklist
 
-- [ ] `npm run check` passes locally (and `swift build && swift test` if Swift changed)
+- [ ] `npm run check` passes locally (and `swift build && swift test` if Swift changed, `dotnet build` and `dotnet test` in `windows/` if C# changed)
 - [ ] README updated if a build step finished or behavior changed
 - [ ] `project.md` / `docs/` updated if the design changed
 - [ ] Before/after screenshots included for UI changes

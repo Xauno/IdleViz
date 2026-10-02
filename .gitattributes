@@ -1,2 +1,5 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Text files are LF in the repository and in every checkout, Windows included. Prettier checks for LF,
+# and the vendored libraries are checked against hashes of their LF bytes.
+* text=auto eol=lf
+
+*.ico binary

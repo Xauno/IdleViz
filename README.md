@@ -20,6 +20,7 @@ It is not a real screensaver, just a fullscreen window on top of everything.
 - [Usage](#usage)
 - [Custom visualizers](#custom-visualizers)
 - [How it works](#how-it-works)
+- [Windows](#windows)
 - [Development](#development)
 - [Project layout](#project-layout)
 - [Contributing](#contributing)
@@ -162,6 +163,44 @@ You can add your own visuals without touching the app. The easiest way is a sing
 
 One borderless window holds one web page. The page stacks the Butterchurn canvas, a dim layer and the Spotify-style overlay. A Swift helper watches for idle time and hotkeys, reads now-playing info from Spotify, and sends audio analysis to the page about 60 times a second. The full design, including the decisions behind it, is in [project.md](project.md).
 
+## Windows
+
+A Windows 11 version is being built in [`windows/`](windows/): the same page in WebView2, with the helper around it rewritten in C# and WinUI 3. The brief is [windows-port.html](windows-port.html), and what has been built and decided so far is in [docs/windows.md](docs/windows.md).
+
+> **Status: only the scaffold exists.** The Windows app is a tray icon with an **Exit** menu. It doesn't open a visualizer, has no hotkey and no settings, and doesn't talk to Spotify yet. Everything under [Features](#features) and [Usage](#usage) describes the Mac app.
+
+| Step | What                                                                                              | Status |
+| ---- | ------------------------------------------------------------------------------------------------- | ------ |
+| W0   | Scaffold: solution, `IdleViz.Core` with its first tests, CI job, installer script, empty tray app | Done   |
+| W1   | Open/close shell: tray flyout and menu, hotkey, URL, black fullscreen window, dismiss             |        |
+| W2   | Spike: Spotify-only audio capture, the page in WebView2, what the media controls report (findings only) |  |
+| W3   | Spotify now-playing from the Windows media controls, content type, artwork                        |        |
+| W4   | Open rules and tray icon flash                                                                    |        |
+| W5   | The page in the window: overlay, CSP, all overlay states                                          |        |
+| W6   | Idle trigger, with skip rules                                                                     |        |
+| W7a  | Visualizer: real Spotify audio, and recovery from a stuck page                                    |        |
+| W7b  | Visualizer: preset controls                                                                       |        |
+| W7c  | Visualizer: custom preset folder, sandboxed plugins, `.milk` conversion                           |        |
+| W7d  | Visualizer: audio delay, with Detect and the manual test                                          |        |
+| W8a  | Polish: keep-awake limit, battery times, fades                                                    |        |
+| W8b  | Polish: warnings (yellow icon, flyout rows)                                                       |        |
+| W8c  | Polish: brightness, overlay switch, run at startup, like, skip and media keys                     |        |
+
+**Requirements:** Windows 11. To build: the .NET 10 SDK and [Inno Setup 6](https://jrsoftware.org/isinfo.php).
+
+**Install:** there is no download. In PowerShell, from the repo:
+
+```powershell
+cd windows
+.\build-installer.ps1 -Install
+```
+
+This builds the app and `windows\artifacts\IdleViz-Setup.exe`, runs it without questions, and starts IdleViz. It installs for your user only, in `%LOCALAPPDATA%\Programs\IdleViz`, so there is no admin prompt, and adds a Start menu entry. Run it again after pulling changes to update. Without `-Install` it only builds the setup file, which you can run yourself. Uninstall from **Settings → Apps → Installed apps**.
+
+**Use:** IdleViz appears in the notification area, possibly behind the **^** overflow arrow. Right-click the icon and choose **Exit** to quit. That is all it does so far.
+
+**Develop:** in `windows/`, `dotnet format --verify-no-changes`, `dotnet build` and `dotnet test`. The build treats warnings as errors. Details are in [docs/windows.md](docs/windows.md).
+
 ## Development
 
 You need Node 22 or later. The JavaScript side (plugins, overlay page) is checked with:
@@ -209,6 +248,7 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ aurora-demo.html        Test page that feeds a plugin audio from a file or microphone
 ├─ mockups.html            UI mockups for the menu-bar popup and the settings window
 ├─ windows-port.html       Brief for building a Windows version: what to reuse, the Windows UI, every decision so far
+├─ windows/                The Windows app: IdleViz.Core (logic) and its tests, IdleViz.App (WinUI 3), the installer script
 ├─ docs/                   Guides, including the custom visualizer guide
 ├─ tests/                  Vitest suite, fake WebGL helpers, and the Swift tests (IdleVizCoreTests)
 └─ .github/                CI workflow, PR template, Dependabot
@@ -226,4 +266,5 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 
 - [Butterchurn](https://github.com/jberg/butterchurn), [butterchurn-presets](https://github.com/jberg/butterchurn-presets), [milkdrop-preset-converter](https://github.com/jberg/milkdrop-preset-converter) and [Milkdrop](https://www.geisswerks.com/milkdrop/), the visualizer engine and the presets it plays
 - [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) for the global hotkey
+- [H.NotifyIcon](https://github.com/HavenDV/H.NotifyIcon) for the tray icon on Windows
 - [Figtree](https://github.com/erikdkennedy/figtree) for the overlay font
