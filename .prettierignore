@@ -6,3 +6,6 @@ aurora-demo.html
 *.md
 IdleViz/web/vendor/*.min.js
 .claude/
+**/bin/
+**/obj/
+windows/artifacts/

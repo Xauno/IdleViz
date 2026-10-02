@@ -2,7 +2,17 @@ import js from "@eslint/js";
 import globals from "globals";
 
 export default [
-  { ignores: ["node_modules/", "coverage/", ".build/", ".claude/", "aurora-demo.html", "IdleViz/web/vendor/"] },
+  {
+    ignores: [
+      "node_modules/",
+      "coverage/",
+      ".build/",
+      ".claude/",
+      "aurora-demo.html",
+      "IdleViz/web/vendor/",
+      "windows/",
+    ],
+  },
   js.configs.recommended,
   {
     files: ["**/*.js"],

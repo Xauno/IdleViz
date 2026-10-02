@@ -68,11 +68,52 @@ jobs:
           -derivedDataPath .build/xcode
           CODE_SIGNING_ALLOWED=NO
 
+  windows:
+    name: Windows (lint, test, build app and installer)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: windows
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: windows/global.json
+
+      - name: Show toolchain
+        run: dotnet --info
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Check formatting
+        run: dotnet format --verify-no-changes --no-restore
+
+      # The analyzers run in the build, and any warning fails it (Directory.Build.props).
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --yes --no-progress
+          }
+
+      - name: Build installer
+        shell: pwsh
+        run: ./build-installer.ps1
+
   # One stable check name for branch protection, so adding or renaming jobs never needs a settings change.
   ci-passed:
     name: CI passed
     if: always()
-    needs: [web, swift]
+    needs: [web, swift, windows]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job to succeed
