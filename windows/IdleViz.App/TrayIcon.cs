@@ -1,41 +1,79 @@
+using System.Diagnostics;
 using System.Windows.Input;
 using H.NotifyIcon;
-using Microsoft.UI.Xaml.Controls;
 
 namespace IdleViz.App;
 
-/// <summary>The notification-area icon and its right-click menu.</summary>
-public sealed partial class TrayIcon : IDisposable
+/// <summary>The notification-area icon: left-click opens the flyout, right-click the menu.</summary>
+internal sealed partial class TrayIcon : IDisposable
 {
+    private readonly App _app;
     private readonly TaskbarIcon _icon;
-    private readonly System.Drawing.Icon _image;
+    private readonly Stopwatch _sinceFlyoutClosed = new();
+    private System.Drawing.Icon? _image;
+    private FlyoutWindow? _flyout;
+    private TrayMenu? _menu;
 
-    public TrayIcon(Action exit)
+    public TrayIcon(App app)
     {
-        _image = new System.Drawing.Icon(Path.Combine(AppContext.BaseDirectory, "Assets", "IdleViz.ico"), 16, 16);
-
-        var menu = new MenuFlyout();
-        menu.Items.Add(new MenuFlyoutItem { Text = "Exit", Command = new MenuCommand(exit) });
-
+        _app = app;
         _icon = new TaskbarIcon
         {
             ToolTipText = "IdleViz",
-            Icon = _image,
-            ContextFlyout = menu,
-            // The native Windows menu. The XAML one needs a window to live in, and the app has none.
-            ContextMenuMode = ContextMenuMode.PopupMenu,
             NoLeftClickDelay = true,
+            LeftClickCommand = new ClickCommand(ToggleFlyout),
+            // The library's own menu is not used. Its Windows 11 style one keeps a hidden window that
+            // takes keyboard focus when the app starts, so TrayMenu builds one only when it is asked for.
+            RightClickCommand = new ClickCommand(ShowMenu),
         };
+        RefreshIcon();
         _icon.ForceCreate();
+    }
+
+    /// <summary>Redraws the icon, for when the taskbar switches between light and dark.</summary>
+    public void RefreshIcon()
+    {
+        var previous = _image;
+        _image = TrayGlyph.Create(TrayGlyph.TaskbarColor());
+        _icon.Icon = _image;
+        previous?.Dispose();
     }
 
     public void Dispose()
     {
+        _flyout?.Dismiss();
+        _menu?.Dismiss();
         _icon.Dispose();
-        _image.Dispose();
+        _image?.Dispose();
     }
 
-    private sealed partial class MenuCommand(Action run) : ICommand
+    public void ToggleFlyout()
+    {
+        // The click that should close an open flyout takes its focus away first, which closes it.
+        // Without this check that same click would open it again.
+        if (_flyout is not null || (_sinceFlyoutClosed.IsRunning && _sinceFlyoutClosed.ElapsedMilliseconds < 300))
+        {
+            return;
+        }
+
+        _flyout = new FlyoutWindow(_app);
+        _flyout.Closed += (_, _) =>
+        {
+            _flyout = null;
+            _sinceFlyoutClosed.Restart();
+        };
+        _flyout.ShowAboveTray();
+    }
+
+    public void ShowMenu()
+    {
+        _menu?.Dismiss();
+        _menu = new TrayMenu(_app);
+        _menu.Closed += (_, _) => _menu = null;
+        _menu.ShowAtPointer();
+    }
+
+    private sealed partial class ClickCommand(Action run) : ICommand
     {
         public event EventHandler? CanExecuteChanged
         {

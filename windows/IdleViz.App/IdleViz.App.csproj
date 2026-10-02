@@ -16,10 +16,18 @@
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
+    <!-- Without this, publish leaves out the compiled XAML (IdleViz.pri and the .xbf files), and every window fails to open. -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <!-- Program.cs has the entry point: it hands over to a copy that is already running before any UI starts. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <!-- The Win32 calls CsWin32 generates use pointers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" />
     <PackageReference Include="H.NotifyIcon.WinUI" />
+    <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
   </ItemGroup>
 

@@ -45,6 +45,8 @@ if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
 Write-Host "Publishing IdleViz $version..."
 dotnet publish (Join-Path $root 'IdleViz.App\IdleViz.App.csproj') --configuration Release --output $publishDir --nologo -v quiet
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE." }
+# The compiled XAML. Publish has left it out before, and the app then starts but can't open any window.
+if (-not (Test-Path (Join-Path $publishDir 'IdleViz.pri'))) { throw 'The published app has no IdleViz.pri.' }
 
 Write-Host 'Building the setup file...'
 & $iscc /Q "/DAppVersion=$version" "/DPublishDir=$publishDir" (Join-Path $root 'installer\IdleViz.iss')

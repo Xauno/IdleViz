@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+  x:Class="IdleViz.App.FlyoutWindow"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Window.SystemBackdrop>
+    <DesktopAcrylicBackdrop />
+  </Window.SystemBackdrop>
+
+  <StackPanel x:Name="Root" Padding="4" VerticalAlignment="Top">
+    <Button
+      x:Name="SettingsRow"
+      Padding="12,8"
+      HorizontalAlignment="Stretch"
+      HorizontalContentAlignment="Left"
+      Click="OnSettingsClick"
+      Content="Settings"
+      CornerRadius="4">
+      <!-- A plain row that only shows a background while hovered or pressed, like the rows of a Windows flyout. -->
+      <Button.Resources>
+        <SolidColorBrush x:Key="ButtonBackground" Color="Transparent" />
+        <SolidColorBrush x:Key="ButtonBorderBrush" Color="Transparent" />
+        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
+        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
+        <StaticResource x:Key="ButtonBackgroundPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+        <StaticResource x:Key="ButtonBackgroundPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+      </Button.Resources>
+    </Button>
+
+    <Rectangle Height="1" Margin="0,4" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+    <!-- For information only: it shows the hotkey and can't be clicked. -->
+    <Grid Padding="12,8" ColumnSpacing="10">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Open visualizer" />
+      <TextBlock
+        x:Name="HotkeyText"
+        Grid.Column="1"
+        VerticalAlignment="Center"
+        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+        Style="{StaticResource CaptionTextBlockStyle}" />
+    </Grid>
+  </StackPanel>
+</Window>
