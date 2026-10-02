@@ -1,0 +1,2936 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IdleViz for Windows: build brief</title>
+    <style>
+      @font-face {
+        font-family: "Figtree";
+        src: url("IdleViz/web/fonts/Figtree%5Bwght%5D.ttf") format("truetype");
+        font-weight: 300 900;
+      }
+      :root {
+        --bg: #f5f5f3;
+        --fg: #1c1c1a;
+        --muted: #6b6b66;
+        --card: #fff;
+        --line: #d9d9d4;
+        --accent: #2f6fdb;
+        --code: #ecece8;
+        --you-bg: #e4edfb;
+        --you-fg: #173f85;
+        --win-bg: #e0f3e6;
+        --win-fg: #17512b;
+        --me-bg: #fdf1d6;
+        --me-fg: #6b4b00;
+        --risk-bg: #fbe3e1;
+        --risk-fg: #8a1c14;
+        /* Windows 11 look, for the mockups */
+        --w-mica: #f3f3f3;
+        --w-card: #fbfbfb;
+        --w-stroke: #e5e5e5;
+        --w-text: #1b1b1b;
+        --w-text2: #5f5f5f;
+        --w-ctl: #fefefe;
+        --w-ctl-stroke: #d1d1d1;
+        --w-accent: #005fb8;
+        --w-on-accent: #fff;
+        --w-flyout: rgba(243, 243, 243, 0.86);
+        --w-hover: rgba(0, 0, 0, 0.05);
+        --w-warn-bg: #fff4ce;
+        --w-warn-fg: #9d5d00;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #1a1a19;
+          --fg: #ececea;
+          --muted: #a1a19b;
+          --card: #262625;
+          --line: #3c3c3a;
+          --accent: #6ea2ff;
+          --code: #2f2f2d;
+          --you-bg: #1c2c4a;
+          --you-fg: #b9d0ff;
+          --win-bg: #183222;
+          --win-fg: #a9e2bb;
+          --me-bg: #3a2f12;
+          --me-fg: #f0d48a;
+          --risk-bg: #45201d;
+          --risk-fg: #ffb4ac;
+          --w-mica: #202020;
+          --w-card: #2b2b2b;
+          --w-stroke: #1d1d1d;
+          --w-text: #fff;
+          --w-text2: #c5c5c5;
+          --w-ctl: #343434;
+          --w-ctl-stroke: #454545;
+          --w-accent: #60cdff;
+          --w-on-accent: #000;
+          --w-flyout: rgba(44, 44, 44, 0.9);
+          --w-hover: rgba(255, 255, 255, 0.07);
+          --w-warn-bg: #433519;
+          --w-warn-fg: #fce100;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #1a1a19;
+        --fg: #ececea;
+        --muted: #a1a19b;
+        --card: #262625;
+        --line: #3c3c3a;
+        --accent: #6ea2ff;
+        --code: #2f2f2d;
+        --you-bg: #1c2c4a;
+        --you-fg: #b9d0ff;
+        --win-bg: #183222;
+        --win-fg: #a9e2bb;
+        --me-bg: #3a2f12;
+        --me-fg: #f0d48a;
+        --risk-bg: #45201d;
+        --risk-fg: #ffb4ac;
+        --w-mica: #202020;
+        --w-card: #2b2b2b;
+        --w-stroke: #1d1d1d;
+        --w-text: #fff;
+        --w-text2: #c5c5c5;
+        --w-ctl: #343434;
+        --w-ctl-stroke: #454545;
+        --w-accent: #60cdff;
+        --w-on-accent: #000;
+        --w-flyout: rgba(44, 44, 44, 0.9);
+        --w-hover: rgba(255, 255, 255, 0.07);
+        --w-warn-bg: #433519;
+        --w-warn-fg: #fce100;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          15px/1.6 "Segoe UI Variable",
+          "Segoe UI",
+          -apple-system,
+          system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 32px 20px 80px;
+      }
+      h1 {
+        font-size: 26px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 20px;
+        margin: 48px 0 8px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+      }
+      h3 {
+        font-size: 16px;
+        margin: 26px 0 6px;
+      }
+      h4 {
+        font-size: 14px;
+        margin: 16px 0 4px;
+      }
+      .lead {
+        color: var(--muted);
+        margin: 0 0 10px;
+      }
+      code {
+        background: var(--code);
+        border-radius: 4px;
+        padding: 1px 5px;
+        font-size: 13px;
+      }
+      ul,
+      ol {
+        padding-left: 22px;
+        margin: 6px 0;
+      }
+      a {
+        color: var(--accent);
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 14px;
+        margin: 10px 0;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 12px;
+      }
+      .scroll {
+        overflow-x: auto;
+      }
+      .toc {
+        columns: 2;
+        font-size: 14px;
+        margin: 12px 0 0;
+        padding-left: 20px;
+      }
+      .theme {
+        display: inline-flex;
+        gap: 4px;
+        margin: 8px 0;
+      }
+      .theme button {
+        font: inherit;
+        font-size: 12px;
+        padding: 3px 12px;
+        border: 0.5px solid var(--line);
+        border-radius: 6px;
+        background: var(--card);
+        color: var(--fg);
+        cursor: pointer;
+      }
+      .theme button[aria-pressed="true"] {
+        background: var(--accent);
+        color: var(--card);
+        border-color: var(--accent);
+      }
+
+      /* Decision callouts */
+      .tag {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 4px;
+        padding: 1px 7px;
+        white-space: nowrap;
+      }
+      .you {
+        background: var(--you-bg);
+        color: var(--you-fg);
+      }
+      .win {
+        background: var(--win-bg);
+        color: var(--win-fg);
+      }
+      .me {
+        background: var(--me-bg);
+        color: var(--me-fg);
+      }
+      .risk {
+        background: var(--risk-bg);
+        color: var(--risk-fg);
+      }
+      .d {
+        border-radius: 8px;
+        padding: 9px 14px;
+        margin: 10px 0;
+        font-size: 14px;
+      }
+      .d > .tag {
+        background: none;
+        padding: 0;
+        margin-right: 6px;
+      }
+      .d ul {
+        margin: 4px 0 0;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        font-size: 13px;
+        margin: 10px 0;
+      }
+      .two {
+        display: flex;
+        gap: 28px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        margin: 16px 0;
+      }
+      .two > div {
+        flex: 1;
+        min-width: 300px;
+      }
+      figure {
+        margin: 16px 0;
+      }
+      figcaption {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 6px;
+      }
+      svg text {
+        font-family: inherit;
+      }
+
+      /* ---------- Windows 11 mockups ---------- */
+      .w {
+        font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+        color: var(--w-text);
+        font-size: 14px;
+        line-height: 1.35;
+      }
+      .desk {
+        position: relative;
+        overflow: hidden;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #1f4e8c, #5a8fd6 55%, #9cc2ee);
+        height: 300px;
+      }
+      .taskbar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 40px;
+        background: var(--w-flyout);
+        backdrop-filter: blur(20px);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+        padding: 0 12px;
+        font-size: 12px;
+        color: var(--w-text);
+      }
+      .ticon {
+        width: 26px;
+        height: 26px;
+        border-radius: 4px;
+        display: grid;
+        place-items: center;
+      }
+      .ticon.sel {
+        background: var(--w-hover);
+      }
+      .ticon svg {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+      }
+      .flyout {
+        position: absolute;
+        right: 12px;
+        bottom: 52px;
+        width: 290px;
+        background: var(--w-flyout);
+        backdrop-filter: blur(30px) saturate(140%);
+        border: 1px solid var(--w-ctl-stroke);
+        border-radius: 8px;
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+        padding: 4px;
+      }
+      .frow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 4px;
+      }
+      .frow.hl {
+        background: var(--w-hover);
+      }
+      .frow.dim {
+        color: var(--w-text2);
+      }
+      .frow small {
+        display: block;
+        font-size: 12px;
+        color: var(--w-text2);
+      }
+      .fsep {
+        height: 1px;
+        background: var(--w-ctl-stroke);
+        margin: 4px 0;
+        opacity: 0.6;
+      }
+      .warnglyph {
+        color: var(--w-warn-fg);
+        font-weight: 700;
+      }
+      .cmenu {
+        position: absolute;
+        right: 12px;
+        bottom: 52px;
+        width: 250px;
+      }
+      .keys {
+        font-size: 12px;
+        color: var(--w-text2);
+      }
+      .wwin {
+        width: 440px;
+        max-width: 100%;
+        background: var(--w-mica);
+        border: 1px solid var(--w-ctl-stroke);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+      }
+      .wbar {
+        display: flex;
+        align-items: center;
+        height: 32px;
+        font-size: 12px;
+        padding-left: 12px;
+      }
+      .wbar span:first-child {
+        flex: 1;
+      }
+      .wbtn {
+        width: 46px;
+        text-align: center;
+        font-size: 11px;
+        color: var(--w-text);
+      }
+      .wbtn.off {
+        opacity: 0.3;
+      }
+      .wbody {
+        padding: 4px 16px 16px;
+        height: 620px;
+        overflow-y: auto;
+      }
+      .wh {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 18px 0 6px;
+      }
+      .wcard {
+        background: var(--w-card);
+        border: 1px solid var(--w-stroke);
+        border-radius: 4px;
+        padding: 10px 14px;
+        min-height: 54px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 3px;
+      }
+      .wcard.sub {
+        margin-left: 0;
+        padding-left: 40px;
+        min-height: 46px;
+      }
+      .wcard small {
+        display: block;
+        font-size: 12px;
+        color: var(--w-text2);
+      }
+      .wctl {
+        font-size: 13px;
+        background: var(--w-ctl);
+        border: 1px solid var(--w-ctl-stroke);
+        border-bottom-color: color-mix(in srgb, var(--w-ctl-stroke) 70%, #000);
+        border-radius: 4px;
+        padding: 4px 11px;
+        white-space: nowrap;
+      }
+      .wctl.combo::after {
+        content: "⌄";
+        margin-left: 10px;
+        color: var(--w-text2);
+      }
+      .wctl.prim {
+        background: var(--w-accent);
+        color: var(--w-on-accent);
+        border-color: var(--w-accent);
+      }
+      .wsw {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        flex: none;
+      }
+      .wsw i {
+        width: 40px;
+        height: 20px;
+        border-radius: 10px;
+        border: 1px solid var(--w-text2);
+        position: relative;
+        display: block;
+      }
+      .wsw i::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--w-text2);
+      }
+      .wsw.on i {
+        background: var(--w-accent);
+        border-color: var(--w-accent);
+      }
+      .wsw.on i::after {
+        left: 23px;
+        background: var(--w-on-accent);
+      }
+      .wslider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        flex: none;
+      }
+      .wslider i {
+        display: block;
+        width: 110px;
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(to right, var(--w-accent) var(--v, 40%), var(--w-text2) var(--v, 40%));
+        position: relative;
+      }
+      .wslider i::after {
+        content: "";
+        position: absolute;
+        left: calc(var(--v, 40%) - 9px);
+        top: -7px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--w-ctl);
+        border: 5px solid var(--w-accent);
+        box-shadow: 0 0 0 1px var(--w-ctl-stroke);
+      }
+      .winfo {
+        background: var(--w-warn-bg);
+        border: 1px solid var(--w-stroke);
+        border-radius: 4px;
+        padding: 10px 14px;
+        font-size: 13px;
+        margin-bottom: 4px;
+        display: flex;
+        gap: 10px;
+      }
+      .wdlg {
+        width: 360px;
+        max-width: 100%;
+        background: var(--w-card);
+        border: 1px solid var(--w-ctl-stroke);
+        border-radius: 8px;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+      }
+      .wdlg .dbody {
+        padding: 20px 20px 16px;
+      }
+      .wdlg .dtitle {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+      .wdlg .dfoot {
+        background: var(--w-mica);
+        border-top: 1px solid var(--w-stroke);
+        padding: 14px 20px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .seg {
+        display: flex;
+        gap: 18px;
+        font-size: 13px;
+        border-bottom: 1px solid var(--w-stroke);
+        margin-bottom: 8px;
+      }
+      .seg span {
+        padding: 6px 0;
+      }
+      .seg .cur {
+        border-bottom: 2px solid var(--w-accent);
+        font-weight: 600;
+      }
+      .wlist div {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 2px;
+        font-size: 13px;
+        border-bottom: 1px solid var(--w-stroke);
+      }
+      .wsearch {
+        border: 1px solid var(--w-ctl-stroke);
+        border-bottom: 2px solid var(--w-accent);
+        border-radius: 4px;
+        background: var(--w-ctl);
+        padding: 5px 10px;
+        font-size: 13px;
+        color: var(--w-text2);
+        margin-bottom: 6px;
+      }
+      .panel {
+        height: 120px;
+        border-radius: 4px;
+        background: #000;
+        display: grid;
+        place-items: center;
+        color: #777;
+        font-size: 12px;
+        margin: 6px 0 10px;
+      }
+      .panel.lit {
+        background: #fff;
+        color: #555;
+      }
+      .panel.mark {
+        background: #ff9500;
+        color: #402400;
+      }
+
+      /* ---------- The fullscreen page, drawn to scale ---------- */
+      .tv {
+        position: relative;
+        container-type: inline-size;
+        aspect-ratio: 16 / 9;
+        border-radius: 6px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 28% 32%, #1db954 0, transparent 34%),
+          radial-gradient(circle at 72% 58%, #7b2ff7 0, transparent 40%),
+          radial-gradient(circle at 46% 78%, #f72585 0, transparent 34%),
+          radial-gradient(circle at 62% 22%, #4361ee 0, transparent 38%), #0b0b12;
+        font-family: "Figtree", "Segoe UI", sans-serif;
+        color: #fff;
+      }
+      .tv .dim {
+        position: absolute;
+        inset: 0;
+        background: #000;
+        opacity: 0.3;
+      }
+      .tv .scrim {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to top, rgb(0 0 0 / 55%) 0, rgb(0 0 0 / 25%) 35%, transparent 60%);
+      }
+      .tv .trk {
+        position: absolute;
+        left: 7.083%;
+        top: 56.3%;
+        display: flex;
+        align-items: center;
+        gap: 2.5cqw;
+      }
+      .tv .art {
+        width: 9.167cqw;
+        height: 9.167cqw;
+        flex: none;
+        background: linear-gradient(135deg, #ffb347, #c2410c);
+        box-shadow: 0 0.4cqw 1.25cqw rgb(0 0 0 / 50%);
+      }
+      .tv .ttl {
+        font-size: 3.75cqw;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        display: flex;
+        align-items: center;
+        gap: 1.46cqw;
+      }
+      .tv .art2 {
+        font-size: 1.354cqw;
+        font-weight: 600;
+        margin-top: 0.3cqw;
+      }
+      .tv .heart {
+        width: 3.125cqw;
+        height: 3.125cqw;
+        fill: #fff;
+      }
+      .tv .heart.corner {
+        position: absolute;
+        top: 4cqw;
+        right: 4cqw;
+        fill: none;
+        stroke: #fff;
+        stroke-width: 2;
+      }
+      .tv .adl {
+        position: absolute;
+        left: 7.083%;
+        top: 75.9%;
+        font-size: 1.354cqw;
+        font-weight: 600;
+      }
+      .tv .prog {
+        position: absolute;
+        left: 7.083%;
+        right: 7.083%;
+        top: 81.85%;
+        display: flex;
+        align-items: center;
+        gap: 1.25cqw;
+        font-size: 1.25cqw;
+        color: rgb(255 255 255 / 85%);
+        font-variant-numeric: tabular-nums;
+      }
+      .tv .bar {
+        flex: 1;
+        height: max(2px, 0.21cqw);
+        background: rgb(255 255 255 / 30%);
+        border-radius: 2px;
+      }
+      .tv .bar i {
+        display: block;
+        height: 100%;
+        width: 31%;
+        background: #fff;
+        border-radius: 2px;
+      }
+      .tv .m {
+        position: absolute;
+        font:
+          600 10px "Segoe UI",
+          system-ui,
+          sans-serif;
+        color: #ffe600;
+        text-shadow: 0 1px 2px #000;
+        white-space: nowrap;
+      }
+      .grid4 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 14px;
+        margin: 14px 0;
+      }
+      .bytes {
+        display: flex;
+        font-size: 11px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        overflow: hidden;
+        margin: 10px 0 4px;
+      }
+      .bytes div {
+        padding: 6px 6px;
+        border-right: 1px solid var(--line);
+        background: var(--card);
+        min-width: 0;
+      }
+      .bytes div:last-child {
+        border-right: none;
+      }
+      .bytes b {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>IdleViz for Windows: build brief</h1>
+      <p class="lead">
+        For the AI that builds the Windows version. IdleViz is a finished macOS app in this repository. This page says
+        what to build on Windows, what to copy unchanged, what has to be rewritten, how the Windows UI should look, and
+        every decision the owner has made so far. It sits next to <code>project.md</code> (the full Mac design) and
+        <code>mockups.html</code> (the Mac UI).
+      </p>
+      <div class="theme" role="group" aria-label="Preview appearance">
+        <button type="button" data-t="system" aria-pressed="true">System</button>
+        <button type="button" data-t="light" aria-pressed="false">Light</button>
+        <button type="button" data-t="dark" aria-pressed="false">Dark</button>
+      </div>
+
+      <ol class="toc">
+        <li><a href="#what">What you are building</a></li>
+        <li><a href="#how">How you work</a></li>
+        <li><a href="#map">What carries over, what is rewritten</a></li>
+        <li><a href="#ui">The Windows UI</a></li>
+        <li><a href="#page">The fullscreen page</a></li>
+        <li><a href="#spec">Behaviour, part by part</a></li>
+        <li><a href="#order">Build order</a></li>
+        <li><a href="#decisions">Every decision so far</a></li>
+        <li><a href="#open">Open points to confirm</a></li>
+      </ol>
+
+      <h3>How to read the coloured notes</h3>
+      <div class="legend">
+        <span><span class="tag you">Owner decided</span> made while building the Mac app. Keep it.</span>
+        <span><span class="tag win">Owner decided, Windows</span> made for this port. Keep it.</span>
+        <span
+          ><span class="tag me">Claude's call</span> chosen by the author of this page, not by the owner. Confirm with
+          the owner before building on it.</span
+        >
+        <span><span class="tag risk">Check first</span> an assumption about Windows nobody has tested yet.</span>
+      </div>
+      <div class="d you">
+        <span class="tag">Owner decided</span><b>The standing rule: ask before any judgement call.</b> If a decision has
+        more than one reasonable answer (design, scope, naming, a tradeoff), ask the owner instead of choosing. It is
+        rule 2 in <code>AGENTS.md</code>. The owner prefers short, plain questions with a recommended option.
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="what">1. What you are building</h2>
+      <p>
+        A tray app for Windows 11 that turns the PC into a music display. When the PC has been idle for a few minutes,
+        or on a hotkey, it opens a fullscreen <a href="https://github.com/jberg/butterchurn">Butterchurn</a> (WebGL
+        Milkdrop) visualizer that reacts to Spotify's audio and nothing else, with a now-playing overlay styled after
+        the Spotify TV app. Any input closes it. It is not a real screensaver, just a fullscreen window on top of
+        everything.
+      </p>
+      <p>The goal is the same app, behaving the same way, looking like it belongs on Windows.</p>
+
+      <div class="scroll">
+        <table>
+          <tr>
+            <th>Spotify state</th>
+            <th>Opens?</th>
+            <th>Overlay</th>
+          </tr>
+          <tr>
+            <td>Not running, or no track</td>
+            <td>No (a manual trigger flashes the tray icon)</td>
+            <td>n/a</td>
+          </tr>
+          <tr>
+            <td>Song, playing</td>
+            <td>Yes</td>
+            <td>Full layout: art, title, artist, progress bar, times</td>
+          </tr>
+          <tr>
+            <td>Song, paused</td>
+            <td>Yes</td>
+            <td>Progress bar only, frozen in place</td>
+          </tr>
+          <tr>
+            <td>Podcast</td>
+            <td>Yes</td>
+            <td>None</td>
+          </tr>
+          <tr>
+            <td>Ad between songs</td>
+            <td>Yes</td>
+            <td>"Advertisement" label and the progress bar</td>
+          </tr>
+          <tr>
+            <td>Playing on another device (Spotify Connect)</td>
+            <td>Yes</td>
+            <td>As above. The visuals get silence and drift slowly.</td>
+          </tr>
+          <tr>
+            <td>Track goes away, or Spotify quits, while open</td>
+            <td>Stays open</td>
+            <td>Fades out after 1.5 s, and comes back when a track does</td>
+          </tr>
+        </table>
+      </div>
+
+      <h3>Not part of it</h3>
+      <ul>
+        <li>Other players, Spotify's Web API, any login.</li>
+        <li>A real <code>.scr</code> screensaver.</li>
+        <li>More than one display. The visualizer opens on the primary display only.</li>
+        <li>A welcome window (see section 4).</li>
+        <li>Distribution to other people: no code signing, no auto-update.</li>
+      </ul>
+      <div class="d win">
+        <span class="tag">Owner decided, Windows</span>
+        <ul>
+          <li><b>W1.</b> You get this page plus the repository, and you run on the Windows PC.</li>
+          <li><b>W2.</b> C# with WinUI 3 for the native UI and WebView2 for the page.</li>
+          <li><b>W3.</b> Windows 11 only. No fallbacks for Windows 10.</li>
+          <li>
+            <b>W4.</b> Tray icon: left-click opens a small flyout, right-click opens the usual Windows menu with Exit.
+          </li>
+          <li>
+            <b>W5.</b> Now-playing info comes from the Windows media controls. Song, podcast or ad is a best guess.
+          </li>
+          <li><b>W6.</b> No welcome window. The yellow icon and the error rows stay, for real problems.</li>
+          <li><b>W7.</b> Personal use, unsigned, but with an installer (setup file, Start menu entry, uninstaller).</li>
+        </ul>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="how">2. How you work</h2>
+      <div class="two">
+        <div>
+          <h3>Where you run</h3>
+          <p>
+            You run on the owner's <strong>Windows PC</strong>, in a clone of this repository, in a native Windows shell
+            (PowerShell, not WSL: a WSL session can't build or launch a WinUI app). That lets you build, start and test
+            the Windows app yourself.
+          </p>
+          <p>
+            The owner's <strong>Mac</strong> has the finished app installed. It is the reference. You can't run it, so
+            when something has to be compared by eye (the fade speed, the overlay position, how the visuals follow the
+            music), ask the owner to look at both machines.
+          </p>
+          <h4>What the PC needs</h4>
+          <ul>
+            <li>Git and the GitHub CLI (<code>gh</code>), signed in.</li>
+            <li>The current .NET SDK (LTS) and the Windows App SDK workload for WinUI 3.</li>
+            <li>Node 22 or later, for <code>npm run check</code> (the page's tests).</li>
+            <li>The WebView2 runtime (part of Windows 11).</li>
+            <li>The Spotify desktop app, signed in.</li>
+            <li>An installer builder (see section 6, Install).</li>
+          </ul>
+          <p>Check each of these first and install what is missing, asking before anything that needs admin rights.</p>
+        </div>
+        <div>
+          <h3>How you check your own work</h3>
+          <ul>
+            <li>
+              <b>Unit tests</b> for everything that needs no screen: a <code>IdleViz.Core</code> library with tests,
+              ported from <code>Sources/IdleVizCore</code> and <code>tests/IdleVizCoreTests</code>.
+            </li>
+            <li>
+              <b>A log file</b> you can read while the app runs. The Mac app logs every open, close reason, preset
+              change, Spotify change and audio status; do the same.
+            </li>
+            <li>
+              <b>Debug switches</b>, as on the Mac: keep the window open on input, open settings at launch, open the
+              visualizer a few seconds after launch, fake a warning state.
+            </li>
+            <li><b>The page's DevTools</b>, in Debug builds only.</li>
+            <li>
+              <b>The owner</b>, for anything that needs hands or eyes. If a test needs the PC to be idle, ask the owner
+              to stop touching it rather than skipping the test.
+            </li>
+          </ul>
+          <h3>Repository rules (from <code>AGENTS.md</code>)</h3>
+          <ul>
+            <li><code>main</code> is protected. Every change is a branch and a pull request.</li>
+            <li>One build step is one PR, and it includes its tests.</li>
+            <li>
+              PR titles are conventional commits with a scope. The body follows
+              <code>.github/PULL_REQUEST_TEMPLATE.md</code>, with a Verification section that says what was not tested.
+            </li>
+            <li>
+              Update <code>README.md</code> at the end of every build step. Don't describe unbuilt things as working.
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div class="d you">
+        <span class="tag">Owner decided</span><b>Workflow.</b> Pull requests with passing CI and no required approval.
+        PRs written like those in pingdotgg/t3code. Squash merge. Claude may merge its own PR once CI is green. Tooling:
+        Vitest, ESLint and Prettier for the page; XCTest and SwiftLint for Swift. Public repository, MIT license.
+      </div>
+      <div class="d me">
+        <span class="tag">Claude's call</span><b>J1. Same repository, new <code>windows/</code> folder.</b> The Windows
+        app lives in this repo and loads <code>IdleViz/web/</code> as it is, so both apps share one page. Suggested
+        layout: <code>windows/IdleViz.sln</code>, <code>windows/IdleViz.Core/</code> (logic),
+        <code>windows/IdleViz.Core.Tests/</code>, <code>windows/IdleViz.App/</code> (WinUI),
+        <code>windows/installer/</code>. CI gets a <code>windows-latest</code> job that builds and tests it. The test
+        framework (xUnit is suggested) and the C# lint setup are not decided.
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="map">3. What carries over, what is rewritten</h2>
+      <p>
+        The Mac app is one window holding one web page, plus a native helper around it. The page is plain HTML, CSS and
+        JavaScript and doesn't know which system it runs on. The helper is all macOS API calls. So the page is copied
+        and the helper is rewritten.
+      </p>
+      <figure>
+        <svg
+          viewBox="0 0 940 430"
+          role="img"
+          aria-label="Architecture: native helper on the left, the page on the right"
+        >
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--muted)" />
+            </marker>
+          </defs>
+          <rect x="6" y="6" width="560" height="418" rx="10" fill="var(--me-bg)" stroke="var(--line)" />
+          <text x="22" y="30" font-size="14" font-weight="600" fill="var(--me-fg)">
+            Native helper: rewrite in C# (Mac version is the reference)
+          </text>
+          <g font-size="12" fill="var(--fg)">
+            <g>
+              <rect x="22" y="46" width="160" height="78" rx="6" fill="var(--card)" stroke="var(--line)" />
+              <text x="32" y="65" font-weight="600">Triggers</text>
+              <text x="32" y="83">Idle timer</text>
+              <text x="32" y="99">Global hotkey</text>
+              <text x="32" y="115">idleviz://open</text>
+            </g>
+            <g>
+              <rect x="210" y="46" width="150" height="78" rx="6" fill="var(--card)" stroke="var(--line)" />
+              <text x="220" y="65" font-weight="600">Open rules</text>
+              <text x="220" y="83">Spotify has a track?</text>
+              <text x="220" y="99">Idle only: locked,</text>
+              <text x="220" y="115">fullscreen app?</text>
+            </g>
+            <g>
+              <rect x="388" y="46" width="162" height="78" rx="6" fill="var(--card)" stroke="var(--line)" />
+              <text x="398" y="65" font-weight="600">Window controller</text>
+              <text x="398" y="83">Fullscreen, topmost</text>
+              <text x="398" y="99">Fades in and out</text>
+              <text x="398" y="115">Keeps display awake</text>
+            </g>
+            <g>
+              <rect x="22" y="146" width="160" height="62" rx="6" fill="var(--card)" stroke="var(--line)" />
+              <text x="32" y="165" font-weight="600">Dismiss watcher</text>
+              <text x="32" y="183">Any input closes it</text>
+              <text x="32" y="199">Like, skip, media keys don't</text>
+            </g>
+            <g>
+              <rect x="210" y="146" width="150" height="62" rx="6" fill="var(--card)" stroke="var(--line)" />
+              <text x="220" y="165" font-weight="600">Keep awake + power</text>
+              <text x="220" y="183">Time limit, counted</text>
+              <text x="220" y="199">from open. Battery times</text>
+            </g>
+            <g>
+              <rect x="388" y="146" width="162" height="62" rx="6" fill="var(--card)" stroke="var(--line)" />
+              <text x="398" y="165" font-weight="600">Tray icon + settings</text>
+              <text x="398" y="183">Flyout, menu, warnings</text>
+              <text x="398" y="199">Settings window</text>
+            </g>
+            <g>
+              <rect x="22" y="232" width="250" height="52" rx="6" fill="var(--card)" stroke="var(--line)" />
+              <text x="32" y="251" font-weight="600">Spotify info</text>
+              <text x="32" y="269">Media controls → track, art, position</text>
+            </g>
+            <g>
+              <rect x="22" y="296" width="250" height="52" rx="6" fill="var(--card)" stroke="var(--line)" />
+              <text x="32" y="315" font-weight="600">Spotify audio</text>
+              <text x="32" y="333">Process capture → FFT → delay line</text>
+            </g>
+            <g>
+              <rect x="22" y="360" width="250" height="52" rx="6" fill="var(--card)" stroke="var(--line)" />
+              <text x="32" y="379" font-weight="600">Preset library</text>
+              <text x="32" y="397">Scan and watch the folder, convert .milk</text>
+            </g>
+            <g>
+              <rect x="300" y="232" width="250" height="180" rx="6" fill="var(--card)" stroke="var(--line)" />
+              <text x="310" y="251" font-weight="600">Page host (WebView2)</text>
+              <text x="310" y="271">Serves idleviz-app:// with the CSP</text>
+              <text x="310" y="289">Calls page functions only</text>
+              <text x="310" y="307">Status check once a second</text>
+              <text x="310" y="325">Replaces a stuck page after 3 s</text>
+              <text x="310" y="343">Denies camera, mic, everything</text>
+              <text x="310" y="371" fill="var(--muted)">The page can't call back.</text>
+              <text x="310" y="387" fill="var(--muted)">The helper asks, the page answers.</text>
+            </g>
+          </g>
+          <line x1="182" y1="85" x2="208" y2="85" stroke="var(--muted)" marker-end="url(#ah)" />
+          <line x1="360" y1="85" x2="386" y2="85" stroke="var(--muted)" marker-end="url(#ah)" />
+          <line x1="272" y1="258" x2="298" y2="258" stroke="var(--muted)" marker-end="url(#ah)" />
+          <line x1="272" y1="322" x2="298" y2="322" stroke="var(--muted)" marker-end="url(#ah)" />
+          <line x1="272" y1="386" x2="298" y2="386" stroke="var(--muted)" marker-end="url(#ah)" />
+
+          <rect x="610" y="6" width="324" height="418" rx="10" fill="var(--win-bg)" stroke="var(--line)" />
+          <text x="626" y="30" font-size="14" font-weight="600" fill="var(--win-fg)">
+            The page: reuse IdleViz/web/ unchanged
+          </text>
+          <g font-size="12" fill="var(--fg)">
+            <rect x="626" y="46" width="292" height="70" rx="6" fill="var(--card)" stroke="var(--line)" />
+            <text x="636" y="65" font-weight="600">Overlay (top layer)</text>
+            <text x="636" y="83">Art, title, artist, progress, heart</text>
+            <text x="636" y="101" fill="var(--muted)">nowPlaying, setOverlayEnabled, showLike</text>
+            <rect x="626" y="128" width="292" height="52" rx="6" fill="var(--card)" stroke="var(--line)" />
+            <text x="636" y="147" font-weight="600">Dim layer</text>
+            <text x="636" y="165" fill="var(--muted)">setBrightness (black, 1 − brightness)</text>
+            <rect x="626" y="192" width="292" height="104" rx="6" fill="var(--card)" stroke="var(--line)" />
+            <text x="636" y="211" font-weight="600">Visualizer (bottom layer)</text>
+            <text x="636" y="229">Butterchurn canvas, 395 bundled presets</text>
+            <text x="636" y="247">or one plugin in a sandboxed frame</text>
+            <text x="636" y="265" fill="var(--muted)">audioFrame, setPresetSettings,</text>
+            <text x="636" y="281" fill="var(--muted)">setCustomPresets, skipPreset</text>
+            <rect x="626" y="308" width="292" height="52" rx="6" fill="var(--card)" stroke="var(--line)" />
+            <text x="636" y="327" font-weight="600">Asked by the helper</text>
+            <text x="636" y="345" fill="var(--muted)">idlevizStatus(), idlevizPresets()</text>
+            <rect x="626" y="372" width="292" height="40" rx="6" fill="var(--card)" stroke="var(--line)" />
+            <text x="636" y="396" font-weight="600">converter.html (hidden, .milk → .json)</text>
+          </g>
+          <line x1="552" y1="322" x2="608" y2="230" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ah)" />
+          <text x="560" y="270" font-size="11" fill="var(--muted)" transform="rotate(-58 572 280)">script calls</text>
+        </svg>
+        <figcaption>
+          Left: what you write. Right: what already exists. The arrow is the only connection, and it goes one way.
+        </figcaption>
+      </figure>
+
+      <h3>Mac part → Windows part</h3>
+      <div class="scroll">
+        <table>
+          <tr>
+            <th>Job</th>
+            <th>Mac (read this for the rules)</th>
+            <th>Windows</th>
+          </tr>
+          <tr>
+            <td>The page</td>
+            <td><code>IdleViz/web/</code> in a <code>WKWebView</code></td>
+            <td>The same folder in WebView2 (Chromium). Don't fork it.</td>
+          </tr>
+          <tr>
+            <td>Logic without a screen</td>
+            <td><code>Sources/IdleVizCore/</code>, 213 tests</td>
+            <td>Port file by file to <code>IdleViz.Core</code>, tests included. Same names, same numbers.</td>
+          </tr>
+          <tr>
+            <td>Menu-bar icon and popup</td>
+            <td><code>MenuBarView.swift</code>, <code>MenuBarIcon.swift</code></td>
+            <td>Notification-area (tray) icon, a flyout and a context menu</td>
+          </tr>
+          <tr>
+            <td>Settings window</td>
+            <td><code>SettingsWindow.swift</code>, <code>PresetControls.swift</code></td>
+            <td>WinUI 3 window with Mica and settings cards</td>
+          </tr>
+          <tr>
+            <td>Idle time</td>
+            <td><code>CGEventSource.secondsSinceLastEventType</code></td>
+            <td><code>GetLastInputInfo</code></td>
+          </tr>
+          <tr>
+            <td>Global hotkey</td>
+            <td><code>KeyboardShortcuts</code> package</td>
+            <td><code>RegisterHotKey</code>, plus a recorder control you build</td>
+          </tr>
+          <tr>
+            <td>Open from a terminal</td>
+            <td><code>open idleviz://open</code></td>
+            <td>
+              <code>start idleviz://open</code> (protocol registered per user; a second launch hands over to the running
+              copy)
+            </td>
+          </tr>
+          <tr>
+            <td>Dismiss on input</td>
+            <td><code>NSEvent</code> monitors and an idle-time backup</td>
+            <td>Low-level keyboard and mouse hooks while open, and a <code>GetLastInputInfo</code> backup</td>
+          </tr>
+          <tr>
+            <td>Keep the display awake</td>
+            <td>IOKit power assertion "IdleViz visualizer"</td>
+            <td>A display-required power request with the same reason text</td>
+          </tr>
+          <tr>
+            <td>Battery or mains</td>
+            <td><code>IOPSGetProvidingPowerSourceType</code></td>
+            <td><code>GetSystemPowerStatus</code> and a power-source change notification</td>
+          </tr>
+          <tr>
+            <td>What Spotify plays</td>
+            <td>Distributed notification and one AppleScript query</td>
+            <td>
+              Windows media controls (<code>GlobalSystemMediaTransportControlsSessionManager</code>), Spotify's session
+              only
+            </td>
+          </tr>
+          <tr>
+            <td>Album art</td>
+            <td>Downloaded from the artwork URL</td>
+            <td>The thumbnail the media controls hand over. No network at all.</td>
+          </tr>
+          <tr>
+            <td>Spotify's audio</td>
+            <td>Core Audio process tap</td>
+            <td>WASAPI process loopback capture on Spotify's process tree</td>
+          </tr>
+          <tr>
+            <td>FFT and bands</td>
+            <td>vDSP in <code>AudioAnalyzer.swift</code></td>
+            <td>Any FFT in C#. The numbers must match the Mac tests.</td>
+          </tr>
+          <tr>
+            <td>Output device and its latency</td>
+            <td>Core Audio device properties</td>
+            <td>
+              <code>IMMDeviceEnumerator</code>, <code>IMMNotificationClient</code>, <code>IAudioClient</code> latency
+            </td>
+          </tr>
+          <tr>
+            <td>Microphone (Detect delay)</td>
+            <td><code>AVAudioEngine</code> on the built-in mic</td>
+            <td>WASAPI capture on the built-in mic</td>
+          </tr>
+          <tr>
+            <td>Presets folder</td>
+            <td><code>~/Library/Application Support/IdleViz/Presets/</code>, FSEvents</td>
+            <td><code>%APPDATA%\IdleViz\Presets\</code>, <code>FileSystemWatcher</code></td>
+          </tr>
+          <tr>
+            <td>Settings storage</td>
+            <td><code>UserDefaults</code></td>
+            <td>One JSON file under <code>%LOCALAPPDATA%\IdleViz\</code>, same key names</td>
+          </tr>
+          <tr>
+            <td>Start with the system</td>
+            <td><code>SMAppService</code></td>
+            <td>Per-user startup entry, state read back from Windows</td>
+          </tr>
+          <tr>
+            <td>Permissions and welcome window</td>
+            <td><code>Permissions.swift</code>, <code>WelcomeWindow.swift</code></td>
+            <td>Not ported. Windows asks for neither permission. Warnings replace them.</td>
+          </tr>
+          <tr>
+            <td>Install</td>
+            <td><code>IdleViz.command</code> copies the app to /Applications</td>
+            <td>A script that builds a setup file</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="ui">4. The Windows UI</h2>
+      <p class="lead">
+        These are previews of layout, grouping, row order and wording, not code to port. Build them from real WinUI 3
+        controls and let Windows supply the colours, fonts and spacing. Use the buttons at the top of the page to see
+        light and dark.
+      </p>
+      <div class="d you">
+        <span class="tag">Owner decided</span>On the Mac the owner asked for a liquid-glass popup "like the Battery
+        menu", and a settings window with no sidebar and no tabs: one section that scrolls, small, portrait, fixed size,
+        never fullscreen, no dark-mode setting (it follows the system). For Windows the owner said: Liquid Glass isn't a
+        thing there, so make it look like a usual Windows app.
+      </div>
+
+      <h3>4.1 Tray icon</h3>
+      <div class="two">
+        <div class="w">
+          <div class="desk" style="height: 96px">
+            <div class="taskbar" style="justify-content: center; gap: 26px">
+              <span class="ticon" title="Normal"
+                ><svg viewBox="0 0 16 16"><path d="M2 7v2M5 4v8M8 2v12M11 5v6M14 7v2" /></svg
+              ></span>
+              <span class="ticon" title="Refused"
+                ><svg viewBox="0 0 16 16"><path d="M2 7v2M5 4v8M8 2v12M11 5v6M14 7v2M2 14 14 2" /></svg
+              ></span>
+              <span class="ticon" style="color: #f5b800" title="Warning"
+                ><svg viewBox="0 0 16 16"><path d="M2 7v2M5 4v8M8 2v12M11 5v6M14 7v2" /></svg
+              ></span>
+            </div>
+          </div>
+          <figcaption>Normal, the refusal flash, and the warning state.</figcaption>
+        </div>
+        <div>
+          <ul>
+            <li>A waveform glyph, one colour, white or black to suit the taskbar.</li>
+            <li>
+              <b>Refused open:</b> when a manual open is refused (no Spotify track), swap to the slashed waveform and
+              back 3 times over about 1 s.
+            </li>
+            <li><b>Warning:</b> the same glyph in yellow while a problem row is showing.</li>
+            <li>Tooltip: "IdleViz", or "IdleViz, something needs attention".</li>
+            <li>No taskbar button and no window while only the tray icon is showing.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="d you">
+        <span class="tag">Owner decided</span>The refused-open signal is the slashed waveform (not a blink, not a dimmed
+        icon). A missing permission turns the icon yellow and adds an error row under "Open visualizer".
+      </div>
+
+      <h3>4.2 Left-click: the flyout</h3>
+      <div class="two">
+        <div class="w">
+          <div class="desk">
+            <div class="flyout">
+              <div class="frow hl"><span>Settings</span></div>
+              <div class="fsep"></div>
+              <div class="frow dim"><span>Open visualizer</span><span class="keys">Ctrl + Alt + V</span></div>
+              <div class="frow">
+                <span style="display: flex; gap: 10px"
+                  ><span class="warnglyph">⚠</span
+                  ><span>Spotify audio can't be captured<small>Show details ›</small></span></span
+                >
+              </div>
+            </div>
+            <div class="taskbar">
+              <span>⌃</span>
+              <span class="ticon sel" style="color: #f5b800"
+                ><svg viewBox="0 0 16 16"><path d="M2 7v2M5 4v8M8 2v12M11 5v6M14 7v2" /></svg
+              ></span>
+              <span>🔊</span><span>9:41 AM</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <ul>
+            <li>
+              Looks like the Windows 11 volume or battery flyout: acrylic background, 8 px corners, a thin border, a
+              soft shadow, anchored above the tray icon. Closes when it loses focus or on Esc.
+            </li>
+            <li>About 290 px wide. Height fits the rows. Rows highlight on hover with 4 px corners.</li>
+            <li><b>Settings</b> is the only normal row. It opens the settings window.</li>
+            <li>
+              <b>Open visualizer</b> is dimmed and not clickable. It shows the current hotkey, read each time the flyout
+              opens, or "Not set".
+            </li>
+            <li>
+              <b>Warning rows</b> only while something is wrong, one per problem, each with a yellow warning glyph and a
+              second line.
+            </li>
+            <li>Re-check the warnings every time the flyout opens.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="d you">
+        <span class="tag">Owner decided</span>The popup is deliberately tiny: one clickable row that opens a separate
+        settings window, and below it the hotkey for opening the visualizer, shown for information.
+      </div>
+
+      <h3>4.3 Right-click: the context menu</h3>
+      <div class="two">
+        <div class="w">
+          <div class="desk" style="height: 230px">
+            <div class="flyout cmenu">
+              <div class="frow"><span>Settings</span></div>
+              <div class="frow hl"><span>Open visualizer</span><span class="keys">Ctrl+Alt+V</span></div>
+              <div class="fsep"></div>
+              <div class="frow"><span>Exit</span></div>
+            </div>
+            <div class="taskbar">
+              <span>⌃</span>
+              <span class="ticon sel"
+                ><svg viewBox="0 0 16 16"><path d="M2 7v2M5 4v8M8 2v12M11 5v6M14 7v2" /></svg
+              ></span>
+              <span>🔊</span><span>9:41 AM</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <ul>
+            <li>A standard Windows 11 context menu.</li>
+            <li><b>Open visualizer</b> is clickable here and runs the same open rules as the hotkey.</li>
+            <li><b>Exit</b> quits the app. This is the only Exit.</li>
+          </ul>
+          <div class="d win">
+            <span class="tag">Owner decided, Windows</span>On the Mac there is no Quit item anywhere: the red button
+            closes settings and ⌘Q quits. Windows has no ⌘Q, so Exit lives in the right-click menu. Closing the settings
+            window (the X, or Alt+F4) only closes that window. The app keeps running in the tray.
+          </div>
+        </div>
+      </div>
+
+      <h3>4.4 Settings window</h3>
+      <div class="two">
+        <div class="w">
+          <div class="wwin">
+            <div class="wbar">
+              <span>IdleViz Settings</span><span class="wbtn">—</span><span class="wbtn off">☐</span
+              ><span class="wbtn">✕</span>
+            </div>
+            <div class="wbody">
+              <div class="wh" style="margin-top: 6px">General</div>
+              <div class="wcard">
+                <div>Start after idle<small>Needs a Spotify track</small></div>
+                <span class="wctl combo">5 min</span>
+              </div>
+              <div class="wcard">
+                <div>Keep screen awake<small>Then the PC sleeps as usual</small></div>
+                <span class="wctl combo">1 hour</span>
+              </div>
+              <div class="wcard">
+                <div>Different times on battery</div>
+                <span class="wsw on">On<i></i></span>
+              </div>
+              <div class="wcard sub">
+                <div>On battery: start after idle</div>
+                <span class="wctl combo">5 min</span>
+              </div>
+              <div class="wcard sub">
+                <div>On battery: keep screen awake</div>
+                <span class="wctl combo">30 min</span>
+              </div>
+              <div class="wcard">
+                <div>Open hotkey</div>
+                <span class="wctl">Ctrl + Alt + V &nbsp;✕</span>
+              </div>
+              <div class="wcard">
+                <div>Like key<small>Favorites what's on screen</small></div>
+                <span class="wctl combo">L</span>
+              </div>
+              <div class="wcard">
+                <div>Skip key<small>Next visualizer, in Shuffle</small></div>
+                <span class="wctl combo">N</span>
+              </div>
+              <div class="wcard">
+                <div>Open now</div>
+                <span class="wctl">Open</span>
+              </div>
+              <div class="wcard">
+                <div>Run at startup</div>
+                <span class="wsw">Off<i></i></span>
+              </div>
+
+              <div class="wh">Visualizer</div>
+              <div class="wcard">
+                <div>Show Spotify overlay</div>
+                <span class="wsw on">On<i></i></span>
+              </div>
+              <div class="wcard">
+                <div>Brightness</div>
+                <span class="wslider"><i style="--v: 40%"></i>70%</span>
+              </div>
+              <div class="wcard">
+                <div>Audio delay<small>For WH-1000XM5</small></div>
+                <span class="wslider"><i style="--v: 8%"></i>180 ms</span>
+              </div>
+              <div class="wcard">
+                <div>Detect delay<small>Listens with the mic for a few seconds</small></div>
+                <span class="wctl">Detect</span>
+              </div>
+              <div class="wcard">
+                <div>Manual delay test<small>Match a flash to a beep, no mic</small></div>
+                <span class="wctl">Start</span>
+              </div>
+              <div class="wcard">
+                <div>Mode</div>
+                <span class="wctl combo">Shuffle</span>
+              </div>
+              <div class="wcard">
+                <div>Shuffle from</div>
+                <span class="wctl combo">All</span>
+              </div>
+              <div class="wcard">
+                <div>Seconds per preset</div>
+                <span class="wctl combo">30</span>
+              </div>
+              <div class="wcard">
+                <div>Blend time</div>
+                <span class="wctl combo">2.7 s</span>
+              </div>
+              <div class="wcard">
+                <div>Last shown<small>Geiss - Swirlie 5</small></div>
+                <span style="display: flex; gap: 4px"><span class="wctl">♡</span><span class="wctl">⊘</span></span>
+              </div>
+              <div class="wcard">
+                <div>Favorites</div>
+                <span class="wctl">Manage (12)</span>
+              </div>
+              <div class="wcard">
+                <div>Blocklist</div>
+                <span class="wctl">Manage (4)</span>
+              </div>
+
+              <div class="wh">Presets</div>
+              <div class="winfo">
+                <span class="warnglyph">⚠</span
+                ><span>Custom plugins and presets are code. Only import ones you trust.</span>
+              </div>
+              <div class="wcard">
+                <div>Import…<small>.json, .js, .milk</small></div>
+                <span class="wctl">Import</span>
+              </div>
+              <div class="wcard">
+                <div>Folder<small>395 bundled, 18 custom</small></div>
+                <span class="wctl">Open</span>
+              </div>
+              <div class="wcard">
+                <div>Rescan</div>
+                <span class="wctl">Reload</span>
+              </div>
+              <div class="wh" style="font-weight: 400; font-size: 12px; color: var(--w-text2)">Failed to load (2)</div>
+              <div class="wcard">
+                <div>broken-tunnel.milk<small>The warp shader couldn't be converted</small></div>
+                <span class="wctl">Reveal</span>
+              </div>
+              <div class="wcard">
+                <div>slow.js<small>Frame over 50 ms</small></div>
+                <span class="wctl">Reveal</span>
+              </div>
+            </div>
+          </div>
+          <figcaption>Scroll inside the window to see all three sections.</figcaption>
+        </div>
+
+        <div>
+          <h4>Window</h4>
+          <ul>
+            <li>A normal window with a title bar, Mica background, Windows 11 rounded corners.</li>
+            <li>
+              Small, portrait, fixed size. Not resizable, Maximize disabled, no fullscreen. Minimize and Close stay. The
+              content scrolls inside.
+            </li>
+            <li>One page. No navigation pane, no tabs.</li>
+            <li>It has a taskbar button while it is open. Opening it again brings the existing window forward.</li>
+            <li>It stays open when the visualizer opens.</li>
+            <li>Light and dark follow the Windows app mode. No setting, no hard-coded colours.</li>
+          </ul>
+          <h4>Rows</h4>
+          <ul>
+            <li>
+              Each row is a settings card: label on the left, an optional one-line hint under it, one control on the
+              right. Use the standard controls: <code>ComboBox</code>, <code>ToggleSwitch</code>, <code>Slider</code>,
+              <code>Button</code>.
+            </li>
+            <li>Section order and row order are exactly as shown: General, Visualizer, Presets.</li>
+            <li>
+              <b>Different times on battery</b> reveals the two "On battery" rows. The first time it is turned on they
+              start as copies of the rows above. On a PC with no battery, the switch and both rows are not shown at all.
+            </li>
+            <li>
+              <b>Open hotkey</b> is a recorder: click, press a combination with at least one modifier, and it is saved.
+              The ✕ clears it. If Windows refuses the combination (another app has it), say so under the row.
+            </li>
+            <li>
+              <b>Like key</b> and <b>Skip key</b> offer Off, A to Z, 0 to 9, the four arrow keys and Space. Each leaves
+              out the key the other one uses.
+            </li>
+            <li>
+              <b>Mode</b> is Shuffle or Single. Shuffle shows Shuffle from (All, Bundled, Custom, Favorites), Seconds
+              per preset (15, 30, 45, 60, 120, 300) and Blend time (0, 1, 2.7, 5, 8 s). Single replaces those three with
+              one <b>Visualizer</b> picker listing every preset and plugin.
+            </li>
+            <li>
+              When the chosen Shuffle-from set is empty (no favorites yet, no custom presets), the row's hint says that
+              all presets are used instead.
+            </li>
+            <li><b>Last shown</b> is hidden until a preset has been on screen. The heart is filled for a favorite.</li>
+            <li><b>Failed to load</b> is hidden when nothing has failed.</li>
+            <li>Every control applies at once, including while the visualizer is open.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="d me">
+        <span class="tag">Claude's call</span><b>J2. Windows details of the settings window.</b> None of these were
+        asked:
+        <ul>
+          <li>Size about 440 × 680 (the Mac one is 340 × 560; Windows controls are larger).</li>
+          <li>Title "IdleViz Settings".</li>
+          <li>"Then the Mac sleeps as usual" becomes "Then the PC sleeps as usual".</li>
+          <li>"Launch at login" becomes "Run at startup", the wording Windows uses.</li>
+          <li>The Mac's sheets become modal dialogs inside the settings window (<code>ContentDialog</code>).</li>
+          <li>The trust warning is an <code>InfoBar</code> with warning severity.</li>
+        </ul>
+      </div>
+
+      <h3>4.5 Dialogs</h3>
+      <div class="two">
+        <div class="w">
+          <div class="wdlg">
+            <div class="dbody">
+              <div class="dtitle">Favorites</div>
+              <div class="seg"><span>On the list (12)</span><span class="cur">All presets</span></div>
+              <div class="wsearch">Search</div>
+              <div class="wlist">
+                <div>
+                  <span>Aurora <span class="keys">custom</span></span
+                  ><span class="wctl">Add</span>
+                </div>
+                <div><span>Flexi - mindblob mix</span><span class="wctl">Remove</span></div>
+                <div><span>Geiss - Swirlie 5</span><span class="wctl">Add</span></div>
+                <div><span>Zylot - Paint Spill</span><span class="wctl">Add</span></div>
+              </div>
+            </div>
+            <div class="dfoot"><span class="wctl prim">Done</span></div>
+          </div>
+          <figcaption>Favorites and Blocklist use the same dialog.</figcaption>
+        </div>
+        <div class="w">
+          <div class="wdlg">
+            <div class="dbody">
+              <div class="dtitle">Manual delay test</div>
+              <div class="panel mark">every fourth flash is orange</div>
+              <div style="font-size: 13px; color: var(--w-text2); margin-bottom: 12px">
+                Drag until the panel lights up exactly when you hear the beep. Every fourth beep is higher, and its
+                flash is orange.
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; justify-content: space-between">
+                <span class="wctl">−10 ms</span><span class="wslider"><i style="--v: 8%; width: 130px"></i></span
+                ><span class="wctl">+10 ms</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  font-size: 12px;
+                  color: var(--w-text2);
+                  margin-top: 10px;
+                "
+              >
+                <span>For WH-1000XM5</span><span>180 ms</span>
+              </div>
+            </div>
+            <div class="dfoot"><span class="wctl prim">Done</span></div>
+          </div>
+          <figcaption>
+            The panel is black, flashes white, and orange on every fourth beep, in light and dark mode.
+          </figcaption>
+        </div>
+      </div>
+      <ul>
+        <li>
+          <b>Favorites / Blocklist:</b> two tabs. "On the list (n)" shows the entries with Remove. "All presets" shows
+          everything with a search box and Add or Remove. Custom entries carry a small "custom" tag. A preset is never
+          on both lists: adding it to one takes it off the other.
+        </li>
+        <li>
+          <b>Manual delay test:</b> the same per-device delay as the slider in the Visualizer section, changed live.
+          Done saves it for the device even if it wasn't moved.
+        </li>
+      </ul>
+      <div class="d you">
+        <span class="tag">Owner decided</span>Favorites and Blocklist stay as "Manage" dialogs, not an inline list.
+        Presets get onto the lists two ways: the <b>Last shown</b> row, and an "All presets" tab in each dialog. The
+        manual delay test is a dialog on the settings window, not fullscreen and not inline.
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="page">5. The fullscreen page</h2>
+      <p>
+        This is the existing page in <code>IdleViz/web/</code>. You don't rebuild it. The drawings below are so you know
+        what a correct result looks like when you run it on Windows.
+      </p>
+      <figure>
+        <div class="tv">
+          <div class="dim"></div>
+          <div class="scrim"></div>
+          <div class="trk">
+            <div class="art"></div>
+            <div>
+              <div class="ttl">
+                Night Drive<svg class="heart" viewBox="0 0 24 24">
+                  <path d="M12 21C7 17 3 13 3 8.5a4.5 4.5 0 0 1 9 0 4.5 4.5 0 0 1 9 0C21 13 17 17 12 21z" />
+                </svg>
+              </div>
+              <div class="art2">The Example Band</div>
+            </div>
+          </div>
+          <div class="prog">
+            <span>01:12</span><span class="bar"><i></i></span><span>03:48</span>
+          </div>
+          <span class="m" style="left: 7.083%; top: 51%">art 176 × 176 at (136, 608)</span>
+          <span class="m" style="left: 19%; top: 73.5%">text starts 48 px right of the art</span>
+          <span class="m" style="left: 40%; top: 87%">progress row at y 884, from x 136 to x 1784</span>
+          <span class="m" style="right: 3%; top: 4%"
+            >stage: 1920 × 1080, scaled to the window width, pinned to the bottom</span
+          >
+        </div>
+        <figcaption>
+          Song playing, just after the like key was pressed. Title: Figtree 800, 72 px. Artist: 600, 26 px. Times: 400,
+          24 px, tabular figures. The background here stands in for a Butterchurn preset at 70% brightness.
+        </figcaption>
+      </figure>
+      <div class="grid4">
+        <figure style="margin: 0">
+          <div class="tv">
+            <div class="dim"></div>
+            <div class="scrim"></div>
+            <div class="prog">
+              <span>01:12</span><span class="bar"><i></i></span><span>03:48</span>
+            </div>
+          </div>
+          <figcaption><b>Paused.</b> Everything fades except the progress row, which doesn't move.</figcaption>
+        </figure>
+        <figure style="margin: 0">
+          <div class="tv">
+            <div class="dim"></div>
+            <div class="scrim"></div>
+            <div class="adl">Advertisement</div>
+            <div class="prog">
+              <span>00:07</span><span class="bar"><i style="width: 24%"></i></span><span>00:30</span>
+            </div>
+          </div>
+          <figcaption><b>Ad between songs.</b> A label at the art's left edge, and the progress row.</figcaption>
+        </figure>
+        <figure style="margin: 0">
+          <div class="tv">
+            <div class="dim"></div>
+            <svg class="heart corner" viewBox="0 0 24 24">
+              <path d="M12 21C7 17 3 13 3 8.5a4.5 4.5 0 0 1 9 0 4.5 4.5 0 0 1 9 0C21 13 17 17 12 21z" />
+            </svg>
+          </div>
+          <figcaption>
+            <b>Podcast, no track, or overlay off.</b> Visualizer only, no scrim. The heart goes top right; an outline
+            means "taken off the favorites".
+          </figcaption>
+        </figure>
+      </div>
+      <div class="d you">
+        <span class="tag">Owner decided</span><b>Overlay design.</b>
+        <ul>
+          <li>The overlay is its own layer, so it can sit on any visualizer.</li>
+          <li>It matches the Spotify TV app's now-playing screen, with the visualizer in place of the artist photo.</li>
+          <li>
+            Left out on purpose: the Spotify logo and "Playing from" header, and the control row under the progress bar.
+            The progress row sits lower to use part of that space.
+          </li>
+          <li>The font is Figtree, bundled in the repo with its license. Never loaded from a CDN.</li>
+          <li>The overlay can be switched off in settings. Off means nothing at all, the scrim included.</li>
+          <li>The visualizer runs at 70% brightness by default (50 to 100%), using a black layer, not a filter.</li>
+          <li>An idea to show the artist's picture instead of a visualizer was raised and withdrawn.</li>
+        </ul>
+      </div>
+      <p>
+        The reference photo of the TV app is not in the repository (it shows Spotify's design, and the repo is public).
+        Don't add screenshots of Spotify's apps to the repo.
+      </p>
+
+      <!-- ============================================================ -->
+      <h2 id="spec">6. Behaviour, part by part</h2>
+      <p class="lead">
+        For each part: the rule, the numbers, and how to do it on Windows. The Mac file named in each heading is where
+        the edge cases are written down and tested. Read it before you write the Windows one.
+      </p>
+
+      <h3>
+        6.1 Triggers and open rules
+        <small
+          >(<code>Trigger.swift</code>, <code>OpenRules.swift</code>, <code>IdleScheduler.swift</code>,
+          <code>IdleSkipRules.swift</code>)</small
+        >
+      </h3>
+      <ul>
+        <li>
+          <b>Four triggers:</b> idle timeout, the global hotkey (default Ctrl+Alt+V), <code>idleviz://open</code>, and
+          Open now in settings or the context menu. The last three are "manual".
+        </li>
+        <li>
+          <b>Open rules, for every trigger:</b> Spotify is running and has a current track, playing or paused. Songs,
+          podcasts and ads all count. Use the state already known from the media-control events, so opening is instant.
+        </li>
+        <li><b>Refused manual trigger:</b> flash the tray icon. A refused idle trigger does nothing visible.</li>
+        <li>
+          <b>Idle:</b> setting <code>idleTimeout</code> in minutes: 5, 10, 15, 30, or 0 for Off. Default 5. Don't poll
+          on a fixed interval: schedule the next check for (timeout − current idle time), and re-check after wake and
+          unlock.
+        </li>
+        <li>
+          <b>One attempt per idle period.</b> If the idle trigger fires and the open is blocked, don't try again until
+          there has been new input.
+        </li>
+        <li>
+          <b>Idle-only skip rules:</b> the session is locked; the session isn't the one at the console (remote desktop,
+          another user); another app is keeping the display busy.
+        </li>
+        <li>
+          After the keep-awake limit closed the visualizer, don't reopen until there has been new input, whichever
+          trigger opened it.
+        </li>
+        <li>
+          A manual trigger while the visualizer is open does nothing, except in the debug no-dismiss mode, where it
+          closes it.
+        </li>
+      </ul>
+      <div class="d you">
+        <span class="tag">Owner decided</span>Default idle time 5 minutes. A blocked idle attempt
+        <b>waits for new input</b> instead of retrying. The open check uses cached state and only asks Spotify when
+        nothing is known yet. When Spotify plays on another device, it still opens (overlay as usual, silent visuals).
+      </div>
+      <div class="d risk">
+        <span class="tag">Check first</span><b>"Another app is keeping the display awake."</b> The Mac reads the
+        system's list of display-sleep assertions, which covers a video or a call in any window. Windows only gives that
+        list to an administrator. Without admin rights the nearest check is the shell's notification state
+        (<code>SHQueryUserNotificationState</code>: a fullscreen app, a Direct3D fullscreen app, presentation mode).
+        That misses a video or a call in a normal window. Ask the owner how to handle the gap: accept it, or also skip
+        while any app other than Spotify is playing sound.
+      </div>
+
+      <h3>
+        6.2 The window
+        <small>(<code>WindowController.swift</code>, <code>Fade.swift</code>, <code>DisplayLayout.swift</code>)</small>
+      </h3>
+      <ul>
+        <li>One borderless window covering the primary display, above everything including the taskbar.</li>
+        <li>Create it at launch, hidden, with the page loaded, and keep it between opens. Opening must be instant.</li>
+        <li>Remember the foreground window when opening, and give focus back to it on close.</li>
+        <li>Hide the cursor while open.</li>
+        <li>
+          <b>Fades:</b> in over 0.6 s. Out over 0.25 s on input, 1.5 s at the keep-awake limit, none for sleep or a
+          display change.
+        </li>
+        <li>
+          <b>The PC is handed back when a fade-out starts, not when it ends:</b> the cursor returns, focus goes back,
+          the window stops taking clicks and the display request is released. The page and the audio keep running until
+          the fade is over, so the picture doesn't freeze.
+        </li>
+        <li>A trigger during a fade-out finishes the close and opens again.</li>
+        <li>
+          <b>Close without a fade</b> when the PC goes to sleep and when the displays change: one added or removed, a
+          resolution, scale or position change, another display becoming primary. Compare the full layout with the last
+          one seen, and ignore change events where nothing differs.
+        </li>
+      </ul>
+      <div class="d you">
+        <span class="tag">Owner decided</span>Fade everything, and make the input fade quick, like the system
+        screensaver. Create the window at launch and keep settings open (this fixed the visualizer not showing over
+        fullscreen apps on the Mac). A notification must never close it: on the Mac the cause was the Dock resizing,
+        which looked like a display change.
+      </div>
+      <div class="d risk">
+        <span class="tag">Check first</span><b>Fading a window that holds WebView2.</b> The Mac fades the window's own
+        opacity, so the desktop shows through. A WinUI window has no opacity setting, and a layered window may not work
+        with WebView2's composition. Try window-level opacity first. If it can't be done, the fallback is to show the
+        black window at once and fade the page in from black. That looks different from the Mac, so ask the owner before
+        settling on it.
+      </div>
+
+      <h3>
+        6.3 Dismiss, and the keys that don't
+        <small>(<code>DismissTracker.swift</code>, <code>VisualizerKeys.swift</code>)</small>
+      </h3>
+      <figure>
+        <svg viewBox="0 0 940 150" role="img" aria-label="Timeline of an open and an input close">
+          <line x1="20" y1="70" x2="920" y2="70" stroke="var(--line)" stroke-width="2" />
+          <rect x="40" y="52" width="150" height="36" rx="4" fill="var(--you-bg)" />
+          <text x="48" y="74" font-size="12" fill="var(--you-fg)">fade in 0.6 s</text>
+          <rect x="40" y="96" width="100" height="22" rx="4" fill="var(--me-bg)" />
+          <text x="46" y="111" font-size="11" fill="var(--me-fg)">0.4 s: input ignored</text>
+          <rect x="190" y="52" width="500" height="36" rx="4" fill="var(--win-bg)" />
+          <text x="200" y="74" font-size="12" fill="var(--win-fg)">
+            open: display kept awake, cursor hidden, status check every 1 s
+          </text>
+          <line x1="690" y1="30" x2="690" y2="120" stroke="var(--risk-fg)" stroke-dasharray="4 3" />
+          <text x="696" y="38" font-size="11" fill="var(--risk-fg)">input: PC handed back here</text>
+          <rect x="690" y="52" width="62" height="36" rx="4" fill="var(--you-bg)" />
+          <text x="694" y="74" font-size="11" fill="var(--you-fg)">out 0.25 s</text>
+          <text x="760" y="74" font-size="12" fill="var(--muted)">hidden: page stops rendering</text>
+          <text x="40" y="22" font-size="12" fill="var(--fg)">trigger</text>
+          <line x1="40" y1="26" x2="40" y2="52" stroke="var(--muted)" />
+          <text x="40" y="142" font-size="11" fill="var(--muted)">
+            Keys still held at 0.4 s are ignored until released.
+          </text>
+        </svg>
+      </figure>
+      <ul>
+        <li>
+          <b>Anything closes it:</b> a mouse move with a real delta, a click, a scroll, any key or modifier, a touch or
+          touchpad gesture. As sensitive as a screensaver.
+        </li>
+        <li>
+          <b>Grace period 0.4 s</b> after opening, so the trigger itself doesn't close it. Keys still held when it ends
+          are "stuck": their release and their key repeat are ignored. Pressing one again closes the window.
+        </li>
+        <li>
+          <b>Media keys keep it open and still do their job:</b> volume up, down, mute, play/pause, next, previous, and
+          brightness or keyboard-backlight keys where Windows reports them. Every other key closes it, F1 to F12 and the
+          Windows key included.
+        </li>
+        <li>
+          <b>Like key</b> (L by default): toggles the preset on screen on the favorites. Ask the page which preset is
+          showing at that moment (<code>idlevizStatus()</code>), then call <code>showLike(true|false)</code>. The page
+          shows a heart for 1.6 s: filled when added, outline when taken off, beside the title in the full layout, top
+          right otherwise.
+        </li>
+        <li>
+          <b>Skip key</b> (N by default): calls <code>skipPreset()</code>. In Shuffle the page blends to the next preset
+          in 0.5 s, whatever the blend setting is, and restarts the seconds-per-preset count. In Single it does nothing.
+        </li>
+        <li>Key repeat doesn't run like or skip again. A modifier still closes the window, so Ctrl+L closes it.</li>
+        <li>
+          Settings <code>likeKey</code> and <code>skipKey</code> hold a key code, or −1 for Off. Read them each time the
+          window opens.
+        </li>
+        <li>
+          <b>Backup check:</b> every 100 ms compare the system's last-input time with the time since opening. If there
+          was input the hooks didn't explain, wait 30 ms, check once more, then close.
+        </li>
+        <li>Debug switch: turn dismiss off so the open page can be inspected.</li>
+      </ul>
+      <div class="d you">
+        <span class="tag">Owner decided</span>
+        <ul>
+          <li>
+            Keys still held when the 0.4 s ends are ignored until pressed again (found by hand: holding the hotkey's
+            modifiers used to close it).
+          </li>
+          <li>
+            Like and skip are plain keys picked from a list, not recorded shortcuts. Defaults L and N. The list has
+            letters, digits, arrows and Space.
+          </li>
+          <li>
+            Like toggles and shows a brief heart next to the track title. Skip uses a quick 0.5 s blend and does nothing
+            in Single mode.
+          </li>
+          <li>Both rows sit in General, under Open hotkey.</li>
+          <li>Only the keys with a printed media function keep it open. Keys that open system UI keep closing it.</li>
+        </ul>
+      </div>
+      <div class="d me">
+        <span class="tag">Claude's call</span><b>J3. Low-level hooks for input.</b> Suggested: a low-level keyboard hook
+        and mouse hook installed only while the visualizer is open. They need no permission and see input whether or not
+        the window has focus. Two effects differ from the Mac, where like and skip only work if the app got focus: on
+        Windows they would always work, and the key that closes the visualizer can be swallowed so it never types into
+        the app behind. Key codes would be Windows virtual-key codes, which follow the keyboard layout, so the Mac's
+        "labels are for a US layout" caveat goes away.
+      </div>
+
+      <h3>
+        6.4 Keep awake and battery
+        <small>(<code>Timing.swift</code>, <code>KeepAwake.swift</code>, <code>PowerSource.swift</code>)</small>
+      </h3>
+      <ul>
+        <li>While the window is open, the display doesn't sleep and the screensaver and auto-lock don't start.</li>
+        <li>
+          Setting <code>keepAwakeLimit</code> in minutes: 30, 60, 120, 240. Default 60. Counted from when the window
+          opened. At the limit: fade out over 1.5 s, release the request, and let Windows sleep and lock as usual.
+        </li>
+        <li>A changed setting applies at once to an open window, still counted from when it opened.</li>
+        <li>
+          <code>useBatteryTimes</code> (default off), <code>idleTimeoutBattery</code>,
+          <code>keepAwakeLimitBattery</code>. While the switch is on and the PC runs on battery, those two replace the
+          normal values. A battery value never set counts as a copy of the normal one.
+        </li>
+        <li>
+          On a power-source change, reschedule the idle check, and apply the new limit to an open window (close at once
+          if it is already past). Use the change notification, not polling.
+        </li>
+      </ul>
+      <div class="d you">
+        <span class="tag">Owner decided</span>Stay awake with a time limit, default 1 hour, adjustable in settings. It
+        opens on battery too, with an optional second pair of times behind a switch that reveals the extra rows, and the
+        whole option is hidden on a machine with no battery. Accepted tradeoff: during the limit the computer doesn't
+        lock by itself.
+      </div>
+
+      <h3>
+        6.5 Hosting the page
+        <small
+          >(<code>PageView.swift</code>, <code>AppScheme.swift</code>, <code>AppSchemeHandler.swift</code>,
+          <code>PageStatus.swift</code>)</small
+        >
+      </h3>
+      <ul>
+        <li>
+          Serve the page from the custom scheme, not from <code>file://</code>: <code>idleviz-app://app/…</code> is the
+          <code>IdleViz/web/</code> folder, and <code>idleviz-app://presets/…</code> is the presets folder,
+          <code>.json</code> and <code>.js</code> files only. Reject <code>..</code>, encoded <code>..</code>, links out
+          of the folder, other hosts.
+        </li>
+        <li>
+          Send the Content-Security-Policy as a response header, a different one for <code>index.html</code>,
+          <code>plugin-host.html</code> and <code>converter.html</code>. The exact strings are in
+          <code>AppScheme.swift</code>. Send <code>Access-Control-Allow-Origin: *</code> with every response, because
+          the plugin frame has an opaque origin.
+        </li>
+        <li>Only allow navigation inside the scheme.</li>
+        <li>
+          <b>The page must have no way to call the app.</b> Switch off web messages, add no host objects, and deny every
+          permission request (camera, microphone, everything). The app talks to the page only by running script, and
+          learns about the page only by asking it.
+        </li>
+        <li>
+          <b>Wait for the page's scripts.</b> After navigation completes, ask every 50 ms whether the page's functions
+          exist, and only then send the current state (settings, presets, now playing, brightness, delay).
+        </li>
+        <li>
+          <b>Status check:</b> once a second while open, call <code>idlevizStatus()</code>. It returns the preset on
+          screen, frame counts and new load failures. Treat the reply as untrusted: check its shape, cap strings at 300
+          characters and the failure list at 200.
+        </li>
+        <li>
+          <b>Stuck page:</b> no reply for 3 s means the page is stuck (a plugin in an endless loop). Throw the web view
+          away and make a new one, send it the state again, mark the preset that was on screen as failed, and make sure
+          the stuck renderer process is gone.
+        </li>
+        <li>Reload and re-send state if the renderer process crashes.</li>
+        <li>The page only renders while the window is showing. Check that a hidden window costs nothing.</li>
+        <li>DevTools on in Debug builds only.</li>
+      </ul>
+      <h4>Functions the app calls on the page</h4>
+      <div class="scroll">
+        <table>
+          <tr>
+            <th>Call</th>
+            <th>When</th>
+            <th>Shape (source of truth)</th>
+          </tr>
+          <tr>
+            <td><code>nowPlaying(json | null)</code></td>
+            <td>On every Spotify change, when artwork arrives, when the window opens, every 5 s while open</td>
+            <td><code>OverlayPayload.swift</code>, <code>overlay-state.js</code></td>
+          </tr>
+          <tr>
+            <td><code>audioFrame(base64)</code></td>
+            <td>About 60 times a second while open</td>
+            <td><code>AudioFrame.swift</code>, <code>audio-frame.js</code></td>
+          </tr>
+          <tr>
+            <td><code>setPresetSettings(json)</code></td>
+            <td>Page ready, and every change</td>
+            <td><code>PresetSettings.swift</code>, <code>visualizer-state.js</code></td>
+          </tr>
+          <tr>
+            <td><code>setCustomPresets(json)</code></td>
+            <td>Page ready, and when the folder changes</td>
+            <td><code>CustomPresets.swift</code></td>
+          </tr>
+          <tr>
+            <td>
+              <code>setBrightness(0.5…1)</code>, <code>setOverlayEnabled(bool)</code>,
+              <code>setAudioDelay(seconds)</code>
+            </td>
+            <td>Page ready, and every change</td>
+            <td><code>DisplaySettings.swift</code>, <code>AudioDelay.swift</code></td>
+          </tr>
+          <tr>
+            <td><code>skipPreset()</code>, <code>showLike(bool)</code></td>
+            <td>Skip key, like key</td>
+            <td><code>VisualizerKeys.swift</code></td>
+          </tr>
+          <tr>
+            <td><code>idlevizStatus()</code>, <code>idlevizPresets()</code></td>
+            <td>Once a second while open; when settings needs the preset list</td>
+            <td><code>PageStatus.swift</code>, <code>PresetSettings.swift</code></td>
+          </tr>
+        </table>
+      </div>
+      <p>
+        Call them with optional chaining (<code>window.audioFrame?.(…)</code>) so a call before the page is ready
+        doesn't throw. Text from Spotify goes through a JSON encoder into the script, never by string concatenation.
+      </p>
+      <div class="d you">
+        <span class="tag">Owner decided</span>The app asks the page; the page never calls the app. Every plugin, bundled
+        or custom, runs in a separate sandboxed frame. Butterchurn and its presets are vendored in git (unchanged from
+        npm, with checksums), not fetched from a CDN and not copied at build time.
+      </div>
+      <div class="d risk">
+        <span class="tag">Check first</span><b>WebView2 and the custom scheme.</b> The page's CSP names
+        <code>idleviz-app:</code>, so keeping that scheme means zero page changes. Confirm in the first spike that
+        WebView2 under WinUI 3 can register it as a secure scheme with ES modules, that the sandboxed plugin frame can
+        import from it, and that <code>'unsafe-eval'</code> (which Butterchurn needs) works there. If the page has to
+        change to run on Windows, it must keep working on the Mac, and that is a question for the owner.
+      </div>
+
+      <h3>
+        6.6 What Spotify is playing
+        <small
+          >(<code>NowPlaying.swift</code>, <code>SpotifyTracker.swift</code>, <code>SpotifyInfo.swift</code>)</small
+        >
+      </h3>
+      <ul>
+        <li>
+          Use the Windows media controls and only Spotify's session (the desktop app and the Store app identify
+          themselves differently; handle both). Never another player's session.
+        </li>
+        <li>
+          Event-driven: update when the session's properties, playback state or timeline change. No per-second polling.
+        </li>
+        <li>From it: title, artist, album, playing or paused, position, duration, and the thumbnail.</li>
+        <li>
+          Pass the thumbnail to the page as a <code>data:</code> URL inside the payload, JPEG, PNG or WebP only (checked
+          by the first bytes). Keep the 5 most recent in memory. No artwork means the page shows a grey square with a
+          music note.
+        </li>
+        <li>
+          <b>"No track"</b> is: no Spotify session, playback stopped or closed, or an empty title. The page waits 1.5 s
+          before hiding the overlay, because a switch to a new album can report "no track" for a moment.
+        </li>
+        <li>If reading the session fails, keep the last known track instead of clearing it.</li>
+        <li>
+          The page moves the progress bar by itself from position plus time, minus the audio delay. While the window is
+          open, re-read the position every 5 s to correct drift and catch seeks.
+        </li>
+        <li>Never launch Spotify, and never control playback, except pause and resume around the manual delay test.</li>
+      </ul>
+      <div class="d win">
+        <span class="tag">Owner decided, Windows</span>Windows media controls, no Spotify login. Song, podcast or ad is
+        guessed, since Windows doesn't say. The Mac rules to reproduce: podcast → no overlay; ad after a song →
+        "Advertisement" plus progress; ad after a podcast → no overlay.
+      </div>
+      <div class="d risk">
+        <span class="tag">Check first</span><b>What Spotify actually reports on Windows.</b> Log it in the first spike,
+        for a song, a paused song, a podcast, a local file and Spotify Connect:
+        <ul>
+          <li>
+            <b>Position and duration.</b> If Spotify doesn't report a timeline, the progress bar and times can't be
+            drawn. That is a product question for the owner, not something to work around quietly.
+          </li>
+          <li><b>Podcasts.</b> On the Mac a podcast has an empty artist. Find out what marks one here.</li>
+          <li>
+            <b>Ads.</b> The owner has Premium and never saw an ad on the Mac either, so the ad rules are untested on
+            both systems.
+          </li>
+          <li>
+            <b>A track ID.</b> There is no Spotify URL here, so a track change has to be detected from title, artist and
+            album.
+          </li>
+        </ul>
+      </div>
+      <div class="d you">
+        <span class="tag">Owner decided</span>If the track disappears or Spotify quits while the visualizer is open, the
+        visualizer stays and only the overlay goes. This was asked twice and answered the same way both times. A failed
+        read keeps the last known track. Five covers are cached.
+      </div>
+
+      <h3>
+        6.7 Spotify's audio
+        <small
+          >(<code>SpotifyAudioTap.swift</code>, <code>AudioPump.swift</code>, <code>AudioAnalyzer.swift</code>,
+          <code>AutoGain.swift</code>, <code>AudioFrame.swift</code>)</small
+        >
+      </h3>
+      <div class="d you">
+        <span class="tag">Owner decided</span><b>The visuals only ever get Spotify's audio.</b> Not the system mix, not
+        another app, not the microphone. If Spotify isn't there, the frame is silence, never a fallback source. Audio
+        reaches the page only through <code>audioFrame</code>, and a plugin only gets a plain object of numbers. The
+        audio is turned into levels in native code, not in the page.
+      </div>
+      <ul>
+        <li>
+          Capture with WASAPI process loopback, targeting Spotify's main process and including its child processes. Run
+          it only while the window is open (plus during Detect delay). Rebuild it when Spotify starts or quits and when
+          the default output device changes. Clear the sample buffer on teardown.
+        </li>
+        <li>
+          <b>Test for the guarantee:</b> pause Spotify, play something else (a browser video, a system sound), and
+          confirm the visuals stay flat.
+        </li>
+        <li>
+          <b>Analysis, 60 times a second,</b> on the newest 1024 samples: mono mix → automatic gain → Hann window →
+          1024-point FFT → 64 log-spaced bands from about 40 Hz to 16 kHz.
+        </li>
+        <li>
+          <b>Bands:</b> −65 dB to −10 dB maps onto 0..1 (a full-scale sine is 0 dB). Each frame a band moves 70% of the
+          way up to a higher value and 12% of the way down to a lower one, and snaps to exact zero in silence. The
+          lowest bands are narrower than one FFT bin, so they read a value interpolated between the two nearest bins.
+        </li>
+        <li><code>bass</code>, <code>mid</code>, <code>treble</code> are the averages of bands 0–7, 8–29 and 30–63.</li>
+        <li>
+          <b>Automatic gain:</b> follows the frame's RMS, rising in about 0.5 s and falling in about 5 s, and scales it
+          to 0.2. Gain stays between 0.5× and 32×, starts at 1×, is held while the input is below −60 dBFS, and is
+          remembered between opens.
+        </li>
+        <li>Drop frames, don't queue them, if the page falls behind.</li>
+      </ul>
+      <h4>The frame: 7,448 bytes, little-endian, sent base64-encoded</h4>
+      <div class="bytes">
+        <div style="flex: 0.6"><b>u32</b>sequence</div>
+        <div style="flex: 0.8"><b>f32</b>sample rate</div>
+        <div style="flex: 1.6"><b>f32 × 4</b>bass, mid, treble, rms</div>
+        <div style="flex: 2"><b>f32 × 64</b>bands, 0..1</div>
+        <div style="flex: 3"><b>f32 × 1024</b>waveform, −1..1</div>
+        <div style="flex: 2"><b>u8 × 1024</b>mono</div>
+        <div style="flex: 2"><b>u8 × 1024</b>left</div>
+        <div style="flex: 2"><b>u8 × 1024</b>right</div>
+      </div>
+      <p class="lead">
+        The three byte arrays are Butterchurn's input: time-domain samples where 128 is silence. Byte offsets: header
+        0–23, bands 24, waveform 280, bytes 4376. <code>tests/audio-frame.test.js</code> checks the layout.
+      </p>
+      <div class="d risk">
+        <span class="tag">Check first</span><b>Do this spike before anything else is built on it.</b> Prove that process
+        loopback hears Spotify and only Spotify, find out whether it captures before or after Spotify's own volume
+        slider, measure the cost of sending a frame 60 times a second by script, and check that Butterchurn holds 60
+        fps. On the Mac this spike found four bugs that would otherwise have shown up much later.
+      </div>
+
+      <h3>
+        6.8 Audio delay <small>(<code>AudioDelay.swift</code> in both folders, <code>BeepTest.swift</code>)</small>
+      </h3>
+      <ul>
+        <li>
+          Bluetooth speakers play the sound 150 to 300 ms late and network speakers up to about 2 s, so the visuals wait
+          to match. Keep analysed frames in a small buffer and send each one <code>delay</code> after it was captured.
+          The page and plugins don't know about it. Opening the window clears the buffer.
+        </li>
+        <li>
+          <b>Per output device:</b> setting <code>audioDelayByDevice</code>, keyed by the default output device's ID. 0
+          to 2.5 s in 10 ms steps. Switch values when the default device changes. The hint under the slider names the
+          device.
+        </li>
+        <li>A device with no saved value starts at the latency the system reports for it.</li>
+        <li>
+          <b>Detect delay:</b> only while Spotify plays out loud. Record the built-in microphone and the captured
+          Spotify signal for about 5 s, cross-correlate them, and save the result if the peak is clear. If not (too
+          quiet, a noisy room, headphones), keep the old value and say so in the hint. Stop the microphone at once. The
+          recording stays in memory and is never sent to the page.
+        </li>
+        <li>
+          The method is in <code>DelayDetector</code>: a softened phase transform (magnitude to the power 0.8, 300 Hz to
+          6 kHz), smoothed over 5 ms, lags from −0.1 to 2.5 s. A result counts only if its peak is 10 standard
+          deviations above the lags more than 100 ms away and 1.5 times the best of them. A lag below zero is saved as
+          0. Port it with its tests.
+        </li>
+        <li>
+          Use the built-in microphone even if a headset is the default input: recording from a Bluetooth headset's own
+          microphone switches it to call mode and changes the delay being measured.
+        </li>
+        <li>
+          If Windows blocks microphone access for desktop apps, say so in the hint with a link to the microphone privacy
+          page. This is only a hint. It never turns the tray icon yellow.
+        </li>
+        <li>
+          <b>Manual delay test:</b> pause Spotify if it is playing. Play a 60 ms beep every second, each placed at an
+          exact time on the audio clock. Light the panel for 120 ms starting <code>delay</code> after each beep, read
+          from the same clock. Every fourth beep is an octave higher (1760 Hz instead of 880 Hz) and its flash is
+          orange. Done stops the beeps, saves the delay and resumes Spotify if the app paused it. Detect and the manual
+          test can't run together.
+        </li>
+      </ul>
+      <div class="d you">
+        <span class="tag">Owner decided</span>
+        <ul>
+          <li>
+            An audio delay setting, plus a detector that uses the microphone, and the microphone turns on only when a
+            button is pressed.
+          </li>
+          <li>A new device starts at the delay it reports, not at 0.</li>
+          <li>
+            The detector uses the phase-transform method (the first, loudness-based version worked half the time),
+            measured from the moment the audio is handed to the app.
+          </li>
+          <li>
+            The manual test: drag until they match; a dialog on the settings window; a beep every second with the fourth
+            one marked; Spotify paused, then resumed.
+          </li>
+        </ul>
+      </div>
+
+      <h3>
+        6.9 Presets
+        <small
+          >(<code>PresetSettings.swift</code>, <code>CustomPresets.swift</code>, <code>PresetLibrary.swift</code>,
+          <code>MilkConverter.swift</code>)</small
+        >
+      </h3>
+      <ul>
+        <li>
+          <b>Bundled:</b> 395 presets from four packs, already in <code>IdleViz/web/vendor/</code>. Nothing to do.
+        </li>
+        <li>
+          <b>Settings sent to the page:</b> <code>visualizerMode</code> (<code>shuffle</code> or <code>single</code>),
+          <code>singlePreset</code>, <code>shuffleFrom</code>, <code>secondsPerPreset</code>, <code>blendSeconds</code>,
+          <code>favoritePresets</code>, <code>blockedPresets</code>. A preset ID is its source, a colon and its name:
+          <code>bundled:Geiss - Swirlie 5</code>, <code>custom:pack/tunnel.json</code>.
+        </li>
+        <li>
+          Blocked presets are left out of shuffle. A preset picked in Single is shown even if blocked. An empty filter
+          falls back to all unblocked presets. Shuffle shows every preset once before any repeat.
+        </li>
+        <li>
+          <b>Custom folder:</b> created on first launch, subfolders allowed. <code>.json</code> Butterchurn presets,
+          <code>.milk</code> Milkdrop presets, <code>.js</code> plugins. At most 5,000 files. Hidden files and folders
+          are skipped. Watched for changes with a 300 ms debounce, ignoring the app's own cache writes.
+        </li>
+        <li>
+          <b>.milk conversion</b> runs in a hidden second web view on <code>converter.html</code>, one file at a time,
+          abandoned after 10 s. Results are cached in <code>Presets\.cache\&lt;sha256&gt;.json</code>, keyed by the
+          converter version and the file's contents. Check a file looks like a Milkdrop preset before converting, and
+          treat "parsing failed" in the result as a failure.
+        </li>
+        <li>
+          <b>Import…</b> opens a picker for files or folders and copies them in. A taken name gets a number. Nothing is
+          ever replaced. <b>Open</b> shows the folder in File Explorer. <b>Reload</b> rescans. <b>Reveal</b> selects the
+          failed file in File Explorer.
+        </li>
+        <li>
+          Failures (with the page's error message) are listed under Failed to load and tried again when the file
+          changes. They are not added to the blocklist.
+        </li>
+        <li>The plugin author guide is <code>docs/custom-visualizer.md</code>. It applies unchanged.</li>
+      </ul>
+      <div class="d you">
+        <span class="tag">Owner decided</span>
+        <ul>
+          <li>The visualizer is built in (Butterchurn), not a separate visualizer app.</li>
+          <li>Custom presets come from a folder, and custom <code>.js</code> plugins are allowed.</li>
+          <li>Bundled packs: Base, Extra, Extra2 and MD1.</li>
+          <li>Defaults: shuffle all, 30 s per preset, 2.7 s blend.</li>
+          <li>A choice between one fixed visualizer and shuffle; "shuffle from" reuses the Favorites list.</li>
+          <li>Broken presets go on a separate failed list, not on the blocklist.</li>
+        </ul>
+      </div>
+
+      <h3>
+        6.10 Warnings <small>(replaces <code>Permissions.swift</code> and <code>WelcomeWindow.swift</code>)</small>
+      </h3>
+      <ul>
+        <li>There is no welcome window and no permission prompt.</li>
+        <li>While something is wrong, the tray icon is yellow and the flyout has one row per problem.</li>
+        <li>Re-check when the flyout opens, when Spotify starts, and when the visualizer opens.</li>
+        <li>
+          Silence while Spotify says "playing" is not a problem by itself: Spotify Connect and a muted Spotify look the
+          same. Log it.
+        </li>
+      </ul>
+      <div class="d me">
+        <span class="tag">Claude's call</span><b>J4. Which problems, and what a click does.</b> The owner chose to keep
+        warnings "for real problems" but the list wasn't discussed. Suggested: "Spotify audio can't be captured" (the
+        capture can't be started) and "Can't read what Spotify is playing" (the media controls can't be reached). On the
+        Mac a click opens the right System Settings page. Windows has no such page for these, so the suggestion is a
+        small details dialog with the error text and a button to open the log folder.
+      </div>
+
+      <h3>6.11 Start with Windows, storage, install</h3>
+      <ul>
+        <li>
+          <b>Run at startup:</b> read the state from Windows each time the settings window appears instead of storing
+          it, because the user can also switch it off in Windows' own startup-apps list. If Windows has it disabled
+          there, show a hint.
+        </li>
+        <li>
+          <b>Settings</b> use the Mac's key names, so the two apps stay easy to compare. Unusable stored values fall
+          back to defaults.
+        </li>
+        <li>One running copy only. A second launch, including <code>idleviz://open</code>, hands over to the first.</li>
+      </ul>
+      <div class="d win">
+        <span class="tag">Owner decided, Windows</span>Just for the owner, unsigned, but with an installer: a setup file
+        that installs the app, adds a Start menu entry and an uninstaller. The Mac equivalent is
+        <code>IdleViz.command</code>, which builds, installs and opens the app in one step.
+      </div>
+      <div class="d me">
+        <span class="tag">Claude's call</span><b>J5. How the installer is made.</b> Suggested: an unpackaged,
+        self-contained build with a per-user installer made by a free tool such as Inno Setup, and one script that
+        builds the app and the setup file. An MSIX package was not suggested because Windows only installs a signed one.
+        The script name, the install folder and the installer tool are not decided. Also not decided: the app name stays
+        "IdleViz", the presets folder is <code>%APPDATA%\IdleViz\Presets\</code>, and duplicate import names follow File
+        Explorer ("Tunnel (2).milk").
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="order">7. Build order</h2>
+      <p>
+        The Mac app was built in this order, one pull request per step, with the riskiest part proved early. The same
+        order is suggested for Windows. Each step ends with its tests, a README update and a Verification section that
+        says plainly what was not checked.
+      </p>
+      <div class="scroll">
+        <table>
+          <tr>
+            <th>Step</th>
+            <th>What</th>
+            <th>Done when</th>
+          </tr>
+          <tr>
+            <td>W0</td>
+            <td>Solution, the Core library with its first tests, the CI job, the installer script</td>
+            <td>CI builds and tests on Windows; the setup file installs an empty tray app</td>
+          </tr>
+          <tr>
+            <td>W1</td>
+            <td>
+              Open/close shell: tray icon, flyout, menu, hotkey, URL, black fullscreen window, dismiss, focus returned
+            </td>
+            <td>Feels like a screensaver; the stuck-key rule works</td>
+          </tr>
+          <tr>
+            <td>W2</td>
+            <td>
+              <b>Spike, not merged:</b> process loopback on Spotify, the page in WebView2 from the custom scheme, frames
+              driving Butterchurn, what the media controls report
+            </td>
+            <td>Findings written into the docs; every "Check first" above has an answer</td>
+          </tr>
+          <tr>
+            <td>W3</td>
+            <td>Spotify info from the media controls, content type, artwork</td>
+            <td>Logged correctly for each state; Spotify is never launched</td>
+          </tr>
+          <tr>
+            <td>W4</td>
+            <td>Open rules and the tray icon flash</td>
+            <td>No track: no open, icon flashes</td>
+          </tr>
+          <tr>
+            <td>W5</td>
+            <td>The page in the window with the overlay, CSP and all overlay states</td>
+            <td>Matches section 5 on the PC and the Mac side by side</td>
+          </tr>
+          <tr>
+            <td>W6</td>
+            <td>Idle trigger and skip rules</td>
+            <td>Opens once per idle period; blocked attempts wait for input</td>
+          </tr>
+          <tr>
+            <td>W7a–e</td>
+            <td>
+              Real audio and recovery; preset controls; custom folder, plugins and .milk; audio delay with Detect and
+              the manual test
+            </td>
+            <td>The Spotify-only test passes; a hung plugin is recovered from</td>
+          </tr>
+          <tr>
+            <td>W8a–c</td>
+            <td>
+              Keep awake, battery times and fades; warnings; brightness, overlay switch and run at startup; like, skip
+              and media keys
+            </td>
+            <td>Feature parity with the Mac README</td>
+          </tr>
+        </table>
+      </div>
+      <div class="d you">
+        <span class="tag">Owner decided</span>Test the riskiest part right after step 1, as a throwaway spike whose PR
+        only records the findings. Split the big steps into several PRs.
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="decisions">8. Every decision so far</h2>
+      <p class="lead">
+        What the owner chose while the Mac app was planned and built, with what was turned down, and what each one means
+        on Windows. Decisions about macOS-only things are listed too, so nobody re-asks them.
+      </p>
+      <div class="scroll">
+        <table>
+          <tr>
+            <th>#</th>
+            <th>Decision</th>
+            <th>Turned down</th>
+            <th>On Windows</th>
+          </tr>
+          <tr>
+            <td colspan="4"><b>Product</b></td>
+          </tr>
+          <tr>
+            <td>1</td>
+            <td>Visualizer built in, with Butterchurn</td>
+            <td>Driving a separate visualizer app; native libprojectM</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>Custom presets imported from a folder</td>
+            <td></td>
+            <td>Same, other folder path</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>Overlay is a separate layer that works over any visualizer</td>
+            <td></td>
+            <td>Same page</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>Custom <code>.js</code> plugins, and the JS only ever gets Spotify's audio</td>
+            <td>Presets only</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>A written guide for plugin authors in <code>docs/</code></td>
+            <td></td>
+            <td>Same guide</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td>Spotify on another device: still open, silent visuals</td>
+            <td>Don't open</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>Track gone or Spotify quit while open: stay open, hide the overlay</td>
+            <td>Close on quit; close on quit or no track</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>App is just for the owner</td>
+            <td>Built for others</td>
+            <td>Same (W7)</td>
+          </tr>
+          <tr>
+            <td>9</td>
+            <td>Only the newest OS version, no fallbacks</td>
+            <td>Supporting older versions with a plainer look</td>
+            <td>Windows 11 only (W3)</td>
+          </tr>
+          <tr>
+            <td>10</td>
+            <td>App and bundle named IdleViz (<code>com.xauno.IdleViz</code>), no "Spotify" in the name</td>
+            <td></td>
+            <td>Same name</td>
+          </tr>
+          <tr>
+            <td>11</td>
+            <td>No Spotify Web API, no login</td>
+            <td></td>
+            <td>Kept (W5)</td>
+          </tr>
+          <tr>
+            <td colspan="4"><b>Menu and settings UI</b></td>
+          </tr>
+          <tr>
+            <td>12</td>
+            <td>Tiny popup: one clickable Settings row, hotkey shown below</td>
+            <td></td>
+            <td>Flyout (W4)</td>
+          </tr>
+          <tr>
+            <td>13</td>
+            <td>Popup has the system's glass look, like the Battery menu</td>
+            <td>A plain menu</td>
+            <td>Windows 11 flyout look</td>
+          </tr>
+          <tr>
+            <td>14</td>
+            <td>Settings: no sidebar, no tabs, one page that scrolls</td>
+            <td>Sidebar with sections</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>15</td>
+            <td>Settings: small, portrait, can't be fullscreen</td>
+            <td></td>
+            <td>Same, Maximize disabled</td>
+          </tr>
+          <tr>
+            <td>16</td>
+            <td>No Quit item; close button and ⌘Q</td>
+            <td>A Quit row</td>
+            <td>Exit in the right-click menu (W4)</td>
+          </tr>
+          <tr>
+            <td>17</td>
+            <td>Overlay on/off is a switch in the Visualizer section</td>
+            <td>Its own Overlay section</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>18</td>
+            <td>Single visualizer or Shuffle; Shuffle from All, Bundled, Custom or Favorites</td>
+            <td>A separate playlist; a checkbox list of all presets</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>19</td>
+            <td>Dark mode follows the system, no setting</td>
+            <td>A System / Light / Dark row</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>20</td>
+            <td>Favorites and Blocklist are Manage dialogs</td>
+            <td>An inline searchable list</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>21</td>
+            <td>Presets get on the lists from a Last shown row and an add tab in each dialog</td>
+            <td>Only one of the two</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>22</td>
+            <td>Seconds per preset 15/30/45/60/120/300; blend 0/1/2.7/5/8 s</td>
+            <td>Two other sets of values</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>23</td>
+            <td>Battery times: a switch that reveals two extra rows; hidden with no battery</td>
+            <td>Always showing both</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>24</td>
+            <td>Like and Skip key rows in General, under Open hotkey</td>
+            <td>In Visualizer; an own "Keys" section</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td colspan="4"><b>Opening and closing</b></td>
+          </tr>
+          <tr>
+            <td>25</td>
+            <td>Idle default 5 minutes (5/10/15/30/Off)</td>
+            <td>10 minutes; Off</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>26</td>
+            <td>Blocked idle attempt waits for new input</td>
+            <td>Retry until it opens</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>27</td>
+            <td>Open check uses cached state, asks only if unknown</td>
+            <td>A fresh query every time</td>
+            <td>Same idea</td>
+          </tr>
+          <tr>
+            <td>28</td>
+            <td>Refused manual open: icon flashes to a slashed waveform</td>
+            <td>Blink off and on; dimmed icon</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>29</td>
+            <td>Keys held past the 0.4 s grace are ignored until pressed again</td>
+            <td></td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>30</td>
+            <td>Stay awake with a limit, default 1 hour, adjustable (30 min, 1, 2, 4 h)</td>
+            <td>No limit; normal sleep</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>31</td>
+            <td>Opens on battery, with optional separate times</td>
+            <td></td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>32</td>
+            <td>Fade in and out; input fade is quick</td>
+            <td>Input closes instantly; fade out only</td>
+            <td>Same (see 6.2)</td>
+          </tr>
+          <tr>
+            <td>33</td>
+            <td>Create the window at launch; settings stays open when the visualizer opens</td>
+            <td>Closing settings on open; a non-activating panel</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>34</td>
+            <td>Notifications must not close it</td>
+            <td></td>
+            <td>Same rule: only real display changes close it</td>
+          </tr>
+          <tr>
+            <td colspan="4"><b>Keys while open</b></td>
+          </tr>
+          <tr>
+            <td>35</td>
+            <td>Like and skip are plain keys picked from a list</td>
+            <td>Recorded shortcuts with modifiers; fixed keys</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>36</td>
+            <td>Defaults: like L, skip N</td>
+            <td>Skip on →; no defaults</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>37</td>
+            <td>Key choices: letters, digits, arrows, Space</td>
+            <td>A short list; no digits</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>38</td>
+            <td>Like toggles, with a brief heart next to the track title</td>
+            <td>Add only; no feedback; a large centred heart; always top right</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>39</td>
+            <td>Skip does nothing in Single mode</td>
+            <td>Showing another preset; changing the Single preset</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>40</td>
+            <td>Skip blends in about 0.5 s</td>
+            <td>The blend-time setting; a hard cut</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>41</td>
+            <td>Only keys with a printed media function keep it open</td>
+            <td>The whole top row; only F1–F12</td>
+            <td>Volume and media keys</td>
+          </tr>
+          <tr>
+            <td>42</td>
+            <td>Keys that open system UI still close it</td>
+            <td>Keeping it open for those too</td>
+            <td>Same idea (Windows key and so on)</td>
+          </tr>
+          <tr>
+            <td colspan="4"><b>Audio</b></td>
+          </tr>
+          <tr>
+            <td>43</td>
+            <td>Audio becomes levels in native code</td>
+            <td>In the page</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>44</td>
+            <td>Audio delay setting plus a microphone detector</td>
+            <td></td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>45</td>
+            <td>Microphone only when a button is pressed</td>
+            <td>On speaker change; constantly while open</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>46</td>
+            <td>New devices start at their reported delay</td>
+            <td>Start at 0</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>47</td>
+            <td>Detector: phase-transform correlation</td>
+            <td>Loudness onsets, with or without a fallback</td>
+            <td>Port as is</td>
+          </tr>
+          <tr>
+            <td>48</td>
+            <td>Delay measured from the hand-over time</td>
+            <td>The samples' own timestamps</td>
+            <td>Same idea</td>
+          </tr>
+          <tr>
+            <td>49</td>
+            <td>Manual test: drag until they match</td>
+            <td>Tap along to the beep</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>50</td>
+            <td>Manual test in a dialog on the settings window</td>
+            <td>Whole screen; inline in the row</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>51</td>
+            <td>A beep every second, the fourth one marked</td>
+            <td>One beep every 3 s; all the same</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>52</td>
+            <td>Spotify is paused for the test, then resumed</td>
+            <td>Leaving Spotify alone</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td colspan="4"><b>Presets and plugins</b></td>
+          </tr>
+          <tr>
+            <td>53</td>
+            <td>Plugins run in a separate sandboxed frame</td>
+            <td>The same page</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>54</td>
+            <td>The app asks the page; no channel from page to app</td>
+            <td>A locked-down message channel</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>55</td>
+            <td>Broken presets go on a failed list</td>
+            <td>Adding them to the blocklist</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>56</td>
+            <td>Libraries vendored in git</td>
+            <td>CDN script tags; npm plus a copy script</td>
+            <td>Already done</td>
+          </tr>
+          <tr>
+            <td>57</td>
+            <td>Packs: Base, Extra, Extra2, MD1</td>
+            <td>Fewer packs</td>
+            <td>Already done</td>
+          </tr>
+          <tr>
+            <td>58</td>
+            <td>Default: shuffle all, 30 s, 2.7 s blend</td>
+            <td>One fixed preset</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>59</td>
+            <td>Figtree bundled for the overlay</td>
+            <td></td>
+            <td>Already done</td>
+          </tr>
+          <tr>
+            <td colspan="4"><b>Spotify info</b></td>
+          </tr>
+          <tr>
+            <td>60</td>
+            <td>A failed query keeps the last known track</td>
+            <td></td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>61</td>
+            <td>Five album covers cached in memory</td>
+            <td>10; 1</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>62</td>
+            <td>Position re-synced every 5 s while open</td>
+            <td></td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>63</td>
+            <td>Fields joined with an invisible separator character</td>
+            <td>Keeping "||"</td>
+            <td>Not needed (no AppleScript)</td>
+          </tr>
+          <tr>
+            <td colspan="4"><b>Permissions (macOS only)</b></td>
+          </tr>
+          <tr>
+            <td>64</td>
+            <td>Missing permission: yellow icon and error rows; a click opens the right settings page</td>
+            <td>Text only</td>
+            <td>Warnings kept (W6)</td>
+          </tr>
+          <tr>
+            <td>65</td>
+            <td>Welcome window whenever a permission was never asked; one Continue button</td>
+            <td>Once on first launch; a button per row; asking at once</td>
+            <td>Dropped (W6)</td>
+          </tr>
+          <tr>
+            <td>66</td>
+            <td>The audio permission is read from a private system API</td>
+            <td>Silence check only</td>
+            <td>Not needed</td>
+          </tr>
+          <tr>
+            <td colspan="4"><b>Build and process</b></td>
+          </tr>
+          <tr>
+            <td>67</td>
+            <td>Riskiest part tested early in a throwaway spike</td>
+            <td>Keeping the original order</td>
+            <td>Same (W2)</td>
+          </tr>
+          <tr>
+            <td>68</td>
+            <td>Big steps split into several PRs</td>
+            <td>One PR</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>69</td>
+            <td>Pull requests, CI required, no approvals; squash merge; t3code-style descriptions</td>
+            <td>Requiring an approval</td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>70</td>
+            <td>Ask before any judgement call</td>
+            <td></td>
+            <td>Same</td>
+          </tr>
+          <tr>
+            <td>71</td>
+            <td>One file that builds, installs and opens the app, committed to the repo</td>
+            <td>Build only; open only</td>
+            <td>An installer instead (W7)</td>
+          </tr>
+          <tr>
+            <td>72</td>
+            <td>Signing team ID kept out of the public repo</td>
+            <td></td>
+            <td>Not needed (unsigned)</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- ============================================================ -->
+      <h2 id="open">9. Open points to confirm with the owner</h2>
+      <p>These were chosen by the author of this page or are still unknown. Raise each one before building on it.</p>
+      <div class="scroll">
+        <table>
+          <tr>
+            <th></th>
+            <th>Point</th>
+            <th>Suggested</th>
+          </tr>
+          <tr>
+            <td><span class="tag me">J1</span></td>
+            <td>Where the Windows code lives, test framework, CI job</td>
+            <td>Same repo, <code>windows/</code> folder, shared page</td>
+          </tr>
+          <tr>
+            <td><span class="tag me">J2</span></td>
+            <td>Settings window size, title and Windows wording</td>
+            <td>440 × 680, "Run at startup", "PC"</td>
+          </tr>
+          <tr>
+            <td><span class="tag me">J3</span></td>
+            <td>Input through low-level hooks; like and skip then work without focus</td>
+            <td>Hooks while open</td>
+          </tr>
+          <tr>
+            <td><span class="tag me">J4</span></td>
+            <td>Which problems show as warnings, and what a click does</td>
+            <td>Two problems, a details dialog</td>
+          </tr>
+          <tr>
+            <td><span class="tag me">J5</span></td>
+            <td>Installer tool, install folder, presets folder, duplicate-name style</td>
+            <td>Per-user installer, <code>%APPDATA%\IdleViz\Presets\</code></td>
+          </tr>
+          <tr>
+            <td><span class="tag me">J6</span></td>
+            <td>Default hotkey</td>
+            <td>Ctrl+Alt+V, the Mac's ⌃⌥V</td>
+          </tr>
+          <tr>
+            <td><span class="tag risk">R1</span></td>
+            <td>Does Spotify report position and duration to the media controls?</td>
+            <td>Find out in W2. If not, ask.</td>
+          </tr>
+          <tr>
+            <td><span class="tag risk">R2</span></td>
+            <td>How to tell a podcast or an ad</td>
+            <td>Find out in W2, then propose a rule</td>
+          </tr>
+          <tr>
+            <td><span class="tag risk">R3</span></td>
+            <td>"Another app keeps the display awake" without admin rights</td>
+            <td>Fullscreen and presentation state; ask about the gap</td>
+          </tr>
+          <tr>
+            <td><span class="tag risk">R4</span></td>
+            <td>Fading a window that holds WebView2</td>
+            <td>Window opacity, else ask</td>
+          </tr>
+          <tr>
+            <td><span class="tag risk">R5</span></td>
+            <td>The custom scheme, sandboxed frame and CSP in WebView2</td>
+            <td>Prove in W2 with no page changes</td>
+          </tr>
+          <tr>
+            <td><span class="tag risk">R6</span></td>
+            <td>
+              Frame cap on 144 Hz and faster displays (the page skips frames closer than 12 ms, tuned for 60 and 120 Hz)
+            </td>
+            <td>Measure; changing it touches the shared page</td>
+          </tr>
+          <tr>
+            <td><span class="tag risk">R7</span></td>
+            <td>A UPS on a desktop PC shouldn't count as a battery</td>
+            <td>Check what Windows reports</td>
+          </tr>
+        </table>
+      </div>
+    </main>
+    <script>
+      var root = document.documentElement;
+      document.querySelectorAll(".theme button").forEach(function (b) {
+        b.addEventListener("click", function () {
+          if (b.dataset.t === "system") root.removeAttribute("data-theme");
+          else root.setAttribute("data-theme", b.dataset.t);
+          document.querySelectorAll(".theme button").forEach(function (x) {
+            x.setAttribute("aria-pressed", x === b ? "true" : "false");
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

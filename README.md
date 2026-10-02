@@ -203,6 +203,8 @@ CI runs all of this on every pull request, and builds the app unsigned with `xco
 ├─ IdleViz/web/visuals/    Bundled visualizer plugins (aurora.js, the example plugin)
 ├─ Config/                 Build settings; your signing team goes in Local.xcconfig
 ├─ aurora-demo.html        Test page that feeds a plugin audio from a file or microphone
+├─ mockups.html            UI mockups for the menu-bar popup and the settings window
+├─ windows-port.html       Brief for building a Windows version: what to reuse, the Windows UI, every decision so far
 ├─ docs/                   Guides, including the custom visualizer guide
 ├─ tests/                  Vitest suite, fake WebGL helpers, and the Swift tests (IdleVizCoreTests)
 └─ .github/                CI workflow, PR template, Dependabot
