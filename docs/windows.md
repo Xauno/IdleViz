@@ -322,3 +322,38 @@ The visualizer window now holds the shared page in WebView2, with the Spotify ov
 - WebView2 starts with `--autoplay-policy=no-user-gesture-required`, as the Mac sets no media type to need a user action. The page's AudioContext is allowed to start without a click.
 
 **Seen when checking** (Windows 11, WebView2 124, 3440 × 1440): a paused song showed only the progress row, a playing song the cover, title, artist and a moving progress bar. Quitting Spotify with the window open left the overlay up at 0.7 s and gone at 3 s (the page's 1.5 s wait). The installed Release copy opened from `idleviz://open` with the page and a hidden pointer. The page asks for `favicon.ico` on every load and gets a 404; that one isn't logged.
+
+### W6: idle trigger and skip rules
+
+The visualizer now opens by itself after the "Start after idle" time without input, under the same open rules as every trigger.
+
+| File | What it does |
+| ---- | ------------ |
+| `IdleViz.Core/IdleScheduler.cs` | When the next check is due, and one attempt per idle period. `IdleTimeoutSetting`: key `idleTimeout`, minutes, 5, 10, 15 or 30, 0 for off, default 5. Ported from `IdleScheduler.swift`. |
+| `IdleViz.Core/IdleSkipRules.cs` | The Windows skip rules below. |
+| `IdleViz.App/IdleWatcher.cs` | Runs the scheduler on a one-shot timer, reads the session, the shell and the sound sessions when it fires. |
+| `IdleViz.App/HotkeyWindow.cs` | Now also hears lock, unlock and wake. |
+| `SettingsWindow.xaml` | The **Start after idle** row ("Needs a Spotify track"), as on the Mac. |
+
+**Timing.** Idle time is `GetLastInputInfo`, the same clock Windows' own idle timeouts use. There is no polling: each check sets a timer for the moment the timeout could first be reached, plus 0.1 s. After the PC wakes or the session is unlocked, and when the setting changes, it checks again at once. A trigger that fires uses up the idle period, whether it opened or not; only new input starts a new one. A trigger while the window is already open does nothing (before W6 the no-dismiss debug mode closed it on any trigger; now only on a manual one, as on the Mac).
+
+**Skip rules**, idle trigger only, in this order:
+
+1. **Locked:** the lock notice (`WTSRegisterSessionNotification`) said so, or the shell reports `QUNS_NOT_PRESENT` (screen saver, locked, or another user's session in front).
+2. **Not at the screen:** a Remote Desktop session, or this session isn't the console session.
+3. **Fullscreen or presenting:** `SHQueryUserNotificationState` reports a fullscreen app, a Direct3D exclusive-fullscreen app, or presentation mode. `QUNS_APP` ("a Store app is running") doesn't count, because Spotify from the Microsoft Store is one.
+4. **Another app is making sound** (the owner's answer to R3): every active sound session on every output, except Windows' system sounds, is read for about 300 ms (6 peak readings, 50 ms apart). A peak above 0.001 (about −60 dBFS) from any process other than IdleViz and Spotify blocks the open. This covers what the Mac's display-sleep assertions catch, a video or a call in a normal window, which the shell state misses. The sound sessions are only read when rules 1 to 3 pass.
+
+Each skip is logged in category `idle` with its reason ("powershell is playing sound").
+
+**Seen when checking** (timeout set to 1 minute in `settings.json` for the test, Debug build, no input):
+
+| Case | Result |
+| --- | --- |
+| Spotify paused, nothing else playing | Opened after 60 s idle ("Opened via Idle") |
+| Spotify playing | Opened: Spotify's own sound doesn't count |
+| A quiet 440 Hz tone (about −35 dBFS) from another process | "Idle, but not opening: powershell is playing sound", logged once; no second attempt in the next 100 s |
+
+Not tried by hand: locking (the script can't unlock again), Remote Desktop, a fullscreen app and presentation mode. They are unit-tested against the shell's and the session's values.
+
+**Not yet:** battery times (W8a, they change the timeout on battery), and waiting for input after the keep-awake limit (W8a; `IdleWatcher.WaitForInput` is there for it).

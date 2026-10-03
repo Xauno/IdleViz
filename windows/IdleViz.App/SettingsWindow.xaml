@@ -34,6 +34,10 @@
         </StackPanel.Resources>
         <TextBlock Margin="0,6,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="General" />
 
+        <controls:SettingsCard Description="Needs a Spotify track" Header="Start after idle">
+          <ComboBox x:Name="IdlePicker" MinWidth="110" SelectionChanged="OnIdleChanged" />
+        </controls:SettingsCard>
+
         <controls:SettingsCard x:Name="HotkeyCard" Header="Open hotkey">
           <local:HotkeyRecorder x:Name="Recorder" />
         </controls:SettingsCard>
