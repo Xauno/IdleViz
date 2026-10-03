@@ -31,7 +31,7 @@ internal sealed class PageView : IDisposable
     private readonly DispatcherQueueTimer _statusTimer;
     private readonly PageWatchdog _watchdog = new();
     private readonly Stopwatch _clock = Stopwatch.StartNew();
-    private readonly SortedSet<string> _hung = new(StringComparer.Ordinal);
+    private readonly TaskCompletionSource<CoreWebView2Environment?> _environmentReady = new();
     private CoreWebView2Environment? _environment;
     private CoreWebView2Controller? _controller;
 
@@ -87,6 +87,15 @@ internal sealed class PageView : IDisposable
     /// <summary>Called when a different preset comes on screen.</summary>
     public event Action<string>? PresetShown;
 
+    /// <summary>Called with the preset that was on screen when the page stopped answering.</summary>
+    public event Action<string>? Hung;
+
+    /// <summary>The WebView2 environment, once it exists; null if WebView2 couldn't start. The converter page shares it.</summary>
+    public Task<CoreWebView2Environment?> Environment => _environmentReady.Task;
+
+    /// <summary>The visualizer window, which the page (and the hidden converter page) live in.</summary>
+    public HWND Parent => _parent;
+
     /// <summary>Starts WebView2 and loads the page. The window may still be hidden.</summary>
     public async void Start()
     {
@@ -99,6 +108,7 @@ internal sealed class PageView : IDisposable
             };
             var dataFolder = Path.Combine(AppPaths.LocalData, "WebView2");
             _environment = await CoreWebView2Environment.CreateWithOptionsAsync(string.Empty, dataFolder, options);
+            _environmentReady.TrySetResult(_environment);
             if (_disposed)
             {
                 return;
@@ -110,6 +120,7 @@ internal sealed class PageView : IDisposable
         catch (Exception error)
         {
             Log.Info("page", $"Can't start the page; the visualizer stays black. Is the WebView2 runtime installed? {error.Message}");
+            _environmentReady.TrySetResult(null);
         }
     }
 
@@ -118,6 +129,17 @@ internal sealed class PageView : IDisposable
     {
         _nowPlayingScript = OverlayPayload.Script(payload);
         Run(_nowPlayingScript);
+    }
+
+    /// <summary>Hands the bundled plugins and the custom presets folder to the page, and asks for the new preset list.</summary>
+    public void SendCustomPresets(CustomPresetPayload payload)
+    {
+        _customPresetsScript = payload.Script;
+        if (_loaded)
+        {
+            Run(_customPresetsScript);
+            FetchPresetList();
+        }
     }
 
     /// <summary>Hands the preset controls to the page, which applies them at once.</summary>
@@ -269,7 +291,7 @@ internal sealed class PageView : IDisposable
 
         web.AddWebResourceRequestedFilter($"{AppAddresses.AppOrigin}/*", CoreWebView2WebResourceContext.All);
         web.AddWebResourceRequestedFilter($"{AppAddresses.PresetsOrigin}/*", CoreWebView2WebResourceContext.All);
-        web.WebResourceRequested += OnRequest;
+        web.WebResourceRequested += (_, e) => WebServer.Respond(_environment, e, _root, _presetsRoot);
         web.NavigationStarting += (_, e) => e.Cancel = !AllowNavigation(e.Uri, "page");
         web.FrameNavigationStarting += (_, e) => e.Cancel = !AllowNavigation(e.Uri, "frame");
         web.NewWindowRequested += (_, e) =>
@@ -361,9 +383,16 @@ internal sealed class PageView : IDisposable
             return;
         }
 
+        var load = _loadId;
         try
         {
             var reply = await _controller.CoreWebView2.ExecuteScriptAsync("window.idlevizPresets?.()");
+            // A page replaced in the meantime answers for nothing; the new one is asked when it is ready.
+            if (load != _loadId)
+            {
+                return;
+            }
+
             var presets = PresetInfo.List(reply);
             Log.Info("page", $"{presets.Count} presets");
             PresetsLoaded?.Invoke(presets);
@@ -461,9 +490,10 @@ internal sealed class PageView : IDisposable
             var preset = _lastStatus?.Preset;
             Log.Info("page", $"The page stopped answering; replacing it (last preset: {preset ?? "none"})");
             // Whatever was on screen is the likely cause. Keep it out, or the new page would hang on it too.
-            if (preset is not null && _hung.Add(preset))
+            // The library answers at once with a new list, which the new page gets when it is ready.
+            if (preset is not null)
             {
-                _customPresetsScript = new CustomPresetPayload([], [.. _hung]).Script;
+                Hung?.Invoke(preset);
             }
 
             await ReplaceStuckPage();
@@ -597,56 +627,6 @@ internal sealed class PageView : IDisposable
         {
             // Suspending is a saving, not a must: a page that wasn't suspended is only hidden.
             Log.Info("page", $"Couldn't suspend the page: {error.Message}");
-        }
-    }
-
-    // Answers the app's two addresses from the web folder and the presets folder. A handler that
-    // throws makes the request fail with no other sign (W2 spike), so nothing may escape it.
-    private void OnRequest(CoreWebView2 sender, CoreWebView2WebResourceRequestedEventArgs e)
-    {
-        if (_environment is null)
-        {
-            return;
-        }
-
-        var url = e.Request.Uri;
-        try
-        {
-            var file = AppAddresses.FileFor(url, _root) ?? AppAddresses.PresetFile(url, _presetsRoot);
-            if (file is null)
-            {
-                // The browser asks for a favicon on every load; only other misses are worth a line.
-                if (!url.EndsWith("/favicon.ico", StringComparison.OrdinalIgnoreCase))
-                {
-                    Log.Info("page", $"404 {url}");
-                }
-
-                e.Response = _environment.CreateWebResourceResponse(null, 404, "Not Found", "Access-Control-Allow-Origin: *");
-                return;
-            }
-
-            var bytes = File.ReadAllBytes(file);
-            var type = AppAddresses.MimeType(file);
-            // A plugin's sandboxed frame has an opaque origin, so every script it loads is a cross-origin request.
-            var headers = $"Content-Type: {type}\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *";
-            if (type.StartsWith("text/html", StringComparison.Ordinal))
-            {
-                headers += $"\r\nContent-Security-Policy: {AppAddresses.ContentSecurityPolicyFor(file)}";
-            }
-
-            e.Response = _environment.CreateWebResourceResponse(new MemoryStream(bytes).AsRandomAccessStream(), 200, "OK", headers);
-        }
-        catch (Exception error)
-        {
-            Log.Info("page", $"Serving {url} failed: {error.Message}");
-            try
-            {
-                e.Response = _environment.CreateWebResourceResponse(null, 500, "Internal Server Error", string.Empty);
-            }
-            catch (Exception)
-            {
-                // Nothing more to do; the request fails.
-            }
         }
     }
 }

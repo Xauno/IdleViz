@@ -87,6 +87,42 @@
         <controls:SettingsCard Header="Blocklist">
           <Button x:Name="BlocklistButton" Click="OnBlocklistClick" />
         </controls:SettingsCard>
+
+        <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Presets" />
+
+        <!-- Presets carry equations that run as code, so the warning covers them as well as plugins. -->
+        <InfoBar
+          IsClosable="False"
+          IsOpen="True"
+          Message="Custom plugins and presets are code. Only import ones you trust."
+          Severity="Warning" />
+
+        <controls:SettingsCard Description=".json, .js, .milk" Header="Import&#x2026;">
+          <Button x:Name="ImportButton" Content="Import">
+            <Button.Flyout>
+              <MenuFlyout Placement="Bottom">
+                <MenuFlyoutItem Click="OnImportFilesClick" Text="Files&#x2026;" />
+                <MenuFlyoutItem Click="OnImportFolderClick" Text="Folder&#x2026;" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+        </controls:SettingsCard>
+
+        <controls:SettingsCard x:Name="FolderCard" Header="Folder">
+          <Button Click="OnOpenFolderClick" Content="Open" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard Header="Rescan">
+          <Button Click="OnReloadClick" Content="Reload" />
+        </controls:SettingsCard>
+
+        <!-- Hidden when nothing has failed. -->
+        <TextBlock
+          x:Name="FailedHeader"
+          Margin="0,18,0,6"
+          Style="{StaticResource BodyStrongTextBlockStyle}"
+          Visibility="Collapsed" />
+        <StackPanel x:Name="FailedList" Spacing="3" />
       </StackPanel>
     </ScrollViewer>
   </Grid>
