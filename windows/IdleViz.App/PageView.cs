@@ -54,6 +54,9 @@ internal sealed class PageView : IDisposable
     /// <summary>The latest list of custom presets and hung presets, replayed the same way.</summary>
     private string _customPresetsScript = CustomPresetPayload.Empty.Script;
 
+    /// <summary>The latest preset controls, replayed the same way.</summary>
+    private string _presetSettingsScript = new PresetSettings().Script;
+
     /// <param name="parent">The visualizer window. The page fills it.</param>
     /// <param name="dispatcher">The UI thread's queue.</param>
     public PageView(HWND parent, DispatcherQueue dispatcher)
@@ -72,6 +75,12 @@ internal sealed class PageView : IDisposable
 
     /// <summary>Called with the presets the page reports as failed, each time that list changes.</summary>
     public event Action<IReadOnlyList<PresetFailure>>? FailuresChanged;
+
+    /// <summary>Called with the page's preset list each time the page has loaded.</summary>
+    public event Action<IReadOnlyList<PresetInfo>>? PresetsLoaded;
+
+    /// <summary>Called when a different preset comes on screen.</summary>
+    public event Action<string>? PresetShown;
 
     /// <summary>Starts WebView2 and loads the page. The window may still be hidden.</summary>
     public async void Start()
@@ -104,6 +113,13 @@ internal sealed class PageView : IDisposable
     {
         _nowPlayingScript = OverlayPayload.Script(payload);
         Run(_nowPlayingScript);
+    }
+
+    /// <summary>Hands the preset controls to the page, which applies them at once.</summary>
+    public void SendPresetSettings(PresetSettings settings)
+    {
+        _presetSettingsScript = settings.Script;
+        Run(_presetSettingsScript);
     }
 
     /// <summary>Hands one audio frame's script to the page. Frames are dropped, not queued, while the page is busy or loading.</summary>
@@ -320,12 +336,34 @@ internal sealed class PageView : IDisposable
                 _loaded = true;
                 Log.Info("page", "Ready");
                 Run(_customPresetsScript);
+                Run(_presetSettingsScript);
                 Run(_nowPlayingScript);
+                FetchPresetList();
             }
         }
         catch (Exception error)
         {
             Log.Info("page", $"Asking the page whether it is ready failed: {error.Message}");
+        }
+    }
+
+    private async void FetchPresetList()
+    {
+        if (_controller is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var reply = await _controller.CoreWebView2.ExecuteScriptAsync("window.idlevizPresets?.()");
+            var presets = PresetInfo.List(reply);
+            Log.Info("page", $"{presets.Count} presets");
+            PresetsLoaded?.Invoke(presets);
+        }
+        catch (Exception error)
+        {
+            Log.Info("page", $"Asking the page for its presets failed: {error.Message}");
         }
     }
 
@@ -449,6 +487,10 @@ internal sealed class PageView : IDisposable
         if (status.Preset != _lastStatus?.Preset)
         {
             Log.Info("page", $"Preset: {status.Preset ?? "none"}");
+            if (status.Preset is { } shown)
+            {
+                PresetShown?.Invoke(shown);
+            }
         }
 
         if (!status.SameFailures(_lastStatus) && (_lastStatus is not null || status.Failed.Count > 0))

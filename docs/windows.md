@@ -293,7 +293,7 @@ Songs and podcasts, playing or paused, all open. An already open window ignores 
 
 ### W5: the page in the window
 
-The visualizer window now holds the shared page in WebView2, with the Spotify overlay. The visuals don't get audio yet (W7a), so the presets move by themselves, and the page has no settings from the app yet (W7b, W8c): it uses its own defaults.
+The visualizer window now holds the shared page in WebView2, with the Spotify overlay. The visuals don't get audio yet (W7a), so the presets move by themselves, and the page has no settings from the app yet (W7b, W8c): it uses its own defaults. (The preset controls came in W7b, below.)
 
 | File | What it does |
 | ---- | ------------ |
@@ -403,3 +403,41 @@ Reloading the old WebView instead does not work: after its renderer was ended, W
 | Cost while open, 20 s | The app 6.6 % of one core, its WebView2 processes 26.9 %, as the spike measured |
 
 **Not yet:** the audio delay (W7d), and the "Spotify audio can't be captured" warning in the tray (W8b); a failed capture is only logged for now.
+
+### W7b: preset controls
+
+The Visualizer section of settings now has the preset rows from the brief (section 4.4), and the Favorites and Blocklist dialogs (4.5).
+
+| File | What it does |
+| ---- | ------------ |
+| `IdleViz.Core/PresetSettings.cs` | Mode, Single preset, Shuffle from, Seconds per preset, Blend time, Favorites and Blocklist: stored under the Mac's key names and values (`visualizerMode: "single"`, `favoritePresets: [...]`) and sent with `setPresetSettings`. Ported from `PresetSettings.swift`, with the same fallbacks for stored values that aren't a choice. |
+| `IdleViz.Core/PresetInfo.cs` | Reads the page's `idlevizPresets()` reply as untrusted JSON, as the Mac does. |
+| `IdleViz.Core/PresetList.cs` | What the Favorites and Blocklist dialogs share: titles, empty text, adding and removing, search. |
+| `IdleViz.Core/SettingsStore.cs` | Numbers with a fraction (the blend time) and lists of strings. |
+| `IdleViz.App/PresetController.cs` | Keeps the controls, saves and sends each change, and remembers the last preset on screen (`lastShownPreset`). Ported from `PresetController.swift`. |
+| `IdleViz.App/PageView.cs` | Sends the controls when the page is ready and on every change, asks for the preset list once the page is ready, and reports each new preset on screen. |
+| `IdleViz.App/SettingsWindow.xaml` | The rows: Mode; Shuffle from, Seconds per preset and Blend time in Shuffle; Visualizer in Single; Last shown with the heart and block toggle buttons; Favorites and Blocklist with "Manage (n)". |
+| `IdleViz.App/PresetListDialog.xaml` | The Favorites and Blocklist dialog: a `ContentDialog` with "On the list (n)" and "All presets" in a `SelectorBar`, a search box on the second, and Add or Remove on each row. |
+
+The page loads when the app starts, so the preset list is there before the first open, as on the Mac.
+
+**Chosen here without asking the owner** (they asked for the build to keep going):
+
+- The heart and block buttons are toggle buttons, so the accent fill shows when they're on. The heart also turns solid, as on the Mac; the block glyph has no solid form in Segoe Fluent Icons.
+- In "All presets", Add or Remove changes the row in place, so the list keeps its scroll position. In "On the list", a removed row goes away at once.
+- The Visualizer picker is 200 px wide, so long preset names are cut short with "…" rather than wrapping the row.
+
+**Seen when checking** (Debug build, settings driven through UI Automation, idle trigger off for the test):
+
+| Case | Result |
+| --- | --- |
+| Seconds per preset set to 15 while closed, then opened | Presets changed exactly 15 s apart (3 changes in 40 s) |
+| Mode switched to Single while the visualizer was open | The page switched to the Single preset within a second |
+| Heart next to Last shown | Saved to `favoritePresets`, the heart filled |
+| Favorites dialog, All presets, search "airhandler", Add | 6 matches shown; the first one added |
+| Blocklist dialog, adding a favorite | It moved from the favorites to the blocklist |
+| Screenshots of both modes and the dialogs | As in the brief's sections 4.4 and 4.5 |
+
+**Found while checking, not fixed here:** with `--show-settings`, the settings window opening at the same moment as the app crashed it in about 4 starts out of 5 (an access violation in the XAML runtime). Main does the same, so it predates W7b; it's flagged as a separate fix. Opening settings once the page is ready works every time.
+
+**Not tried:** picking a different preset in the Visualizer picker, and **Shuffle from** Custom (there are no custom presets until W7c). The like and skip keys are W8c.

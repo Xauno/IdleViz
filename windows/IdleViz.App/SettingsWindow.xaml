@@ -45,6 +45,48 @@
         <controls:SettingsCard Header="Open now">
           <Button Click="OnOpenNowClick" Content="Open" />
         </controls:SettingsCard>
+
+        <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Visualizer" />
+
+        <controls:SettingsCard Header="Mode">
+          <ComboBox x:Name="ModePicker" MinWidth="110" SelectionChanged="OnModeChanged" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard x:Name="ShuffleFromCard" Header="Shuffle from">
+          <ComboBox x:Name="ShuffleFromPicker" MinWidth="110" SelectionChanged="OnShuffleFromChanged" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard x:Name="SecondsCard" Header="Seconds per preset">
+          <ComboBox x:Name="SecondsPicker" MinWidth="110" SelectionChanged="OnSecondsChanged" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard x:Name="BlendCard" Header="Blend time">
+          <ComboBox x:Name="BlendPicker" MinWidth="110" SelectionChanged="OnBlendChanged" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard x:Name="SingleCard" Header="Visualizer">
+          <!-- Preset names are long; a fixed width keeps the row from wrapping, and the box trims them. -->
+          <ComboBox x:Name="SinglePicker" Width="200" SelectionChanged="OnSingleChanged" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard x:Name="LastShownCard" Header="Last shown">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <ToggleButton x:Name="FavoriteButton" Click="OnFavoriteClick">
+              <FontIcon x:Name="FavoriteIcon" FontSize="14" Glyph="&#xE006;" />
+            </ToggleButton>
+            <ToggleButton x:Name="BlockButton" Click="OnBlockClick">
+              <FontIcon FontSize="14" Glyph="&#xE733;" />
+            </ToggleButton>
+          </StackPanel>
+        </controls:SettingsCard>
+
+        <controls:SettingsCard Header="Favorites">
+          <Button x:Name="FavoritesButton" Click="OnFavoritesClick" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard Header="Blocklist">
+          <Button x:Name="BlocklistButton" Click="OnBlocklistClick" />
+        </controls:SettingsCard>
       </StackPanel>
     </ScrollViewer>
   </Grid>

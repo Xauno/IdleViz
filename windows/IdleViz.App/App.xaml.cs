@@ -21,6 +21,7 @@ public partial class App : Application
     private SpotifyInfo? _spotify;
     private OverlayFeed? _overlay;
     private AudioPump? _audio;
+    private PresetController? _presets;
 #if DEBUG
     private DispatcherQueueTimer? _hangTimer;
 #endif
@@ -47,6 +48,9 @@ public partial class App : Application
         get => IdleTimeoutSetting.Minutes(_settings);
         set => _settings.SetInt(IdleTimeoutSetting.Key, value);
     }
+
+    /// <summary>The preset controls. Set once the app has launched, before any window can show them.</summary>
+    internal PresetController Presets => _presets ?? throw new InvalidOperationException("The app hasn't launched yet.");
 
     /// <summary>False while Windows refuses the stored hotkey because another app has it.</summary>
     internal bool HotkeyRegistered { get; private set; } = true;
@@ -83,6 +87,8 @@ public partial class App : Application
         // The capture and the status checks only run while the window is open.
         var spotify = _spotify;
         var page = _visualizer.Page;
+        // Before the page loads, so its first state carries the stored controls.
+        _presets = new PresetController(page, _settings);
         _audio = new AudioPump(_dispatcher, () => spotify.Tracker.Current?.State == SpotifyPlayerState.Playing, page.SendAudioFrame);
         _visualizer.Opened += _audio.Start;
         _visualizer.Opened += page.StartStatusChecks;

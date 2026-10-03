@@ -83,6 +83,44 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void DoublesAndListsSurviveAReload()
+    {
+        var settings = new SettingsStore(FilePath);
+        settings.SetDouble("blendSeconds", 2.7);
+        settings.SetStringList("favoritePresets", ["bundled:A", "custom:B"]);
+
+        var reloaded = new SettingsStore(FilePath);
+        Assert.Equal(2.7, reloaded.GetDouble("blendSeconds"));
+        Assert.Equal(["bundled:A", "custom:B"], reloaded.GetStringList("favoritePresets"));
+        // An int reads as a double too, as JSON doesn't tell them apart.
+        reloaded.SetInt("blendSeconds", 5);
+        Assert.Equal(5.0, reloaded.GetDouble("blendSeconds"));
+    }
+
+    [Fact]
+    public void ListsSkipEntriesOfTheWrongType()
+    {
+        Directory.CreateDirectory(_folder);
+        File.WriteAllText(FilePath, """{ "favoritePresets": ["bundled:A", 4, null, {"x": 1}, "bundled:B"], "blockedPresets": "bundled:C", "blendSeconds": "2.7" }""");
+        var settings = new SettingsStore(FilePath);
+        Assert.Equal(["bundled:A", "bundled:B"], settings.GetStringList("favoritePresets"));
+        Assert.Null(settings.GetStringList("blockedPresets"));
+        Assert.Null(settings.GetDouble("blendSeconds"));
+    }
+
+    [Fact]
+    public void ChangedIsRaisedOnlyWhenAListChanges()
+    {
+        var settings = new SettingsStore();
+        var changes = 0;
+        settings.Changed += (_, _) => changes++;
+        settings.SetStringList("favoritePresets", ["bundled:A"]);
+        settings.SetStringList("favoritePresets", ["bundled:A"]);
+        settings.SetStringList("favoritePresets", ["bundled:A", "bundled:B"]);
+        Assert.Equal(2, changes);
+    }
+
+    [Fact]
     public void NoTemporaryFileIsLeftBehind()
     {
         var settings = new SettingsStore(FilePath);

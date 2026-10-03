@@ -56,11 +56,38 @@ public sealed class SettingsStore
     public string? GetString(string key) =>
         Value(key) is { } value && value.GetValueKind() == JsonValueKind.String ? value.GetValue<string>() : null;
 
+    /// <summary>A number. A whole number set with <see cref="SetInt"/> reads too.</summary>
+    public double? GetDouble(string key)
+    {
+        if (Value(key) is not { } value || value.GetValueKind() != JsonValueKind.Number)
+        {
+            return null;
+        }
+
+        // A value read from the file converts to anything; one set in this run only to its own type.
+        if (value.TryGetValue<double>(out var number))
+        {
+            return double.IsFinite(number) ? number : null;
+        }
+
+        return value.TryGetValue<int>(out var whole) ? whole : null;
+    }
+
+    /// <summary>A list of strings. Entries that aren't strings are skipped; anything but a list reads as not set.</summary>
+    public IReadOnlyList<string>? GetStringList(string key) =>
+        _values[key] is JsonArray list
+            ? [.. list.OfType<JsonValue>().Where(item => item.GetValueKind() == JsonValueKind.String).Select(item => item.GetValue<string>())]
+            : null;
+
     public void SetInt(string key, int value) => Set(key, JsonValue.Create(value));
 
     public void SetBool(string key, bool value) => Set(key, JsonValue.Create(value));
 
     public void SetString(string key, string value) => Set(key, JsonValue.Create(value));
+
+    public void SetDouble(string key, double value) => Set(key, JsonValue.Create(value));
+
+    public void SetStringList(string key, IEnumerable<string> values) => Set(key, new JsonArray([.. values.Select(value => (JsonNode)JsonValue.Create(value))]));
 
     public void Remove(string key)
     {
@@ -73,7 +100,7 @@ public sealed class SettingsStore
 
     private JsonValue? Value(string key) => _values[key] as JsonValue;
 
-    private void Set(string key, JsonValue value)
+    private void Set(string key, JsonNode value)
     {
         if (_values[key] is { } current && JsonNode.DeepEquals(current, value))
         {
