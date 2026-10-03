@@ -85,7 +85,8 @@ $uninstaller.WaitForExit()
 # The uninstaller hands over to a copy of itself in the temp folder, which finishes a moment later.
 $deadline = (Get-Date).AddSeconds(60)
 while ((Test-Path $installDir) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
-Assert-That (-not (Test-Path $installDir)) 'the folder is gone'
+$left = @(Get-ChildItem $installDir -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName.Substring($installDir.Length) })
+Assert-That (-not (Test-Path $installDir)) "the folder is gone (left: $($left -join ', '))"
 Assert-That (-not (Test-Path $startMenuShortcut)) 'the Start menu entry is gone'
 Assert-That (-not (Test-Path $protocolKey)) 'idleviz:// is no longer registered'
 Assert-That ($null -eq (Get-StartupCommand)) 'it does not run at startup'
