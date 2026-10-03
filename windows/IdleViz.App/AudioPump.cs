@@ -48,6 +48,13 @@ internal sealed class AudioPump : IDisposable
         set => Volatile.Write(ref _delay, value);
     }
 
+    /// <summary>Raised on the capture thread: the error text when the capture couldn't start, null when it did.</summary>
+    public event Action<string?>? CaptureProblemChanged
+    {
+        add => _capture.ProblemChanged += value;
+        remove => _capture.ProblemChanged -= value;
+    }
+
     /// <summary>Starts keeping the capture's signal for Detect delay. The capture runs for this even while the window is closed.</summary>
     public void StartRecording(double seconds)
     {

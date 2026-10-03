@@ -33,6 +33,9 @@ public sealed record LaunchOptions
     /// <summary>Debug builds only: behave as a laptop running on its battery, to try the battery times on a desktop PC.</summary>
     public bool PretendBattery { get; init; }
 
+    /// <summary>Debug builds only: show both warnings, as if the capture and the media controls had failed.</summary>
+    public bool PretendWarning { get; init; }
+
     public static LaunchOptions Parse(IEnumerable<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -49,6 +52,7 @@ public sealed record LaunchOptions
                 "--hang-page" => options with { HangPage = true },
                 "--detect-delay" => options with { DetectDelay = true },
                 "--pretend-battery" => options with { PretendBattery = true },
+                "--pretend-warning" => options with { PretendWarning = true },
                 _ => UrlCommands.Parse(argument) is { } command ? options with { Command = command } : options,
             };
         }

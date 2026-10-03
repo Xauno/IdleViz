@@ -33,6 +33,8 @@ public partial class App : Application
     private DispatcherQueueTimer? _openAtLaunchTimer;
     private DispatcherQueueTimer? _firstReadingTimer;
     private TriggerSource? _waitingSource;
+    private bool _pretendWarnings;
+    private bool _probingCapture;
 
     public App(LaunchOptions launchOptions)
     {
@@ -48,6 +50,9 @@ public partial class App : Application
 
     /// <summary>The settings file, for the rows that are stored as they are shown.</summary>
     internal SettingsStore Settings => _settings;
+
+    /// <summary>The problems that turn the tray icon yellow and get a row in the flyout.</summary>
+    internal WarningList Warnings { get; } = new();
 
     /// <summary>False on a desktop PC, where the battery rows are hidden.</summary>
     internal bool HasBattery => _power?.HasBattery ?? false;
@@ -84,7 +89,22 @@ public partial class App : Application
 
         _trayIcon = new TrayIcon(this);
 
+        Warnings.Changed += LogWarnings;
+        _pretendWarnings = debug.PretendWarning;
         _spotify = new SpotifyInfo(_dispatcher);
+        if (_pretendWarnings)
+        {
+            Warnings.Report(WarningKind.AudioCapture, "Pretend: the capture request was refused. (0x80070005)");
+            Warnings.Report(WarningKind.NowPlaying, "Pretend: the media controls did not answer. (0x800706BA)");
+        }
+        else
+        {
+            _spotify.ProblemChanged += problem => Warnings.Report(WarningKind.NowPlaying, problem);
+            // Spotify was started: see whether its sound can be captured, before the window needs it.
+            _spotify.SessionFound += ProbeCapture;
+            _visualizer.Opened += _spotify.Recheck;
+        }
+
         _spotify.Start();
 
         _overlay = new OverlayFeed(_spotify, _visualizer.Page, _dispatcher);
@@ -98,6 +118,12 @@ public partial class App : Application
         _presets = new PresetController(page, _settings, new PresetLibrary(_dispatcher, AppPaths.PresetsFolder, converter));
         bool SpotifyIsPlaying() => spotify.Tracker.Current?.State == SpotifyPlayerState.Playing;
         var audio = _audio = new AudioPump(_dispatcher, SpotifyIsPlaying, page.SendAudioFrame);
+        if (!_pretendWarnings)
+        {
+            var dispatcher = _dispatcher;
+            audio.CaptureProblemChanged += problem => dispatcher.TryEnqueue(() => Warnings.Report(WarningKind.AudioCapture, problem));
+        }
+
         _audioDelay = new AudioDelayController(_dispatcher, _settings, audio, SpotifyIsPlaying, spotify.Pause, spotify.Play);
         // The same delay holds back the audio frames and the progress bar.
         _audioDelay.DelayChanged += delay =>
@@ -319,6 +345,51 @@ public partial class App : Application
         {
             _trayIcon?.Flash();
         }
+    }
+
+    /// <summary>Checks both warnings again. The results arrive a moment later through <see cref="Warnings"/>.</summary>
+    internal void RecheckWarnings()
+    {
+        if (_pretendWarnings)
+        {
+            return;
+        }
+
+        _spotify?.Recheck();
+        ProbeCapture();
+    }
+
+    /// <summary>Opens the details of a warning, as a dialog on the settings window.</summary>
+    internal void ShowWarning(Warning warning)
+    {
+        ShowSettings();
+        _settingsWindow?.ShowWarning(warning);
+    }
+
+    // Asks Windows for a capture of Spotify without starting it. Off the UI thread: it can take a moment.
+    private void ProbeCapture()
+    {
+        if (_probingCapture || _dispatcher is not { } dispatcher)
+        {
+            return;
+        }
+
+        _probingCapture = true;
+        Task.Run(SpotifyCapture.Probe).ContinueWith(
+            probe => dispatcher.TryEnqueue(() =>
+            {
+                _probingCapture = false;
+                Warnings.Report(WarningKind.AudioCapture, probe.IsFaulted ? probe.Exception.InnerException?.Message ?? "The check failed." : probe.Result);
+            }),
+            TaskScheduler.Default);
+    }
+
+    private void LogWarnings()
+    {
+        var showing = Warnings.Current;
+        Log.Info("warning", showing.Count == 0
+            ? "No problems"
+            : string.Join("; ", showing.Select(warning => $"{warning.Title}: {warning.Details}")));
     }
 
     internal void ShowSettings()

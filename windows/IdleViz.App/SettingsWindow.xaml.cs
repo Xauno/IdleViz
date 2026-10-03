@@ -85,6 +85,48 @@ public sealed partial class SettingsWindow : Window
     private HWND Handle => new(WinRT.Interop.WindowNative.GetWindowHandle(this));
 
     /// <summary>Shows the window, or brings it forward if it is already open.</summary>
+    /// <summary>Shows a warning's details: what it means, the error text, and a way to the log.</summary>
+    public async void ShowWarning(Warning warning)
+    {
+        // A window that was only just made has nothing to hang a dialog on until its content is loaded.
+        if (Content is FrameworkElement { IsLoaded: false } content)
+        {
+            content.Loaded += (_, _) => ShowWarning(warning);
+            return;
+        }
+
+        var text = new StackPanel { Spacing = 12 };
+        text.Children.Add(new TextBlock { Text = warning.Explanation, TextWrapping = TextWrapping.Wrap });
+        text.Children.Add(new TextBlock
+        {
+            Text = warning.Details,
+            TextWrapping = TextWrapping.Wrap,
+            IsTextSelectionEnabled = true,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+        });
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Content.XamlRoot,
+            Title = warning.Title,
+            Content = text,
+            PrimaryButtonText = "Open log folder",
+            CloseButtonText = "Close",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        try
+        {
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                Log.OpenFolder();
+            }
+        }
+        catch (Exception error) when (error is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            // Another dialog is already open on this window.
+            Log.Info("settings", $"Couldn't show the warning's details: {error.Message}");
+        }
+    }
+
     public void BringToFront()
     {
         if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized } presenter)

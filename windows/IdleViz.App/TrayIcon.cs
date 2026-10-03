@@ -33,14 +33,17 @@ internal sealed partial class TrayIcon : IDisposable
         _flashTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
         _flashTimer.Interval = TimeSpan.FromMilliseconds(IconFlash.StepMilliseconds);
         _flashTimer.Tick += (_, _) => FlashStep();
+        _app.Warnings.Changed += RefreshIcon;
         RefreshIcon();
         _icon.ForceCreate();
     }
 
-    /// <summary>Redraws the icon, for when the taskbar switches between light and dark.</summary>
+    /// <summary>Redraws the icon, for when the taskbar switches between light and dark or a warning comes or goes. Yellow while one is showing.</summary>
     public void RefreshIcon()
     {
-        _color = TrayGlyph.TaskbarColor();
+        var warnings = _app.Warnings;
+        _color = warnings.Any ? TrayGlyph.WarningColor : TrayGlyph.TaskbarColor();
+        _icon.ToolTipText = warnings.CurrentTooltip;
         ShowGlyph();
     }
 
@@ -55,6 +58,7 @@ internal sealed partial class TrayIcon : IDisposable
 
     public void Dispose()
     {
+        _app.Warnings.Changed -= RefreshIcon;
         _flashTimer.Stop();
         _flyout?.Dismiss();
         _menu?.Dismiss();

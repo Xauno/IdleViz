@@ -15,6 +15,21 @@ internal static class Log
 
     private static string FilePath => Path.Combine(Folder, "idleviz.log");
 
+    /// <summary>Shows the log folder in File Explorer.</summary>
+    public static void OpenFolder()
+    {
+        try
+        {
+            Directory.CreateDirectory(Folder);
+            using var process = System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{Folder}\"") { UseShellExecute = false });
+        }
+        catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            Info("app", $"Couldn't open the log folder: {error.Message}");
+        }
+    }
+
     public static void Info(string category, string message)
     {
         var line = string.Create(
