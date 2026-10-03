@@ -229,6 +229,7 @@ In `IdleViz.Core`: `DismissTracker.cs` (ported with its tests), `KeyboardInput.c
 | `--show-menu` | Opens the tray menu at the pointer. |
 | `--hang-page` | Makes the page loop forever 5 s after each open, to try the stuck-page recovery (W7a). First launch only. |
 | `--detect-delay` | Runs Detect delay 5 s after launch, as the button in settings would (W7d). First launch only. |
+| `--pretend-battery` | Behaves as a laptop running on its battery, so the battery rows show (W8a). First launch only. |
 
 **A second launch** with no URL (clicking the Start menu entry while it runs) opens the settings window, since there is no other window to bring forward. This was not asked; it is the usual behaviour of a Windows tray app.
 
@@ -358,7 +359,7 @@ Each skip is logged in category `idle` with its reason ("powershell is playing s
 
 Not tried by hand: locking (the script can't unlock again), Remote Desktop, a fullscreen app and presentation mode. They are unit-tested against the shell's and the session's values.
 
-**Not yet:** battery times (W8a, they change the timeout on battery), and waiting for input after the keep-awake limit (W8a; `IdleWatcher.WaitForInput` is there for it).
+Battery times and waiting for input after the keep-awake limit came with W8a.
 
 ### W7a: Spotify's audio and the stuck page
 
@@ -532,3 +533,46 @@ The visuals can now wait for the speakers: an **Audio delay** per output device,
 | 10 s open at a 1 s delay | 549 frames reached the page, none dropped by the page |
 
 **Not tried:** whether the flash and the beep line up by ear (it needs ears; with the value Detect found, they should at about 70 ms), a Bluetooth output or microphone, a PC with a built-in microphone, the microphone privacy switch turned off, and changing the output device during the test or with the window open.
+
+### W8a: keep-awake limit, battery times, closing on sleep and display changes
+
+The open visualizer now keeps the display awake, up to a limit, and the idle and keep-awake times can differ on battery.
+
+| File | What it does |
+| ---- | ------------ |
+| `IdleViz.Core/Timing.cs` | `KeepAwakeSetting` (key `keepAwakeLimit`, minutes, 30, 60, 120 or 240, default 60), the battery keys, `PowerStatus` (does this PC have a battery, is it running on it) and `TimingSettings`, which picks the times that apply. Ported from `Timing.swift`. |
+| `IdleViz.Core/DisplayLayout.cs` | The list of displays, and `DisplayTracker`, which says whether it changed. |
+| `IdleViz.App/KeepAwake.cs` | The power request and the limit timer. Ported from `KeepAwake.swift`. |
+| `IdleViz.App/PowerSource.cs` | Battery or mains, and the notice when that changes. |
+| `IdleViz.App/Displays.cs` | Reads each display's position, size and scale. |
+| `IdleViz.App/HotkeyWindow.cs` | Now also hears the sleep notice, power status changes and display changes. |
+| `IdleViz.App/VisualizerController.cs` | `Closing`, raised when the fade-out starts. |
+| `SettingsWindow.xaml` | **Keep screen awake** ("Then the PC sleeps as usual"), **Different times on battery** and its two rows. |
+
+**Keeping awake.** While the window is open the app holds a display request (`PowerCreateRequest` and `PowerSetRequest` with `PowerRequestDisplayRequired`, reason "IdleViz visualizer", which `powercfg /requests` shows). It stops the display turning off, and with it the screen saver and the lock that would follow. The request is dropped when the fade-out starts, not when it ends.
+
+**The limit** counts from when the window opened. When it is reached the window closes with the slow fade (1.5 s, `CloseReason.KeepAwakeLimit`), Windows' own timeouts take over, and the idle trigger waits for new input, so it doesn't open again on its own. A changed setting or power source applies to the open window: the new limit still counts from the opening, so a shorter one may close it at once.
+
+**Battery times.** With **Different times on battery** on, `idleTimeoutBattery` and `keepAwakeLimitBattery` replace the two times while the PC runs on its battery. The first time the switch is turned on, both start as copies of the plugged-in values. Windows sends `PBT_APMPOWERSTATUSCHANGE` on plugging in and unplugging (and on every change of charge, which is ignored), so nothing polls. The three rows are hidden on a PC without a battery. A battery only counts on a PC Windows calls a laptop or a tablet (`PowerDeterminePlatformRoleEx`): a desktop on a UPS also reports a battery, but running on it is a power cut, not an unplugged laptop.
+
+**Sleep and display changes** close the window at once, without a fade, because the screen it is on may be off or gone before a fade ends: `PBT_APMSUSPEND`, and `WM_DISPLAYCHANGE` or `WM_SETTINGCHANGE` when the list of displays (position, size, scale) differs from the last one seen. Windows sends both notices for much else, a new wallpaper or a moved taskbar, so the list is compared each time.
+
+**Chosen here without asking the owner** (they asked for the build to keep going):
+
+- The UPS rule above.
+- A stored time that isn't one of the choices (a hand-edited settings file) is shown as its own entry in the picker instead of being replaced.
+- A stored limit of 0 or less counts as the default, 1 hour.
+- `--pretend-battery` (Debug builds), since the test PC has no battery.
+
+**Seen when checking** (Debug build, no input; whether the display is required was read from the system's execution state every 5 s):
+
+| Case | Result |
+| --- | --- |
+| Start | "Displays: 3440×1440 at 0,0 (100 %), 1920×1080 at -1920,357 (100 %)" |
+| Idle timeout and limit both set to 1 min in `settings.json` | Opened via Idle. The display was required from then on. 60.0 s later: "Keep-awake limit of 1 min reached", "Closing: KeepAwakeLimit", closed 1.5 s after that, and the display was no longer required. It did not open again in the next 2 minutes without input |
+| `--pretend-battery` | The battery switch appeared. Turning it on showed the two battery rows as copies (Off, 1 hour) and stored them. Picking 30 min stored `keepAwakeLimitBattery` 30 |
+| No battery (this PC) | None of the three rows |
+| `WM_SETTINGCHANGE` and `WM_DISPLAYCHANGE` sent to the app with the displays unchanged | Stayed open |
+| The sleep notice (`PBT_APMSUSPEND`) sent to the app | "The PC is going to sleep", "Closing: DisplayChanged", closed 30 ms later |
+
+**Not tried:** a real battery (unplugging with the window open, the role Windows reports on a laptop), a real sleep, and a real display change (unplugging a monitor, changing the resolution or scale). The rules behind them are unit-tested. The limit changing while the window is open was not tried either: the pickers have no time short enough to wait for.

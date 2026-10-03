@@ -28,6 +28,8 @@ public partial class App : Application
     private DispatcherQueueTimer? _detectTimer;
 #endif
     private IdleWatcher? _idle;
+    private KeepAwake? _keepAwake;
+    private PowerSource? _power;
     private DispatcherQueueTimer? _openAtLaunchTimer;
     private DispatcherQueueTimer? _firstReadingTimer;
     private TriggerSource? _waitingSource;
@@ -44,12 +46,11 @@ public partial class App : Application
     /// <summary>The open hotkey as stored, or null if it was cleared.</summary>
     internal Hotkey? OpenHotkey => HotkeySetting.Read(_settings);
 
-    /// <summary>The "Start after idle" setting in minutes, 0 for off.</summary>
-    internal int IdleMinutes
-    {
-        get => IdleTimeoutSetting.Minutes(_settings);
-        set => _settings.SetInt(IdleTimeoutSetting.Key, value);
-    }
+    /// <summary>The settings file, for the rows that are stored as they are shown.</summary>
+    internal SettingsStore Settings => _settings;
+
+    /// <summary>False on a desktop PC, where the battery rows are hidden.</summary>
+    internal bool HasBattery => _power?.HasBattery ?? false;
 
     /// <summary>The preset controls. Set once the app has launched, before any window can show them.</summary>
     internal PresetController Presets => _presets ?? throw new InvalidOperationException("The app hasn't launched yet.");
@@ -112,14 +113,38 @@ public partial class App : Application
         _visualizer.Closed += page.StopStatusChecks;
         _visualizer.Start();
 
-        _idle = new IdleWatcher(_dispatcher, () => IdleTimeoutSetting.Timeout(IdleMinutes), _hotkeyWindow, () => OpenVisualizer(TriggerSource.Idle));
+        var power = _power = new PowerSource(_hotkeyWindow, debug.PretendBattery);
+        var visualizer = _visualizer;
+        var idle = _idle = new IdleWatcher(
+            _dispatcher, () => TimingSettings.Read(_settings).IdleTimeout(power.OnBattery), _hotkeyWindow, () => OpenVisualizer(TriggerSource.Idle));
+        var keepAwake = _keepAwake = new KeepAwake(
+            _dispatcher,
+            () => TimingSettings.Read(_settings).KeepAwakeLimit(power.OnBattery),
+            () =>
+            {
+                // The PC is still idle, so the idle trigger has to wait for new input.
+                idle.WaitForInput();
+                visualizer.Close(CloseReason.KeepAwakeLimit);
+            });
+        _visualizer.Opened += keepAwake.Start;
+        // The PC may sleep again as soon as the fade-out starts.
+        _visualizer.Closing += _ => keepAwake.Stop();
         _settings.Changed += (_, e) =>
         {
-            if (e.Key == IdleTimeoutSetting.Key)
+            if (e.Key is IdleTimeoutSetting.Key or KeepAwakeSetting.Key
+                or BatteryTimesSetting.EnabledKey or BatteryTimesSetting.IdleTimeoutKey or BatteryTimesSetting.KeepAwakeKey)
             {
-                _idle.TimeoutMayHaveChanged();
+                idle.TimeoutMayHaveChanged();
+                keepAwake.LimitMayHaveChanged();
             }
         };
+        power.Changed += () =>
+        {
+            Log.Info("power", $"Now on {(power.OnBattery ? "battery" : "mains power")}");
+            idle.TimeoutMayHaveChanged();
+            keepAwake.LimitMayHaveChanged();
+        };
+        CloseWhenTheDisplayMayHaveChanged(_hotkeyWindow, visualizer);
         _idle.Start();
         Program.Relaunched += options => _dispatcher.TryEnqueue(() =>
         {
@@ -170,6 +195,28 @@ public partial class App : Application
             _openAtLaunchTimer.Tick += (_, _) => OpenVisualizer(TriggerSource.Settings);
             _openAtLaunchTimer.Start();
         }
+    }
+
+    // No fade for these: the screen the window is on may be off or gone before a fade could finish.
+    private static void CloseWhenTheDisplayMayHaveChanged(HotkeyWindow window, VisualizerController visualizer)
+    {
+        window.Suspending += () =>
+        {
+            Log.Info("power", "The PC is going to sleep");
+            visualizer.Close(CloseReason.DisplayChanged);
+        };
+        // Windows sends the notice for more than the displays (a wallpaper change, the taskbar), so the
+        // layout is compared with the last one seen.
+        var displays = new DisplayTracker(Displays.Current());
+        Log.Info("display", $"Displays: {Displays.Describe(displays.Layout)}");
+        window.DisplaysMayHaveChanged += () =>
+        {
+            if (displays.ShouldClose(Displays.Current()))
+            {
+                Log.Info("display", $"The displays changed: {Displays.Describe(displays.Layout)}");
+                visualizer.Close(CloseReason.DisplayChanged);
+            }
+        };
     }
 
     /// <summary>Opens the visualizer if the open rules allow it. A refused manual trigger flashes the tray icon.</summary>
@@ -313,6 +360,7 @@ public partial class App : Application
         _settingsWindow?.Close();
         StopWaiting();
         _idle?.Dispose();
+        _keepAwake?.Dispose();
         _audioDelay?.Dispose();
         _audio?.Dispose();
         _presets?.Library.Dispose();

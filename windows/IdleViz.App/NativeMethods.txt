@@ -76,3 +76,14 @@ PKEY_Device_EnumeratorName
 PropVariantClear
 CoTaskMemFree
 AUDCLNT_E_DEVICE_INVALIDATED
+GetSystemPowerStatus
+PowerDeterminePlatformRoleEx
+PowerCreateRequest
+PowerSetRequest
+PowerClearRequest
+EnumDisplayMonitors
+GetDpiForMonitor
+MONITORINFOEXW
+PBT_APMSUSPEND
+PBT_APMPOWERSTATUSCHANGE
+PBT_APMRESUMEAUTOMATIC

@@ -30,6 +30,9 @@ public sealed record LaunchOptions
     /// <summary>Debug builds only: run Detect delay five seconds after launch, as the button in settings would.</summary>
     public bool DetectDelay { get; init; }
 
+    /// <summary>Debug builds only: behave as a laptop running on its battery, to try the battery times on a desktop PC.</summary>
+    public bool PretendBattery { get; init; }
+
     public static LaunchOptions Parse(IEnumerable<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -45,6 +48,7 @@ public sealed record LaunchOptions
                 "--open-at-launch" => options with { OpenAtLaunch = true },
                 "--hang-page" => options with { HangPage = true },
                 "--detect-delay" => options with { DetectDelay = true },
+                "--pretend-battery" => options with { PretendBattery = true },
                 _ => UrlCommands.Parse(argument) is { } command ? options with { Command = command } : options,
             };
         }

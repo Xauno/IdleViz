@@ -55,6 +55,9 @@ internal sealed class VisualizerController : IDisposable
     /// <summary>Raised when the window has opened.</summary>
     public event Action? Opened;
 
+    /// <summary>Raised when the window starts to fade out and the PC is handed back, with the reason.</summary>
+    public event Action<CloseReason>? Closing;
+
     /// <summary>Raised when the window is gone after its fade-out.</summary>
     public event Action? Closed;
 
@@ -129,6 +132,7 @@ internal sealed class VisualizerController : IDisposable
         }
 
         _previousWindow = HWND.Null;
+        Closing?.Invoke(reason);
 
         if (reason.FadeSeconds() > 0)
         {
