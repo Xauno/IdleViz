@@ -34,6 +34,11 @@ internal sealed class PageView : IDisposable
     private readonly SortedSet<string> _hung = new(StringComparer.Ordinal);
     private CoreWebView2Environment? _environment;
     private CoreWebView2Controller? _controller;
+
+    // The controller's web view, kept for as long as the controller. The page's event handlers are
+    // registered on it, and if nothing refers to it the garbage collector frees it while WebView2
+    // still calls those handlers: the app crashed on the first request, or the page never got ready.
+    private CoreWebView2? _web;
     private bool _visible;
     private bool _loaded;
     private int _readyAttempts;
@@ -217,6 +222,7 @@ internal sealed class PageView : IDisposable
         _statusTimer.Stop();
         _controller?.Close();
         _controller = null;
+        _web = null;
     }
 
     private async Task CreateController()
@@ -238,11 +244,12 @@ internal sealed class PageView : IDisposable
         }
 
         _controller = controller;
+        _web = controller.CoreWebView2;
         controller.DefaultBackgroundColor = Windows.UI.Color.FromArgb(255, 0, 0, 0);
         Resize();
         controller.IsVisible = _visible;
 
-        var web = controller.CoreWebView2;
+        var web = _web;
         var settings = web.Settings;
         settings.IsWebMessageEnabled = false;
         settings.AreHostObjectsAllowed = false;
@@ -399,6 +406,7 @@ internal sealed class PageView : IDisposable
                 // Everything is gone: start over with a new controller.
                 _controller?.Close();
                 _controller = null;
+                _web = null;
                 ResetPageState();
                 try
                 {
@@ -553,6 +561,7 @@ internal sealed class PageView : IDisposable
         _readyTimer.Stop();
         var old = _controller;
         _controller = null;
+        _web = null;
         try
         {
             old?.Close();
