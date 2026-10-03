@@ -496,7 +496,7 @@ Each step is one pull request. At the end of each step, update the README (Roadm
 ## Later
 
 - **First, before rebuilding the Windows port's new features on the Mac: test the delay line in the running app, and fix it if it is still off.** `DelayLine.pop` used to drop about a quarter of the frames at delays that are a whole number of frames (every 50 ms). The fix was written on a Windows PC and has only been through the unit tests in CI; the frame rate in the Mac app was never measured, before or after. Measure the frames per second that reach the page at delays of 0.1, 1.0 and 2.5 s (about 60 expected; the old logic gave about 45 on Windows), and run `swift build && swift test`.
-- Multi-display: one window per `NSScreen`, visualizer on each (or mirrored), overlay on main only or all, and handle display changes while open (`NSApplication.didChangeScreenParametersNotification`).
+- Multi-display on the Mac: one window per `NSScreen`, visualizer on each (or mirrored), overlay on main only or all, and handle display changes while open (`NSApplication.didChangeScreenParametersNotification`). The Windows app has this already (W9 in [docs/windows.md](docs/windows.md)), with the settings and the page calls (`setRenderWidthCap`, `setOverlayRegions`) the Mac version should reuse.
 
 ## Requirements
 
