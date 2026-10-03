@@ -59,11 +59,48 @@
           <local:HotkeyRecorder x:Name="Recorder" />
         </controls:SettingsCard>
 
+        <controls:SettingsCard Description="Favorites what's on screen" Header="Like key">
+          <ComboBox x:Name="LikeKeyPicker" MinWidth="110" SelectionChanged="OnLikeKeyChanged" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard Description="Next visualizer, in Shuffle" Header="Skip key">
+          <ComboBox x:Name="SkipKeyPicker" MinWidth="110" SelectionChanged="OnSkipKeyChanged" />
+        </controls:SettingsCard>
+
         <controls:SettingsCard Header="Open now">
           <Button Click="OnOpenNowClick" Content="Open" />
         </controls:SettingsCard>
 
+        <controls:SettingsCard x:Name="StartupCard" Header="Run at startup">
+          <ToggleSwitch x:Name="StartupSwitch" MinWidth="0" AutomationProperties.Name="Run at startup" Toggled="OnStartupToggled" />
+        </controls:SettingsCard>
+
         <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Visualizer" />
+
+        <controls:SettingsCard Header="Show Spotify overlay">
+          <ToggleSwitch x:Name="OverlaySwitch" MinWidth="0" AutomationProperties.Name="Show Spotify overlay" Toggled="OnOverlayToggled" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard Header="Brightness">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Slider
+              x:Name="BrightnessSlider"
+              Width="130"
+              AutomationProperties.Name="Brightness"
+              IsThumbToolTipEnabled="False"
+              LargeChange="0.1"
+              Maximum="1"
+              Minimum="0.5"
+              SmallChange="0.01"
+              StepFrequency="0.01"
+              ValueChanged="OnBrightnessChanged" />
+            <TextBlock
+              x:Name="BrightnessLabel"
+              Width="56"
+              VerticalAlignment="Center"
+              TextAlignment="Right" />
+          </StackPanel>
+        </controls:SettingsCard>
 
         <controls:SettingsCard x:Name="DelayCard" Header="Audio delay">
           <StackPanel Orientation="Horizontal" Spacing="8">

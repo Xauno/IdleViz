@@ -133,6 +133,11 @@ public partial class App : Application
         };
         audio.Delay = _audioDelay.Delay;
         page.SendAudioDelay(_audioDelay.Delay);
+        var presets = _presets;
+        _visualizer.Keys = () => VisualizerKeys.Read(_settings);
+        _visualizer.KeyPressed += presets.Perform;
+        page.SendBrightness(BrightnessSetting.Value(_settings));
+        page.SendOverlayEnabled(OverlaySetting.Value(_settings));
         _visualizer.Opened += _audio.Start;
         _visualizer.Opened += page.StartStatusChecks;
         _visualizer.Closed += _audio.Stop;
@@ -162,6 +167,14 @@ public partial class App : Application
             {
                 idle.TimeoutMayHaveChanged();
                 keepAwake.LimitMayHaveChanged();
+            }
+            else if (e.Key == BrightnessSetting.Key)
+            {
+                page.SendBrightness(BrightnessSetting.Value(_settings));
+            }
+            else if (e.Key == OverlaySetting.Key)
+            {
+                page.SendOverlayEnabled(OverlaySetting.Value(_settings));
             }
         };
         power.Changed += () =>

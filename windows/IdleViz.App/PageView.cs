@@ -64,6 +64,8 @@ internal sealed class PageView : IDisposable
 
     /// <summary>The latest audio delay, replayed the same way. The progress bar needs it to show the position you hear.</summary>
     private string _audioDelayScript = AudioDelaySetting.Script(0);
+    private string _brightnessScript = BrightnessSetting.Script(BrightnessSetting.DefaultValue);
+    private string _overlayEnabledScript = OverlaySetting.Script(true);
 
     /// <param name="parent">The visualizer window. The page fills it.</param>
     /// <param name="dispatcher">The UI thread's queue.</param>
@@ -157,6 +159,45 @@ internal sealed class PageView : IDisposable
     {
         _audioDelayScript = AudioDelaySetting.Script(seconds);
         Run(_audioDelayScript);
+    }
+
+    /// <summary>Sets how much of the visualizer shows through the black dim layer, 0.5 to 1.</summary>
+    public void SendBrightness(double value)
+    {
+        _brightnessScript = BrightnessSetting.Script(value);
+        Run(_brightnessScript);
+    }
+
+    /// <summary>Shows or hides the Spotify overlay as a whole.</summary>
+    public void SendOverlayEnabled(bool enabled)
+    {
+        _overlayEnabledScript = OverlaySetting.Script(enabled);
+        Run(_overlayEnabledScript);
+    }
+
+    /// <summary>Asks the page for the next preset. It does nothing outside Shuffle.</summary>
+    public void SkipPreset() => Run(VisualizerKeys.SkipScript);
+
+    /// <summary>Shows the heart that confirms the like key.</summary>
+    public void ShowLike(bool liked) => Run(VisualizerKeys.LikeScript(liked));
+
+    /// <summary>The preset on screen right now, or null if the page doesn't say. The once-a-second status can be a moment behind.</summary>
+    public async Task<string?> CurrentPreset()
+    {
+        if (!_loaded || _controller is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return PageStatus.FromReply(await _controller.CoreWebView2.ExecuteScriptAsync("window.idlevizStatus?.()"))?.Preset;
+        }
+        catch (Exception error)
+        {
+            Log.Info("page", $"Asking the page for its preset failed: {error.Message}");
+            return null;
+        }
     }
 
     /// <summary>Hands one audio frame's script to the page. Frames are dropped, not queued, while the page is busy or loading.</summary>
@@ -377,6 +418,8 @@ internal sealed class PageView : IDisposable
                 Run(_customPresetsScript);
                 Run(_presetSettingsScript);
                 Run(_audioDelayScript);
+                Run(_brightnessScript);
+                Run(_overlayEnabledScript);
                 Run(_nowPlayingScript);
                 FetchPresetList();
             }

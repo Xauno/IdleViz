@@ -18,13 +18,17 @@ namespace IdleViz.App;
 ///
 /// The input that closes the visualizer is swallowed, so a key never types into the app behind and a
 /// click never presses something nobody could see. The media keys go through and don't close it.
+/// The like and skip keys don't close it either; they are swallowed and reported instead.
 /// </summary>
 internal sealed class DismissWatcher : IDisposable
 {
     /// <summary>How long the backup check waits for the hooks to explain an input before closing on it.</summary>
     private static readonly TimeSpan s_settleTime = TimeSpan.FromMilliseconds(30);
 
-    private readonly DismissTracker _tracker = new();
+    private readonly DismissTracker _tracker;
+    private readonly VisualizerKeys _keys;
+    private readonly Action<VisualizerAction> _onAction;
+    private readonly HashSet<ushort> _swallowed = [];
     private readonly KeyboardInput _keyboard = new();
     private readonly Stopwatch _sinceOpened = Stopwatch.StartNew();
     private readonly Action _onDismiss;
@@ -39,8 +43,15 @@ internal sealed class DismissWatcher : IDisposable
     private bool _armed;
     private bool _settling;
 
-    public DismissWatcher(DispatcherQueue dispatcher, Action onDismiss)
+    /// <param name="dispatcher">The UI thread's queue.</param>
+    /// <param name="keys">The like and skip keys, which don't close the window.</param>
+    /// <param name="onAction">Called when the like or the skip key is pressed.</param>
+    /// <param name="onDismiss">Called once, when input closes the window.</param>
+    public DismissWatcher(DispatcherQueue dispatcher, VisualizerKeys keys, Action<VisualizerAction> onAction, Action onDismiss)
     {
+        _keys = keys;
+        _tracker = new DismissTracker(passKeys: keys.Codes);
+        _onAction = onAction;
         _onDismiss = onDismiss;
         _keyboardProc = KeyboardProc;
         _mouseProc = MouseProc;
@@ -140,9 +151,39 @@ internal sealed class DismissWatcher : IDisposable
                 Fire($"key 0x{key.vkCode:X2}");
                 return (LRESULT)1;
             }
+
+            if (input.Kind == InputKind.Key && SwallowsActionKey(input))
+            {
+                return (LRESULT)1;
+            }
         }
 
         return PInvoke.CallNextHookEx(null, code, wParam, lParam);
+    }
+
+    // The like and skip keys work whether or not the window has focus, so they are kept from the
+    // app behind too. A key that was already down when the window opened is that app's: it gets
+    // the repeats and the release, and nothing runs.
+    private bool SwallowsActionKey(InputEvent input)
+    {
+        if (_keys.Action(input.Code) is not { } action)
+        {
+            return false;
+        }
+
+        if (!input.IsDown)
+        {
+            return _swallowed.Remove(input.Code);
+        }
+
+        if (input.IsRepeat)
+        {
+            return _swallowed.Contains(input.Code);
+        }
+
+        _swallowed.Add(input.Code);
+        _onAction(action);
+        return true;
     }
 
     private LRESULT MouseProc(int code, WPARAM wParam, LPARAM lParam)

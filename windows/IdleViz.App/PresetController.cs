@@ -84,6 +84,27 @@ internal sealed class PresetController
 
     public string Name(string id) => _names.TryGetValue(id, out var name) ? name : PresetInfo.FallbackName(id);
 
+    /// <summary>Runs the like or skip key.</summary>
+    public async void Perform(VisualizerAction action)
+    {
+        if (action == VisualizerAction.Skip)
+        {
+            _page.SkipPreset();
+            return;
+        }
+
+        // LastShown can be a second behind, so ask the page what is on screen right now.
+        if (await _page.CurrentPreset() is not { } id)
+        {
+            return;
+        }
+
+        var liked = !Settings.IsFavorite(id);
+        Update(settings => settings.SetFavorite(id, liked));
+        _page.ShowLike(liked);
+        Log.Info("presets", $"{(liked ? "Liked" : "Unliked")} {id}");
+    }
+
     /// <summary>Applies a change, stores it and hands it to the page, which applies it at once.</summary>
     public void Update(Action<PresetSettings> change)
     {
