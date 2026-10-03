@@ -17,6 +17,7 @@ windows/
 ├─ IdleViz.Core.Tests/       xUnit tests, ported from tests/IdleVizCoreTests
 ├─ IdleViz.App/              The WinUI 3 app: tray icon, windows, system calls
 ├─ installer/IdleViz.iss     Inno Setup script
+├─ installer/test-installer.ps1  Installs, updates and uninstalls, and checks the result (CI)
 ├─ tools/make-icon.ps1       Draws IdleViz.App/Assets/IdleViz.ico
 └─ build-installer.ps1       Builds the app and the setup file
 ```
@@ -37,8 +38,13 @@ dotnet test
 - **Publishing needs `EnableMsixTooling`**, although the app isn't an MSIX package. Without it `dotnet publish` leaves out the compiled XAML (`IdleViz.pri`), and the installed app starts but crashes as soon as it opens a window, while the Debug build works. `build-installer.ps1` checks the file is there.
 - **Tests.** xUnit v3 on Microsoft.Testing.Platform, which is what `dotnet test` needs on the .NET 10 SDK.
 - **Lint.** `dotnet format` checks the `.editorconfig` style. The built-in .NET analyzers (`latest-recommended`) and the code-style rules run in every build with warnings as errors.
-- **Installer.** Per-user, so no admin prompt: files go to `%LOCALAPPDATA%\Programs\IdleViz`, with a Start menu entry, an uninstaller under Installed apps, and the `idleviz://` protocol registered for the user. Installing over a running copy stops it first. Unsigned, so a downloaded setup file would get a SmartScreen warning; one built on the same PC doesn't.
-- **CI.** The `windows` job on `windows-latest` runs the format check, build, tests and the installer build.
+- **Installer.** Per-user, so no admin prompt: files go to `%LOCALAPPDATA%\Programs\IdleViz` or a folder the user picks, with an uninstaller under Installed apps and the `idleviz://` protocol registered for the user. Installing over a running copy stops it first. Unsigned, so a downloaded setup file gets a SmartScreen warning; one built on the same PC doesn't.
+- **Wizard.** Welcome, the MIT license, the folder, the options, then it installs; there is no separate "ready" page. The options are **Start menu entry** (ticked), **Desktop shortcut** (not ticked) and **Run at startup** (ticked). A silent install (`-Install`, or `/VERYSILENT`) takes the same defaults.
+  - **Updates.** The folder page is left out and the update goes into the installed copy's folder, so there is never a second copy. The shortcut options start as they were at the last install, and unticking one removes its shortcut.
+  - **Run at startup** writes the value the app's own switch writes (`StartupEntry.Command`). On an update the box starts as that value is now, not as it was ticked last time, because the switch in settings may have changed it since; this also holds for a silent update. An entry that starts another copy, such as a Debug build, counts as off and is left alone. `/TASKS=` or `/MERGETASKS=` on the command line wins over this.
+  - **The old files are cleared** before the new ones are copied, but only in a folder that already holds `IdleViz.exe`, since the user may pick a folder with other things in it.
+- **CI.** The `windows` job on `windows-latest` runs the format check, build, tests and the installer build, then `installer/test-installer.ps1`: a first install into a folder of its own, updates with other options, and the uninstaller, checking the files, shortcuts and registry after each. The script refuses to run on a PC that has IdleViz installed, because it would replace and remove that copy.
+- **Releases.** Pushing a tag like `v0.1.0` runs `.github/workflows/release.yml`: it builds and tests the setup file and publishes a GitHub release with `IdleViz-Setup.exe` and generated notes. The tag has to match `Version` in `Directory.Build.props`, or the workflow fails before building.
 - **Line endings.** `.gitattributes` makes every checkout LF. With CRLF, Prettier fails and the vendored libraries no longer match their checksums.
 
 ## Third-party packages

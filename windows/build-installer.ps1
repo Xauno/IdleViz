@@ -60,7 +60,10 @@ if ($Install) {
     $setup = Start-Process $setupFile -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -PassThru
     $setup.WaitForExit()
     if ($setup.ExitCode -ne 0) { throw "The setup file failed with exit code $($setup.ExitCode)." }
-    # A silent install skips the "Start IdleViz" step, so start it here.
-    Start-Process (Join-Path $env:LOCALAPPDATA 'Programs\IdleViz\IdleViz.exe')
+    # A silent install skips the "Start IdleViz" step, so start it here. An update goes into the
+    # folder chosen at the first install, which setup records with the uninstaller.
+    $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F0B2C1E-7C0B-4E0B-9B43-1D2A6B7C9E55}_is1'
+    $installDir = (Get-ItemProperty $uninstallKey).InstallLocation
+    Start-Process (Join-Path $installDir 'IdleViz.exe')
     Write-Host 'IdleViz is installed and running.'
 }

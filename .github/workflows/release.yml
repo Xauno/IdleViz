@@ -1,0 +1,52 @@
+name: Release
+
+# Pushing a tag like v0.1.0 builds the Windows setup file and publishes a GitHub release with it.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows setup file
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows
+    steps:
+      - uses: actions/checkout@v7
+
+      # The setup file takes its version from Directory.Build.props, so the tag has to say the same.
+      - name: Check the tag against the version
+        run: |
+          [xml]$props = Get-Content Directory.Build.props
+          $version = "$($props.Project.PropertyGroup.Version)".Trim()
+          if ("v$version" -ne $env:GITHUB_REF_NAME) {
+            throw "The tag is $env:GITHUB_REF_NAME but Directory.Build.props says $version."
+          }
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: windows/global.json
+
+      - name: Install Inno Setup
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --yes --no-progress
+          }
+
+      - name: Build installer
+        run: ./build-installer.ps1
+
+      - name: Test installer
+        run: ./installer/test-installer.ps1
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create $env:GITHUB_REF_NAME artifacts/IdleViz-Setup.exe --title "IdleViz $env:GITHUB_REF_NAME" --generate-notes --verify-tag
