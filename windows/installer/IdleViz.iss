@@ -60,6 +60,11 @@ Type: filesandordirs; Name: "{app}\*"; Check: FolderHoldsIdleViz
 Type: files; Name: "{userprograms}\IdleViz.lnk"; Tasks: not startmenu
 Type: files; Name: "{userdesktop}\IdleViz.lnk"; Tasks: not desktopicon
 
+[UninstallDelete]
+; Setup only removes folders it made itself. After an update the folder was already there (and the
+; record of the first install was cleared with the old files), so it would stay behind, empty.
+Type: dirifempty; Name: "{app}"
+
 [Icons]
 Name: "{userprograms}\IdleViz"; Filename: "{app}\IdleViz.exe"; Tasks: startmenu
 Name: "{userdesktop}\IdleViz"; Filename: "{app}\IdleViz.exe"; Tasks: desktopicon
