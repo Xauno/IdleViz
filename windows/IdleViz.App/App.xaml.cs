@@ -20,6 +20,10 @@ public partial class App : Application
     private SettingsWindow? _settingsWindow;
     private SpotifyInfo? _spotify;
     private OverlayFeed? _overlay;
+    private AudioPump? _audio;
+#if DEBUG
+    private DispatcherQueueTimer? _hangTimer;
+#endif
     private IdleWatcher? _idle;
     private DispatcherQueueTimer? _openAtLaunchTimer;
     private DispatcherQueueTimer? _firstReadingTimer;
@@ -76,6 +80,14 @@ public partial class App : Application
         _overlay = new OverlayFeed(_spotify, _visualizer.Page, _dispatcher);
         _visualizer.Opened += _overlay.Start;
         _visualizer.Closed += _overlay.Stop;
+        // The capture and the status checks only run while the window is open.
+        var spotify = _spotify;
+        var page = _visualizer.Page;
+        _audio = new AudioPump(_dispatcher, () => spotify.Tracker.Current?.State == SpotifyPlayerState.Playing, page.SendAudioFrame);
+        _visualizer.Opened += _audio.Start;
+        _visualizer.Opened += page.StartStatusChecks;
+        _visualizer.Closed += _audio.Stop;
+        _visualizer.Closed += page.StopStatusChecks;
         _visualizer.Start();
 
         _idle = new IdleWatcher(_dispatcher, () => IdleTimeoutSetting.Timeout(IdleMinutes), _hotkeyWindow, () => OpenVisualizer(TriggerSource.Idle));
@@ -106,6 +118,17 @@ public partial class App : Application
         }
 
         ShowDebugWindows(debug);
+#if DEBUG
+        if (debug.HangPage)
+        {
+            _hangTimer = _dispatcher.CreateTimer();
+            _hangTimer.Interval = TimeSpan.FromSeconds(5);
+            _hangTimer.IsRepeating = false;
+            _hangTimer.Tick += (_, _) => page.Hang();
+            _visualizer.Opened += _hangTimer.Start;
+            _visualizer.Closed += _hangTimer.Stop;
+        }
+#endif
 
         if (debug.OpenAtLaunch)
         {
@@ -259,6 +282,7 @@ public partial class App : Application
         _settingsWindow?.Close();
         StopWaiting();
         _idle?.Dispose();
+        _audio?.Dispose();
         _spotify?.Dispose();
         _visualizer?.Dispose();
         _hotkeyWindow?.Dispose();

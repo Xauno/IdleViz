@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using IdleViz.Core;
 using Microsoft.UI.Dispatching;
 using Microsoft.Web.WebView2.Core;
@@ -19,11 +20,18 @@ internal sealed class PageView : IDisposable
     private const int ReadyCheckAttempts = 200;
     private const string ReadyCheck = "['nowPlaying', 'setPresetSettings', 'setCustomPresets'].every((name) => typeof window[name] === 'function')";
 
+    // Audio frames the page hasn't taken yet. More than a couple means it's busy, so newer frames are dropped.
+    private const int MaxFramesInFlight = 2;
+
     private readonly HWND _parent;
     private readonly DispatcherQueue _dispatcher;
     private readonly string _root;
     private readonly string _presetsRoot;
     private readonly DispatcherQueueTimer _readyTimer;
+    private readonly DispatcherQueueTimer _statusTimer;
+    private readonly PageWatchdog _watchdog = new();
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private readonly SortedSet<string> _hung = new(StringComparer.Ordinal);
     private CoreWebView2Environment? _environment;
     private CoreWebView2Controller? _controller;
     private bool _visible;
@@ -31,8 +39,20 @@ internal sealed class PageView : IDisposable
     private int _readyAttempts;
     private bool _disposed;
 
+    // Counts page loads, so an answer from an earlier page is ignored.
+    private int _loadId;
+    private int _framesInFlight;
+    private PageStatus? _lastStatus;
+
+    // The page's own counts at the first answer after the window opened, for the line logged when it closes.
+    private long _framesAtOpen = -1;
+    private long _audioFramesAtOpen;
+
     /// <summary>The latest <c>nowPlaying</c> call, replayed whenever the page (re)loads.</summary>
     private string _nowPlayingScript = OverlayPayload.Script(null);
+
+    /// <summary>The latest list of custom presets and hung presets, replayed the same way.</summary>
+    private string _customPresetsScript = CustomPresetPayload.Empty.Script;
 
     /// <param name="parent">The visualizer window. The page fills it.</param>
     /// <param name="dispatcher">The UI thread's queue.</param>
@@ -45,7 +65,13 @@ internal sealed class PageView : IDisposable
         _readyTimer = dispatcher.CreateTimer();
         _readyTimer.Interval = TimeSpan.FromMilliseconds(ReadyCheckMilliseconds);
         _readyTimer.Tick += (_, _) => CheckReady();
+        _statusTimer = dispatcher.CreateTimer();
+        _statusTimer.Interval = TimeSpan.FromSeconds(1);
+        _statusTimer.Tick += (_, _) => CheckStatus();
     }
+
+    /// <summary>Called with the presets the page reports as failed, each time that list changes.</summary>
+    public event Action<IReadOnlyList<PresetFailure>>? FailuresChanged;
 
     /// <summary>Starts WebView2 and loads the page. The window may still be hidden.</summary>
     public async void Start()
@@ -80,6 +106,70 @@ internal sealed class PageView : IDisposable
         Run(_nowPlayingScript);
     }
 
+    /// <summary>Hands one audio frame's script to the page. Frames are dropped, not queued, while the page is busy or loading.</summary>
+    public async void SendAudioFrame(string script)
+    {
+        if (!_loaded || _controller is null || _framesInFlight >= MaxFramesInFlight)
+        {
+            return;
+        }
+
+        var load = _loadId;
+        _framesInFlight++;
+        try
+        {
+            await _controller.CoreWebView2.ExecuteScriptAsync(script);
+        }
+        catch (Exception)
+        {
+            // The page went away mid-call (reload or crash); the next frame goes to the new one.
+        }
+        finally
+        {
+            if (load == _loadId)
+            {
+                _framesInFlight--;
+            }
+        }
+    }
+
+    /// <summary>
+    /// While the window is open, asks the page once a second how it's doing. A page that stops
+    /// answering (a preset or plugin stuck in a loop) is replaced.
+    /// </summary>
+    public void StartStatusChecks()
+    {
+        if (_statusTimer.IsRunning)
+        {
+            return;
+        }
+
+        _watchdog.Start(Now);
+        _framesAtOpen = -1;
+        _statusTimer.Start();
+    }
+
+    public void StopStatusChecks()
+    {
+        _statusTimer.Stop();
+        _watchdog.Stop();
+        if (_framesAtOpen >= 0 && _lastStatus is { } status)
+        {
+            Log.Info("page", $"While open: the page drew {status.Frames - _framesAtOpen} frames and got {status.AudioFrames - _audioFramesAtOpen} audio frames");
+        }
+
+        _framesAtOpen = -1;
+    }
+
+#if DEBUG
+    /// <summary>Debug builds only: makes the page's renderer loop forever, as a broken preset would.</summary>
+    public void Hang()
+    {
+        Log.Info("page", "Hanging the page on purpose (--hang-page)");
+        Run("setTimeout(() => { for (;;) {} }, 0)");
+    }
+#endif
+
     /// <summary>
     /// The page renders only while the window is showing. Hidden, it is suspended, so it costs
     /// nothing between opens.
@@ -108,6 +198,7 @@ internal sealed class PageView : IDisposable
     {
         _disposed = true;
         _readyTimer.Stop();
+        _statusTimer.Stop();
         _controller?.Close();
         _controller = null;
     }
@@ -187,7 +278,7 @@ internal sealed class PageView : IDisposable
 
     private void Load()
     {
-        _loaded = false;
+        ResetPageState();
         _readyTimer.Stop();
         _controller?.CoreWebView2.Navigate(AppAddresses.PageUrl);
     }
@@ -228,6 +319,7 @@ internal sealed class PageView : IDisposable
                 _readyTimer.Stop();
                 _loaded = true;
                 Log.Info("page", "Ready");
+                Run(_customPresetsScript);
                 Run(_nowPlayingScript);
             }
         }
@@ -259,7 +351,7 @@ internal sealed class PageView : IDisposable
         Log.Info("page", $"WebView2 process failed: {e.ProcessFailedKind} ({e.Reason}, exit code {e.ExitCode})");
         _dispatcher.TryEnqueue(async () =>
         {
-            if (_disposed)
+            if (_disposed || !IsCurrent(sender))
             {
                 return;
             }
@@ -269,7 +361,7 @@ internal sealed class PageView : IDisposable
                 // Everything is gone: start over with a new controller.
                 _controller?.Close();
                 _controller = null;
-                _loaded = false;
+                ResetPageState();
                 try
                 {
                     await CreateController();
@@ -285,6 +377,149 @@ internal sealed class PageView : IDisposable
                 Load();
             }
         });
+    }
+
+    private double Now => _clock.Elapsed.TotalSeconds;
+
+    private bool IsCurrent(CoreWebView2 sender)
+    {
+        try
+        {
+            return _controller?.CoreWebView2 == sender;
+        }
+        catch (Exception)
+        {
+            // The controller can't be asked once its browser process is gone; that report is for it.
+            return true;
+        }
+    }
+
+    private void ResetPageState()
+    {
+        _loaded = false;
+        _loadId++;
+        _framesInFlight = 0;
+        _lastStatus = null;
+        _framesAtOpen = -1;
+    }
+
+    private async void CheckStatus()
+    {
+        if (_controller is null)
+        {
+            return;
+        }
+
+        if (_watchdog.ShouldReload(Now) && _environment is not null)
+        {
+            var preset = _lastStatus?.Preset;
+            Log.Info("page", $"The page stopped answering; replacing it (last preset: {preset ?? "none"})");
+            // Whatever was on screen is the likely cause. Keep it out, or the new page would hang on it too.
+            if (preset is not null && _hung.Add(preset))
+            {
+                _customPresetsScript = new CustomPresetPayload([], [.. _hung]).Script;
+            }
+
+            await ReplaceStuckPage();
+            return;
+        }
+
+        if (!_loaded)
+        {
+            return;
+        }
+
+        var load = _loadId;
+        string reply;
+        try
+        {
+            reply = await _controller.CoreWebView2.ExecuteScriptAsync("window.idlevizStatus?.()");
+        }
+        catch (Exception)
+        {
+            return;
+        }
+
+        if (load != _loadId || PageStatus.FromReply(reply) is not { } status)
+        {
+            return;
+        }
+
+        _watchdog.Replied(Now);
+        if (status.Preset != _lastStatus?.Preset)
+        {
+            Log.Info("page", $"Preset: {status.Preset ?? "none"}");
+        }
+
+        if (!status.SameFailures(_lastStatus) && (_lastStatus is not null || status.Failed.Count > 0))
+        {
+            var known = (_lastStatus?.Failed ?? []).Select(f => f.Id).ToHashSet(StringComparer.Ordinal);
+            foreach (var failure in status.Failed.Where(f => !known.Contains(f.Id)))
+            {
+                Log.Info("page", $"Failed to load {failure.Id}: {failure.Error}");
+            }
+
+            FailuresChanged?.Invoke(status.Failed);
+        }
+
+        if (_framesAtOpen < 0)
+        {
+            _framesAtOpen = status.Frames;
+            _audioFramesAtOpen = status.AudioFrames;
+        }
+
+        _lastStatus = status;
+    }
+
+    /// <summary>
+    /// A renderer stuck in a JavaScript loop can't be reloaded, and ending it doesn't make WebView2
+    /// report a crash (runtime 124): navigating that WebView again crashed the app. So, as on the Mac,
+    /// the stuck renderer is ended (or it would keep a core busy) and a new WebView takes the old one's place.
+    /// </summary>
+    private async Task ReplaceStuckPage()
+    {
+        var ended = 0;
+        try
+        {
+            // The environment belongs to IdleViz alone, so every renderer in it is the page's or a plugin frame's.
+            foreach (var info in _environment?.GetProcessInfos() ?? [])
+            {
+                if (info.Kind != CoreWebView2ProcessKind.Renderer)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    using var process = Process.GetProcessById(info.ProcessId);
+                    process.Kill();
+                    ended++;
+                }
+                catch (Exception error) when (error is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    // Already gone.
+                }
+            }
+        }
+        catch (Exception error)
+        {
+            Log.Info("page", $"Listing the page's processes failed: {error.Message}");
+        }
+
+        Log.Info("page", $"Ended {ended} renderer process(es)");
+        ResetPageState();
+        _readyTimer.Stop();
+        var old = _controller;
+        _controller = null;
+        try
+        {
+            old?.Close();
+            await CreateController();
+        }
+        catch (Exception error)
+        {
+            Log.Info("page", $"Can't make a new page: {error.Message}");
+        }
     }
 
     private void Resize()

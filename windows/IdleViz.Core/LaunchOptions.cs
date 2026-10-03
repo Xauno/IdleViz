@@ -24,6 +24,9 @@ public sealed record LaunchOptions
     /// <summary>Debug builds only: open the visualizer three seconds after launch.</summary>
     public bool OpenAtLaunch { get; init; }
 
+    /// <summary>Debug builds only: make the page loop forever 5 s after each open, to try the recovery.</summary>
+    public bool HangPage { get; init; }
+
     public static LaunchOptions Parse(IEnumerable<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -37,6 +40,7 @@ public sealed record LaunchOptions
                 "--show-flyout" => options with { ShowFlyout = true },
                 "--show-menu" => options with { ShowMenu = true },
                 "--open-at-launch" => options with { OpenAtLaunch = true },
+                "--hang-page" => options with { HangPage = true },
                 _ => UrlCommands.Parse(argument) is { } command ? options with { Command = command } : options,
             };
         }
