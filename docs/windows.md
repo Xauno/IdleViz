@@ -705,7 +705,7 @@ A stored display that isn't connected falls back: the main display to the primar
 
 - The section is called **Displays** and sits between Visualizer and Presets; the placement choices are worded "Same on each display" and "Extend across displays"; the default placement is the first.
 - The warning is an InfoBar at the top of the section, shown only while the switch is on: "Using more than one display takes more GPU power. The visualizer may run less smoothly, at a lower frame rate."
-- Displays are named by their Windows number and size ("Display 2 (3440 × 1440)"), not by the monitor's model name.
+- Displays are named by the number in the name Windows gives them and the monitor's model ("2: Odyssey G85SB"), as the owner asked after the first version. The model comes from `QueryDisplayConfig`; a display that reports none is "Display 2 (3440 × 1440)". The number is the one in `\.\DISPLAY2`, which is usually, but not provably, the number Windows Settings shows with Identify.
 - Display settings changed while the visualizer is open apply at the next open. A display change still closes it at once, as before.
 - A following page blends with the blend time even after the skip key, which blends the main page in half a second.
 

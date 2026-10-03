@@ -7,7 +7,8 @@ namespace IdleViz.Core;
 /// <param name="Width">Its width in pixels.</param>
 /// <param name="Height">Its height in pixels.</param>
 /// <param name="Dpi">Its scale, as dots per inch: 96 is 100 %.</param>
-public sealed record Display(string Name, int Left, int Top, int Width, int Height, int Dpi);
+/// <param name="Model">The monitor's model name as it reports it, or null if it reports none.</param>
+public sealed record Display(string Name, int Left, int Top, int Width, int Height, int Dpi, string? Model = null);
 
 /// <summary>
 /// Decides whether a display-change notice closes the visualizer. Windows sends such notices for

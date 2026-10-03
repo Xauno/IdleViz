@@ -192,6 +192,8 @@ public sealed class MultiDisplayTests
     public void DisplaysAreLabelledByTheirWindowsNumberAndSize()
     {
         Assert.Equal("Display 1 (3440 × 1440)", DisplayLabel.For(s_wide));
+        Assert.Equal("Display 1 (3440 × 1440)", DisplayLabel.For(s_wide with { Model = " " }));
+        Assert.Equal("1: Odyssey G85SB", DisplayLabel.For(s_wide with { Model = "Odyssey G85SB " }));
         Assert.Equal("Display 12", DisplayLabel.Brief(@"\\.\DISPLAY12"));
         Assert.Equal("Projector", DisplayLabel.Brief("Projector"));
     }

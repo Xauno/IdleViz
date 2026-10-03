@@ -84,20 +84,28 @@ public sealed record MultiDisplaySettings(
 /// <summary>Names the displays in the settings window.</summary>
 public static class DisplayLabel
 {
-    /// <summary>"Display 1 (3440 × 1440)". The number is the one in the name Windows gives the display.</summary>
+    /// <summary>
+    /// "2: Odyssey G85SB": the number in the name Windows gives the display, then the monitor's
+    /// model. A display that reports no model (a virtual one, say) is "Display 2 (3440 × 1440)".
+    /// </summary>
     public static string For(Display display)
     {
         ArgumentNullException.ThrowIfNull(display);
-        return $"{Brief(display.Name)} ({display.Width} × {display.Height})";
+        var number = Number(display.Name);
+        return string.IsNullOrWhiteSpace(display.Model) || number.Length == 0
+            ? $"{Brief(display.Name)} ({display.Width} × {display.Height})"
+            : $"{number}: {display.Model.Trim()}";
     }
 
     /// <summary>"Display 1", for a display that may not be connected.</summary>
     public static string Brief(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
-        var digits = new string([.. name.Reverse().TakeWhile(char.IsAsciiDigit).Reverse()]);
-        return digits.Length > 0 ? $"Display {digits}" : name;
+        var number = Number(name);
+        return number.Length > 0 ? $"Display {number}" : name;
     }
+
+    private static string Number(string name) => new([.. name.Reverse().TakeWhile(char.IsAsciiDigit).Reverse()]);
 }
 
 /// <summary>One display's part of a visualizer window, in pixels from the window's top left corner.</summary>
