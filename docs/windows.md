@@ -234,7 +234,7 @@ In `IdleViz.Core`: `DismissTracker.cs` (ported with its tests), `KeyboardInput.c
 
 ### W3: Spotify now-playing
 
-The app reads what Spotify is playing and writes it to the log. Nothing uses it yet: the open rules are W4 and the overlay is W5.
+The app reads what Spotify is playing and writes it to the log. The open rules (W4) and the overlay (W5) use it.
 
 | File | What it does |
 | ---- | ------------ |
@@ -289,3 +289,36 @@ Songs and podcasts, playing or paused, all open. An already open window ignores 
 **The tray icon library disposes the icon it had whenever it gets a new one,** so the icon is drawn again for every step. Swapping between two kept icons crashed the app on the second step.
 
 **Seen when checking:** a freshly started Spotify is reported with its restored, paused track within about a second, before anything plays, so the visualizer opens at once.
+
+### W5: the page in the window
+
+The visualizer window now holds the shared page in WebView2, with the Spotify overlay. The visuals don't get audio yet (W7a), so the presets move by themselves, and the page has no settings from the app yet (W7b, W8c): it uses its own defaults.
+
+| File | What it does |
+| ---- | ------------ |
+| `IdleViz.Core/AppAddresses.cs` | The two addresses the page is served from, the Content-Security-Policy for each page, file types, and which file an address names. Ported from `AppScheme.swift`. |
+| `IdleViz.Core/OverlayPayload.cs` | What `window.nowPlaying` gets, and the script that sends it. Ported from `OverlayPayload.swift`. |
+| `IdleViz.Core/SpotifyTracker.cs` | Now also keeps `CurrentSince`, when the current track became current. |
+| `IdleViz.App/PageView.cs` | WebView2 on the visualizer window: serves the files, blocks everything else, waits for the page's scripts, reloads after a crash, suspends the page while hidden. Ported from `PageView.swift` and `AppSchemeHandler.swift`. |
+| `IdleViz.App/OverlayFeed.cs` | Sends the overlay its data. |
+| `IdleViz.App.csproj` | Copies `IdleViz/web/` into the app's `web` folder at build time. |
+
+**Addresses.** `https://app.idleviz.invalid/…` is the `web` folder next to the exe, `https://presets.idleviz.invalid/…` is `%APPDATA%\IdleViz\Presets` (`.json` and `.js` only). The app answers both in `WebResourceRequested`; nothing reaches the network. An address is refused if it is for another host, port or scheme, would leave its folder (`..`, encoded or not, `\`, a drive), names a stream (`:`), ends in a dot or space (Windows would drop it and serve another file), passes through a symbolic link or junction below the folder, or names no file. Every response carries `Access-Control-Allow-Origin: *`, and each HTML page its own policy: the Mac's three policies with `idleviz-app:` replaced by the two hosts.
+
+**What the page can't do.** Web messages and host objects are off, so the page has no way to call the app. Every permission request (microphone, camera and the rest) is denied, and so are new windows and downloads. The top frame may only show the app's own pages, and frames only those or `about:blank`. Context menus, zoom, the status bar, browser shortcut keys, autofill and script dialogs are off. DevTools are on in Debug builds only.
+
+**Loading.** The page loads at launch into the hidden window, so the first open shows it at once. After the navigation completes, the app asks every 50 ms (for up to 10 s) whether `nowPlaying`, `setPresetSettings` and `setCustomPresets` exist, and only then sends the overlay its data, as on the Mac. If the renderer crashes or hangs, the page is loaded again; if the whole browser process goes, a new WebView2 is made. (Replacing a page stuck in a plugin's endless loop, with the status checks, is W7a.)
+
+**While hidden** the page is not visible and is suspended. Measured: the app and its WebView2 processes used 0.2 % of one core over 10 s between opens, and about 410 MB of memory together.
+
+**The overlay** gets `nowPlaying` on every Spotify change and seek, when a cover arrives, when the window opens, and every 5 s while it is open. The position is worked out for the moment of sending.
+
+**Cover on its way** (`artworkPending`). On the Mac this is true while the cover downloads. On Windows the cover comes with the track from the media controls, 20 to 150 ms after it (W3 and W4 logs), so a track without a cover counts as pending for 2 s after it became current, and the page leaves the square empty instead of showing the music note. The app tells the page again when the 2 s are over, so a track that never gets a cover shows the note.
+
+**Chosen here without asking the owner** (they asked for the build to keep going); any of these can be changed:
+
+- The 2 s cover wait above.
+- The page runs in WebView2's InPrivate mode, the nearest thing to the Mac's non-persistent web storage: nothing the page or a plugin stores outlives it.
+- WebView2 starts with `--autoplay-policy=no-user-gesture-required`, as the Mac sets no media type to need a user action. The page's AudioContext is allowed to start without a click.
+
+**Seen when checking** (Windows 11, WebView2 124, 3440 × 1440): a paused song showed only the progress row, a playing song the cover, title, artist and a moving progress bar. Quitting Spotify with the window open left the overlay up at 0.7 s and gone at 3 s (the page's 1.5 s wait). The installed Release copy opened from `idleviz://open` with the page and a hidden pointer. The page asks for `favicon.ico` on every load and gets a 404; that one isn't logged.

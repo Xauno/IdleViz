@@ -19,6 +19,7 @@ public partial class App : Application
     private TrayIcon? _trayIcon;
     private SettingsWindow? _settingsWindow;
     private SpotifyInfo? _spotify;
+    private OverlayFeed? _overlay;
     private DispatcherQueueTimer? _openAtLaunchTimer;
     private DispatcherQueueTimer? _firstReadingTimer;
     private TriggerSource? _waitingSource;
@@ -63,6 +64,11 @@ public partial class App : Application
 
         _spotify = new SpotifyInfo(_dispatcher);
         _spotify.Start();
+
+        _overlay = new OverlayFeed(_spotify, _visualizer.Page, _dispatcher);
+        _visualizer.Opened += _overlay.Start;
+        _visualizer.Closed += _overlay.Stop;
+        _visualizer.Start();
 
         Program.Relaunched += options => _dispatcher.TryEnqueue(() =>
         {

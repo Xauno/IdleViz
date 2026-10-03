@@ -35,7 +35,8 @@ internal sealed class VisualizerWindow() : NativeWindow(
             return false;
         }
 
-        if (PInvoke.WindowFromPoint(cursor.ptScreenPos) != Handle)
+        // The page is a child window, so the window under the pointer is that child or this one.
+        if (PInvoke.GetAncestor(PInvoke.WindowFromPoint(cursor.ptScreenPos), GET_ANCESTOR_FLAGS.GA_ROOT) != Handle)
         {
             return false;
         }

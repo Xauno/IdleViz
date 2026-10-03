@@ -5,7 +5,9 @@ DestroyIcon
 DestroyWindow
 DWM_WINDOW_CORNER_PREFERENCE
 DwmSetWindowAttribute
+GetAncestor
 GetAsyncKeyState
+GetClientRect
 GetCursorInfo
 GetCursorPos
 GetDpiForSystem

@@ -216,4 +216,33 @@ public class SpotifyTrackerTests
         // Reading it doesn't change what the tracker holds.
         Assert.Equal(29, tracker.Current!.Position, 3);
     }
+
+    [Fact]
+    public void RemembersWhenTheTrackBecameCurrent()
+    {
+        var (tracker, _) = Make();
+        Assert.Null(tracker.CurrentSince);
+        tracker.Read(NowPlayingTests.Song(position: 29), s_now);
+        Assert.Equal(s_now, tracker.CurrentSince);
+        // A pause, a seek and a corrected length are still the same track.
+        tracker.Read(NowPlayingTests.Song(MediaStatus.Paused, position: 30), s_now.AddSeconds(1));
+        tracker.Read(NowPlayingTests.Song(MediaStatus.Paused, position: 90), s_now.AddSeconds(2));
+        tracker.Read(NowPlayingTests.Song(MediaStatus.Paused, position: 90, duration: 330), s_now.AddSeconds(3));
+        Assert.Equal(s_now, tracker.CurrentSince);
+        tracker.Read(NowPlayingTests.Song(title: "Troublemaker", position: 0), s_now.AddSeconds(4));
+        Assert.Equal(s_now.AddSeconds(4), tracker.CurrentSince);
+    }
+
+    [Fact]
+    public void NoTrackHasNoTimeAndTheSameTrackAfterAGapStartsOver()
+    {
+        var (tracker, _) = Make();
+        tracker.Read(NowPlayingTests.Song(), s_now);
+        tracker.Read(NowPlayingTests.Song(title: ""), s_now.AddSeconds(1));
+        Assert.Null(tracker.CurrentSince);
+        tracker.Read(NowPlayingTests.Song(), s_now.AddSeconds(2));
+        Assert.Equal(s_now.AddSeconds(2), tracker.CurrentSince);
+        tracker.SessionGone();
+        Assert.Null(tracker.CurrentSince);
+    }
 }

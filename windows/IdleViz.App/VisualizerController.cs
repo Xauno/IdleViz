@@ -18,6 +18,7 @@ internal sealed class VisualizerController : IDisposable
 
     private readonly VisualizerWindow _window = new();
     private readonly DispatcherQueue _dispatcher;
+    private readonly PageView _page;
     private readonly DispatcherQueueTimer _fadeTimer;
     private readonly DispatcherQueueTimer _cursorTimer;
     private readonly Stopwatch _fadeClock = new();
@@ -36,6 +37,7 @@ internal sealed class VisualizerController : IDisposable
     {
         _dispatcher = dispatcher;
         _dismissEnabled = dismissEnabled;
+        _page = new PageView(_window.Handle, dispatcher);
         _fadeTimer = dispatcher.CreateTimer();
         _fadeTimer.Interval = TimeSpan.FromMilliseconds(8);
         _fadeTimer.Tick += (_, _) => OnFadeTick();
@@ -46,6 +48,18 @@ internal sealed class VisualizerController : IDisposable
 
     /// <summary>False again as soon as it starts to fade out.</summary>
     public bool IsOpen => _state == State.Open;
+
+    /// <summary>The page in the window. It loads at launch, so the first open shows it at once.</summary>
+    public PageView Page => _page;
+
+    /// <summary>Raised when the window has opened.</summary>
+    public event Action? Opened;
+
+    /// <summary>Raised when the window is gone after its fade-out.</summary>
+    public event Action? Closed;
+
+    /// <summary>Loads the page into the hidden window.</summary>
+    public void Start() => _page.Start();
 
     public void Open(TriggerSource source)
     {
@@ -71,11 +85,13 @@ internal sealed class VisualizerController : IDisposable
         _window.HidesCursor = _dismissEnabled;
         SetOpacity(0);
         _window.Show();
+        _page.SetVisible(true);
         var focused = _window.TakeFocus();
         _state = State.Open;
         _cursorTimer.Start();
         Fade(to: 1, seconds: VisualizerFade.OpenSeconds);
         Log.Info("window", $"Opened via {source}: {(focused ? "has focus" : "focus refused")}");
+        Opened?.Invoke();
 
         if (_dismissEnabled)
         {
@@ -129,6 +145,7 @@ internal sealed class VisualizerController : IDisposable
         _fadeTimer.Stop();
         _cursorTimer.Stop();
         _dismissWatcher?.Dispose();
+        _page.Dispose();
         _window.Dispose();
     }
 
@@ -141,7 +158,9 @@ internal sealed class VisualizerController : IDisposable
 
         _fadeTimer.Stop();
         _window.Hide();
+        _page.SetVisible(false);
         _state = State.Closed;
+        Closed?.Invoke();
     }
 
     private void Fade(double to, double seconds)

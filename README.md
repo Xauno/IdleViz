@@ -167,7 +167,7 @@ One borderless window holds one web page. The page stacks the Butterchurn canvas
 
 A Windows 11 version is being built in [`windows/`](windows/): the same page in WebView2, with the helper around it rewritten in C# and WinUI 3. The brief is [windows-port.html](windows-port.html), and what has been built and decided so far is in [docs/windows.md](docs/windows.md).
 
-> **Status: an open/close shell.** The Windows app lives in the tray and opens a fullscreen **black** window from a hotkey, a URL or its menu, and closes it on any input. There is no visualizer or overlay in the window yet. It only opens while Spotify has a track loaded, and reads what is playing, but only writes that to the log. It doesn't open by itself when the PC is idle. Everything under [Features](#features) and [Usage](#usage) describes the Mac app.
+> **Status: the page in the window.** The Windows app lives in the tray and opens the visualizer full screen from a hotkey, a URL or its menu, while Spotify has a track loaded, and closes it on any input. The window shows the same page as the Mac, with the Spotify overlay, but the visuals don't hear the music yet: they move by themselves. It doesn't open by itself when the PC is idle, and has no visualizer settings. Everything under [Features](#features) and [Usage](#usage) describes the Mac app.
 
 | Step | What                                                                                              | Status |
 | ---- | ------------------------------------------------------------------------------------------------- | ------ |
@@ -176,7 +176,7 @@ A Windows 11 version is being built in [`windows/`](windows/): the same page in 
 | W2   | Spike: Spotify-only audio capture, the page in WebView2, what the media controls report (findings only) | Done |
 | W3   | Spotify now-playing from the Windows media controls, content type, artwork                        | Done   |
 | W4   | Open rules and tray icon flash                                                                    | Done   |
-| W5   | The page in the window: overlay, CSP, all overlay states                                          |        |
+| W5   | The page in the window: overlay, CSP, all overlay states                                          | Done   |
 | W6   | Idle trigger, with skip rules                                                                     |        |
 | W7a  | Visualizer: real Spotify audio, and recovery from a stuck page                                    |        |
 | W7b  | Visualizer: preset controls                                                                       |        |
@@ -200,12 +200,13 @@ This builds the app and `windows\artifacts\IdleViz-Setup.exe`, runs it without q
 **Use:** what works so far.
 
 - **Tray icon:** IdleViz appears in the notification area, possibly behind the **^** overflow arrow. Left-click it for a small flyout with **Settings** and the current open hotkey. Right-click it for a menu with **Settings**, **Open visualizer** and **Exit**. Exit is the only way to quit; closing the settings window leaves the app running.
-- **Open:** press the hotkey (Ctrl + Alt + V by default), run `start idleviz://open` in a terminal, choose **Open visualizer** in the right-click menu, or click **Open** next to **Open now** in settings. Spotify has to be running with a track loaded, a song or a podcast, playing or paused. If it isn't, the tray icon flashes to a slashed waveform 3 times and nothing opens. Otherwise a black window fades in over the whole primary display, taskbar included.
+- **Open:** press the hotkey (Ctrl + Alt + V by default), run `start idleviz://open` in a terminal, choose **Open visualizer** in the right-click menu, or click **Open** next to **Open now** in settings. Spotify has to be running with a track loaded, a song or a podcast, playing or paused. If it isn't, the tray icon flashes to a slashed waveform 3 times and nothing opens. Otherwise the visualizer fades in over the whole primary display, taskbar included.
 - **Close:** move the mouse, click, scroll or press any key. The window fades out quickly and focus returns to the window you were in. The key or click that closes it is not passed on to that window. Input in the first 0.4 s after opening is ignored, so the hotkey itself doesn't close it, and keys you're still holding after that are ignored until you let go; pressing one again closes it.
 - **Media keys:** mute, volume, play/pause, next and previous do their usual job and leave it open.
 - **Settings:** click **Open hotkey**, then press a key together with Ctrl, Alt, Shift or the Windows key to change it. Esc cancels, and the **✕** button clears it. If another app already has the stored combination, the row says so.
-- **Spotify:** the app follows what Spotify is playing through the Windows media controls: song or podcast, playing or paused, position, length and the cover. It needs no Spotify login and never starts Spotify. For now this only shows in the log.
-- **Log:** `%LOCALAPPDATA%\IdleViz\logs\idleviz.log` records each start, open and close, what closed it, why an open was refused, and every change in what Spotify is playing.
+- **Visualizer:** the Butterchurn presets bundled with the page, changing every so often as on the Mac with its default settings. They don't react to Spotify's sound yet, so some look nearly black.
+- **Overlay:** what Spotify is playing, read from the Windows media controls with no Spotify login (it never starts Spotify). A playing song shows its cover, title, artist and a moving progress bar; a paused song only the progress bar; a podcast nothing. When Spotify stops having a track, the overlay goes 1.5 s later. Ads aren't told apart from songs on Windows; none has been seen yet, as the test PC has Spotify Premium.
+- **Log:** `%LOCALAPPDATA%\IdleViz\logs\idleviz.log` records each start, open and close, what closed it, why an open was refused, and every change in what Spotify is playing, and whether the page loaded.
 
 **Develop:** in `windows/`, `dotnet format --verify-no-changes`, `dotnet build` and `dotnet test`. The build treats warnings as errors. Details are in [docs/windows.md](docs/windows.md).
 
