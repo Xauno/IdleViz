@@ -20,6 +20,7 @@ public partial class App : Application
     private SettingsWindow? _settingsWindow;
     private SpotifyInfo? _spotify;
     private OverlayFeed? _overlay;
+    private IdleWatcher? _idle;
     private DispatcherQueueTimer? _openAtLaunchTimer;
     private DispatcherQueueTimer? _firstReadingTimer;
     private TriggerSource? _waitingSource;
@@ -35,6 +36,13 @@ public partial class App : Application
 
     /// <summary>The open hotkey as stored, or null if it was cleared.</summary>
     internal Hotkey? OpenHotkey => HotkeySetting.Read(_settings);
+
+    /// <summary>The "Start after idle" setting in minutes, 0 for off.</summary>
+    internal int IdleMinutes
+    {
+        get => IdleTimeoutSetting.Minutes(_settings);
+        set => _settings.SetInt(IdleTimeoutSetting.Key, value);
+    }
 
     /// <summary>False while Windows refuses the stored hotkey because another app has it.</summary>
     internal bool HotkeyRegistered { get; private set; } = true;
@@ -70,6 +78,15 @@ public partial class App : Application
         _visualizer.Closed += _overlay.Stop;
         _visualizer.Start();
 
+        _idle = new IdleWatcher(_dispatcher, () => IdleTimeoutSetting.Timeout(IdleMinutes), _hotkeyWindow, () => OpenVisualizer(TriggerSource.Idle));
+        _settings.Changed += (_, e) =>
+        {
+            if (e.Key == IdleTimeoutSetting.Key)
+            {
+                _idle.TimeoutMayHaveChanged();
+            }
+        };
+        _idle.Start();
         Program.Relaunched += options => _dispatcher.TryEnqueue(() =>
         {
             try
@@ -241,6 +258,7 @@ public partial class App : Application
         Log.Info("app", "Exit");
         _settingsWindow?.Close();
         StopWaiting();
+        _idle?.Dispose();
         _spotify?.Dispose();
         _visualizer?.Dispose();
         _hotkeyWindow?.Dispose();

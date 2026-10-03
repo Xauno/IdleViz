@@ -38,3 +38,16 @@ UnregisterHotKey
 WindowFromPoint
 WM_*
 IDC_ARROW
+GetSystemMetrics
+IAudioMeterInformation
+IAudioSessionControl2
+IAudioSessionManager2
+IMMDeviceEnumerator
+MMDeviceEnumerator
+NOTIFY_FOR_THIS_SESSION
+SHQueryUserNotificationState
+WTS_SESSION_LOCK
+WTS_SESSION_UNLOCK
+WTSGetActiveConsoleSessionId
+WTSRegisterSessionNotification
+WTSUnRegisterSessionNotification

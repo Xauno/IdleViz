@@ -1,6 +1,7 @@
 using IdleViz.Core;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Windows.Graphics;
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -37,6 +38,7 @@ public sealed partial class SettingsWindow : Window
         var scale = PInvoke.GetDpiForWindow(Handle) / 96.0;
         AppWindow.Resize(new SizeInt32((int)Math.Round(WidthInPixels * scale), (int)Math.Round(HeightInPixels * scale)));
 
+        ShowIdleChoices();
         Recorder.Attach(_app);
         Recorder.HotkeyChanged += ShowHotkeyState;
         ShowHotkeyState();
@@ -65,6 +67,33 @@ public sealed partial class SettingsWindow : Window
         else
         {
             HotkeyCard.Description = "Another app is already using this shortcut. Pick a different one.";
+        }
+    }
+
+    // 5, 10, 15 and 30 min, then Off, as on the Mac. A stored value that isn't a choice gets its own entry.
+    private void ShowIdleChoices()
+    {
+        var current = _app.IdleMinutes;
+        var minutes = IdleTimeoutSetting.Choices.Append(0).ToList();
+        if (!minutes.Contains(current))
+        {
+            minutes.Insert(0, current);
+        }
+
+        foreach (var value in minutes)
+        {
+            IdlePicker.Items.Add(new ComboBoxItem { Content = value > 0 ? $"{value} min" : "Off", Tag = value });
+        }
+
+        IdlePicker.SelectedIndex = minutes.IndexOf(current);
+    }
+
+    private void OnIdleChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // Showing the stored value selects it too; that is not a change.
+        if (IdlePicker.SelectedItem is ComboBoxItem { Tag: int minutes } && minutes != _app.IdleMinutes)
+        {
+            _app.IdleMinutes = minutes;
         }
     }
 

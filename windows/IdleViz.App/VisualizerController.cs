@@ -65,8 +65,8 @@ internal sealed class VisualizerController : IDisposable
     {
         if (_state == State.Open)
         {
-            // Nothing else can close it in the no-dismiss mode, so a second trigger does.
-            if (!_dismissEnabled)
+            // Nothing else can close it in the no-dismiss mode, so a second manual trigger does.
+            if (!_dismissEnabled && source.IsManual())
             {
                 Close(CloseReason.Input);
             }
