@@ -617,3 +617,48 @@ Spotify not running is neither. A failure while Spotify is quitting isn't one ei
 | Normal start, Spotify running | No rows, nothing logged under `warning`; opening the visualizer captured as before |
 
 **Not tried:** a real failure of either kind, since neither could be caused on the test PC; the yellow icon and the tooltip in the tray itself (the script can't see the icon; it is drawn by the same code as the white one); **Open log folder**.
+
+### W8c: brightness, overlay switch, run at startup, like and skip keys
+
+The last step: the remaining settings rows and the two keys that work while the visualizer is open (brief sections 6.3 and 6.11).
+
+| File | What it does |
+| ---- | ------------ |
+| `IdleViz.Core/DisplaySettings.cs` | `BrightnessSetting` (key `visualizerBrightness`, 0.5 to 1, default 0.7) and `OverlaySetting` (key `showOverlay`), with their calls to the page. Ported from `DisplaySettings.swift`. |
+| `IdleViz.Core/VisualizerKeys.cs` | The like and skip keys (`likeKey`, `skipKey`, −1 for Off), the keys the pickers offer, and the page calls. Ported from `VisualizerKeys.swift`. |
+| `IdleViz.Core/Startup.cs` | `StartupEntry`: what the Run key and Windows' own switch mean together. |
+| `IdleViz.App/RunAtStartup.cs` | Reads and writes the entry in the registry. |
+| `IdleViz.App/DismissWatcher.cs` | The keyboard hook now knows the two keys: they don't close the window, are swallowed, and are reported. |
+| `IdleViz.App/PresetController.cs`, `PageView.cs` | `Perform` runs a key; the page gets `skipPreset`, `showLike`, `setBrightness` and `setOverlayEnabled`, the last two again after every load. |
+| `SettingsWindow.xaml` | **Like key**, **Skip key** and **Run at startup** in General; **Show Spotify overlay** and **Brightness** at the top of Visualizer. |
+| `installer/IdleViz.iss` | Uninstalling removes the startup entry. |
+
+**Brightness and the overlay switch** are sent to the page when it is ready and whenever the setting changes, so they apply while the visualizer is open. The page does the rest, as on the Mac: a black layer over the visualizer, and an overlay that is hidden as a whole.
+
+**Like and skip keys.** They are read when the window opens and handed to the dismiss rules as keys that don't close it. The low-level hook sees them whether or not the window has focus (J3), so they are swallowed and never type into the app behind. A fresh press runs the action; key repeat doesn't. Skip calls `skipPreset()`. Like asks the page which preset is on screen at that moment (`idlevizStatus()`), toggles it on the favorites and calls `showLike`. A modifier is a key of its own and closes the window, so Ctrl+L closes it. A like or skip key that was already held when the window opened belongs to the app behind: it does nothing, and its repeats and release are passed on. The keys are stored as Windows virtual-key codes, so the numbers differ from the Mac's for the same key.
+
+**Run at startup** is a value named `IdleViz` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` holding this copy's path in quotes. It is never kept in the settings file: the row is read from the registry when the settings window opens and every time it comes to the front. Windows keeps its own on/off switch for each entry (Settings → Apps → Startup, stored under `Explorer\StartupApproved\Run`; an odd first byte means off). If that is off, the row shows Off with a link "Turned off in Windows. Open Startup apps…", and the app leaves Windows' switch alone. An entry that points at another copy (a Debug build) counts as Off for this one.
+
+**Chosen here without asking the owner** (they asked for the build to keep going):
+
+- The Run key instead of a shortcut in the Startup folder or a scheduled task. It needs no admin rights and shows up in Windows' Startup apps list.
+- Windows' own startup switch is only read, never changed, even when the row is turned on.
+- The like and skip keys are swallowed while the window is open.
+- The keys also work during the 0.4 s after opening.
+
+**A fault found while checking:** changing a picker's list of items from inside its own selection event took the app down ("Catastrophic failure" in the XAML library). The like and skip pickers each leave out the other's key, so each choice rebuilt both lists. Now only the other picker's list is rebuilt. And a slider reports a change as soon as its range is set, while the window is still being built; that is now ignored.
+
+**Seen when checking** (Debug build, settings driven through UI Automation, keys injected):
+
+| Case | Result |
+| --- | --- |
+| Like key picker | Off, A to Z without N, the digits, arrows and Space. Picking F stored `likeKey` 70, and the Skip picker then listed N but not F |
+| Brightness slider to its lowest | "50%", `visualizerBrightness` 0.5; the open visualizer was visibly darker |
+| Show Spotify overlay off | `showOverlay` false; a paused song showed no progress row |
+| Run at startup on, then off | The Run value held the Debug copy's path in quotes, then was gone |
+| Windows' switch set to off, then the row turned on | The row stayed Off with the link to Startup apps |
+| Skip key (set to B) with the visualizer open | A new preset the same moment; the window stayed open |
+| Like key (set to F) twice | "Liked …" and the preset in `favoritePresets`, then "Unliked …"; the window stayed open |
+| Another key (A) | "Closed by key 0x41" |
+
+**Not tried:** the heart on screen (it shows for 1.6 s; the script only saw the log and the settings file), a real sign-in with the row on, the installed copy's uninstaller removing the entry, and a key held across the opening.

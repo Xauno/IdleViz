@@ -26,7 +26,8 @@ public sealed partial class SettingsWindow : Window
     private readonly App _app;
 
     // Set while the rows are being filled in from the settings, so the pickers' own events aren't taken as changes.
-    private bool _showing;
+    // It starts set: a slider reports a change as soon as its range is, while the window is still being built.
+    private bool _showing = true;
 
     // What the Visualizer picker was last filled with: the page's list and a stored preset missing from it.
     private IReadOnlyList<PresetInfo>? _singleChoices;
@@ -42,6 +43,7 @@ public sealed partial class SettingsWindow : Window
     {
         _app = app;
         InitializeComponent();
+        _showing = false;
 
         Title = "IdleViz Settings";
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "IdleViz.ico"));
@@ -61,6 +63,18 @@ public sealed partial class SettingsWindow : Window
         Recorder.Attach(_app);
         Recorder.HotkeyChanged += ShowHotkeyState;
         ShowHotkeyState();
+
+        ShowKeys();
+        ShowDisplayOptions();
+        // Read again whenever the window comes forward: the entry can be switched off in Windows too.
+        Activated += (_, e) =>
+        {
+            if (e.WindowActivationState != WindowActivationState.Deactivated)
+            {
+                ShowStartup();
+            }
+        };
+        ShowStartup();
 
         FillPresetChoices();
         Presets.Changed += ShowPresets;
@@ -242,6 +256,126 @@ public sealed partial class SettingsWindow : Window
 
         settings.SetBool(BatteryTimesSetting.EnabledKey, BatterySwitch.IsOn);
         ShowTimes();
+    }
+
+    // Each picker leaves out the key the other one uses.
+    private void ShowKeys()
+    {
+        var keys = VisualizerKeys.Read(_app.Settings);
+        _showing = true;
+        try
+        {
+            FillKeys(LikeKeyPicker, keys.Like, taken: keys.Skip);
+            FillKeys(SkipKeyPicker, keys.Skip, taken: keys.Like);
+        }
+        finally
+        {
+            _showing = false;
+        }
+    }
+
+    private static void FillKeys(ComboBox picker, ushort? current, ushort? taken)
+    {
+        var choices = VisualizerKey.Choices.Where(key => key.Code != taken).ToList();
+        int[] codes = [VisualizerKeys.Off, .. choices.Select(key => (int)key.Code)];
+
+        // Only the other picker's list changes with a choice. The one being used keeps its items:
+        // emptying a picker from inside its own selection event takes the app down.
+        if (!codes.SequenceEqual(picker.Items.OfType<ComboBoxItem>().Select(item => (int)item.Tag)))
+        {
+            picker.Items.Clear();
+            picker.Items.Add(new ComboBoxItem { Content = "Off", Tag = VisualizerKeys.Off });
+            foreach (var key in choices)
+            {
+                picker.Items.Add(new ComboBoxItem { Content = key.Label, Tag = (int)key.Code });
+            }
+        }
+
+        Select(picker, current is { } code ? code : VisualizerKeys.Off);
+    }
+
+    private void ChangeKey(ComboBox picker, string key)
+    {
+        if (!_showing && picker.SelectedItem is ComboBoxItem { Tag: int code })
+        {
+            _app.Settings.SetInt(key, code);
+            ShowKeys();
+        }
+    }
+
+    private void OnLikeKeyChanged(object sender, SelectionChangedEventArgs e) => ChangeKey(LikeKeyPicker, VisualizerKeys.LikeKey);
+
+    private void OnSkipKeyChanged(object sender, SelectionChangedEventArgs e) => ChangeKey(SkipKeyPicker, VisualizerKeys.SkipKey);
+
+    private void ShowStartup()
+    {
+        var state = RunAtStartup.State;
+        _showing = true;
+        try
+        {
+            StartupSwitch.IsOn = state == StartupState.On;
+        }
+        finally
+        {
+            _showing = false;
+        }
+
+        if (state == StartupState.DisabledInWindows)
+        {
+            var link = new HyperlinkButton { Content = "Turned off in Windows. Open Startup apps\u2026", Padding = new Thickness(0) };
+            link.Click += async (_, _) => await Windows.System.Launcher.LaunchUriAsync(StartupEntry.WindowsSettings);
+            StartupCard.Description = link;
+        }
+        else
+        {
+            StartupCard.ClearValue(CommunityToolkit.WinUI.Controls.SettingsCard.DescriptionProperty);
+        }
+    }
+
+    private void OnStartupToggled(object sender, RoutedEventArgs e)
+    {
+        if (!_showing)
+        {
+            RunAtStartup.Set(StartupSwitch.IsOn);
+            ShowStartup();
+        }
+    }
+
+    private void ShowDisplayOptions()
+    {
+        var brightness = BrightnessSetting.Value(_app.Settings);
+        _showing = true;
+        try
+        {
+            OverlaySwitch.IsOn = OverlaySetting.Value(_app.Settings);
+            BrightnessSlider.Value = brightness;
+        }
+        finally
+        {
+            _showing = false;
+        }
+
+        BrightnessLabel.Text = BrightnessSetting.Label(brightness);
+    }
+
+    private void OnOverlayToggled(object sender, RoutedEventArgs e)
+    {
+        if (!_showing)
+        {
+            _app.Settings.SetBool(OverlaySetting.Key, OverlaySwitch.IsOn);
+        }
+    }
+
+    private void OnBrightnessChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        if (_showing)
+        {
+            return;
+        }
+
+        var brightness = BrightnessSetting.Normalized(e.NewValue);
+        _app.Settings.SetDouble(BrightnessSetting.Key, brightness);
+        BrightnessLabel.Text = BrightnessSetting.Label(brightness);
     }
 
     private void OnOpenNowClick(object sender, RoutedEventArgs e) => _app.OpenVisualizer(TriggerSource.Settings);

@@ -52,6 +52,12 @@ internal sealed class VisualizerController : IDisposable
     /// <summary>The page in the window. It loads at launch, so the first open shows it at once.</summary>
     public PageView Page => _page;
 
+    /// <summary>The like and skip keys. Read each time the window opens.</summary>
+    public Func<VisualizerKeys> Keys { get; set; } = () => new VisualizerKeys(null, null);
+
+    /// <summary>Raised when the like or the skip key is pressed while the window is open.</summary>
+    public event Action<VisualizerAction>? KeyPressed;
+
     /// <summary>Raised when the window has opened.</summary>
     public event Action? Opened;
 
@@ -98,7 +104,7 @@ internal sealed class VisualizerController : IDisposable
 
         if (_dismissEnabled)
         {
-            _dismissWatcher = new DismissWatcher(_dispatcher, () => Close(CloseReason.Input));
+            _dismissWatcher = new DismissWatcher(_dispatcher, Keys(), action => KeyPressed?.Invoke(action), () => Close(CloseReason.Input));
             _dismissWatcher.Start();
         }
     }

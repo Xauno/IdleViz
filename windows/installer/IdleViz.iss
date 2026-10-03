@@ -48,6 +48,8 @@ Name: "{userprograms}\IdleViz"; Filename: "{app}\IdleViz.exe"
 Root: HKCU; Subkey: "Software\Classes\idleviz"; ValueType: string; ValueData: "URL:IdleViz"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\idleviz"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
 Root: HKCU; Subkey: "Software\Classes\idleviz\shell\open\command"; ValueType: string; ValueData: """{app}\IdleViz.exe"" ""%1"""
+; "Run at startup" is written by the app itself. Setup only takes it away again on uninstall.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "IdleViz"; Flags: dontcreatekey uninsdeletevalue
 
 [Run]
 Filename: "{app}\IdleViz.exe"; Description: "Start IdleViz"; Flags: nowait postinstall skipifsilent
