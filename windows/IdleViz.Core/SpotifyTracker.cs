@@ -36,6 +36,12 @@ public sealed class SpotifyTracker
     /// </summary>
     public DateTimeOffset? TrackLostAt { get; private set; }
 
+    /// <summary>
+    /// When the current track became current, or null when there is none. A pause, a seek or a
+    /// corrected length doesn't change it; another track does. See <see cref="OverlayPayload.ArtworkWaitSeconds"/>.
+    /// </summary>
+    public DateTimeOffset? CurrentSince { get; private set; }
+
     /// <summary>Raised with the new item (null = no track) when the track, its state or its length (by 2 s or more) changed.</summary>
     public event Action<NowPlaying?>? Changed;
 
@@ -65,7 +71,7 @@ public sealed class SpotifyTracker
             TrackLostAt = now;
         }
 
-        Publish(item);
+        Publish(item, now);
         if (item is not null
             && expected is not null
             && item.Id == expected.Id
@@ -90,10 +96,19 @@ public sealed class SpotifyTracker
         Publish(null);
     }
 
-    private void Publish(NowPlaying? item)
+    private void Publish(NowPlaying? item, DateTimeOffset? now = null)
     {
         var previous = Current;
         var wasKnown = IsKnown;
+        if (item is null)
+        {
+            CurrentSince = null;
+        }
+        else if (previous?.Id != item.Id)
+        {
+            CurrentSince = now;
+        }
+
         Current = item;
         IsKnown = true;
         if (!wasKnown || !SameExceptPosition(previous, item))

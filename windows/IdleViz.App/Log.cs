@@ -49,4 +49,8 @@ internal static class AppPaths
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IdleViz");
 
     public static string SettingsFile => Path.Combine(LocalData, "settings.json");
+
+    /// <summary>%APPDATA%\IdleViz\Presets: the custom presets and plugins.</summary>
+    public static string PresetsFolder { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "IdleViz", "Presets");
 }
