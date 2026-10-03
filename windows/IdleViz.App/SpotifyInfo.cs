@@ -67,6 +67,38 @@ internal sealed class SpotifyInfo : IDisposable
         }
     }
 
+    /// <summary>Pauses Spotify for the manual delay test. Does nothing if Spotify isn't running.</summary>
+    public async void Pause()
+    {
+        try
+        {
+            if (_session is { } session && !await session.TryPauseAsync())
+            {
+                Log.Info("spotify", "Spotify didn't take the pause");
+            }
+        }
+        catch (Exception error)
+        {
+            Log.Info("spotify", $"Pausing Spotify failed: {error.Message}");
+        }
+    }
+
+    /// <summary>Starts playback again after the manual delay test paused it.</summary>
+    public async void Play()
+    {
+        try
+        {
+            if (_session is { } session && !await session.TryPlayAsync())
+            {
+                Log.Info("spotify", "Spotify didn't take the play");
+            }
+        }
+        catch (Exception error)
+        {
+            Log.Info("spotify", $"Resuming Spotify failed: {error.Message}");
+        }
+    }
+
     public void Dispose()
     {
         _disposed = true;

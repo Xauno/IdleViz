@@ -22,8 +22,10 @@ public partial class App : Application
     private OverlayFeed? _overlay;
     private AudioPump? _audio;
     private PresetController? _presets;
+    private AudioDelayController? _audioDelay;
 #if DEBUG
     private DispatcherQueueTimer? _hangTimer;
+    private DispatcherQueueTimer? _detectTimer;
 #endif
     private IdleWatcher? _idle;
     private DispatcherQueueTimer? _openAtLaunchTimer;
@@ -51,6 +53,9 @@ public partial class App : Application
 
     /// <summary>The preset controls. Set once the app has launched, before any window can show them.</summary>
     internal PresetController Presets => _presets ?? throw new InvalidOperationException("The app hasn't launched yet.");
+
+    /// <summary>The audio delay for the current speakers or headphones. Set once the app has launched.</summary>
+    internal AudioDelayController AudioDelay => _audioDelay ?? throw new InvalidOperationException("The app hasn't launched yet.");
 
     /// <summary>False while Windows refuses the stored hotkey because another app has it.</summary>
     internal bool HotkeyRegistered { get; private set; } = true;
@@ -90,7 +95,17 @@ public partial class App : Application
         // Before the page loads, so its first state carries the stored controls.
         var converter = new MilkConverter(() => page.Environment, page.Parent);
         _presets = new PresetController(page, _settings, new PresetLibrary(_dispatcher, AppPaths.PresetsFolder, converter));
-        _audio = new AudioPump(_dispatcher, () => spotify.Tracker.Current?.State == SpotifyPlayerState.Playing, page.SendAudioFrame);
+        bool SpotifyIsPlaying() => spotify.Tracker.Current?.State == SpotifyPlayerState.Playing;
+        var audio = _audio = new AudioPump(_dispatcher, SpotifyIsPlaying, page.SendAudioFrame);
+        _audioDelay = new AudioDelayController(_dispatcher, _settings, audio, SpotifyIsPlaying, spotify.Pause, spotify.Play);
+        // The same delay holds back the audio frames and the progress bar.
+        _audioDelay.DelayChanged += delay =>
+        {
+            audio.Delay = delay;
+            page.SendAudioDelay(delay);
+        };
+        audio.Delay = _audioDelay.Delay;
+        page.SendAudioDelay(_audioDelay.Delay);
         _visualizer.Opened += _audio.Start;
         _visualizer.Opened += page.StartStatusChecks;
         _visualizer.Closed += _audio.Stop;
@@ -134,6 +149,15 @@ public partial class App : Application
             _hangTimer.Tick += (_, _) => page.Hang();
             _visualizer.Opened += _hangTimer.Start;
             _visualizer.Closed += _hangTimer.Stop;
+        }
+
+        if (debug.DetectDelay)
+        {
+            _detectTimer = _dispatcher.CreateTimer();
+            _detectTimer.Interval = TimeSpan.FromSeconds(5);
+            _detectTimer.IsRepeating = false;
+            _detectTimer.Tick += (_, _) => _audioDelay.Detect();
+            _detectTimer.Start();
         }
 #endif
 
@@ -289,6 +313,7 @@ public partial class App : Application
         _settingsWindow?.Close();
         StopWaiting();
         _idle?.Dispose();
+        _audioDelay?.Dispose();
         _audio?.Dispose();
         _presets?.Library.Dispose();
         _spotify?.Dispose();

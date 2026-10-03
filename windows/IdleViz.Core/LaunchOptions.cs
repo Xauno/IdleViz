@@ -27,6 +27,9 @@ public sealed record LaunchOptions
     /// <summary>Debug builds only: make the page loop forever 5 s after each open, to try the recovery.</summary>
     public bool HangPage { get; init; }
 
+    /// <summary>Debug builds only: run Detect delay five seconds after launch, as the button in settings would.</summary>
+    public bool DetectDelay { get; init; }
+
     public static LaunchOptions Parse(IEnumerable<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -41,6 +44,7 @@ public sealed record LaunchOptions
                 "--show-menu" => options with { ShowMenu = true },
                 "--open-at-launch" => options with { OpenAtLaunch = true },
                 "--hang-page" => options with { HangPage = true },
+                "--detect-delay" => options with { DetectDelay = true },
                 _ => UrlCommands.Parse(argument) is { } command ? options with { Command = command } : options,
             };
         }

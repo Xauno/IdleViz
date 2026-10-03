@@ -64,11 +64,23 @@ public sealed partial class SettingsWindow : Window
 
         FillPresetChoices();
         Presets.Changed += ShowPresets;
-        Closed += (_, _) => Presets.Changed -= ShowPresets;
         ShowPresets();
+
+        ShowMicrophones();
+        AudioDelay.Changed += ShowDelay;
+        ShowDelay();
+        Closed += (_, _) =>
+        {
+            Presets.Changed -= ShowPresets;
+            AudioDelay.Changed -= ShowDelay;
+            // The window can be closed with the test's dialog still open.
+            AudioDelay.StopTest();
+        };
     }
 
     private PresetController Presets => _app.Presets;
+
+    private AudioDelayController AudioDelay => _app.AudioDelay;
 
     private HWND Handle => new(WinRT.Interop.WindowNative.GetWindowHandle(this));
 
@@ -124,6 +136,100 @@ public sealed partial class SettingsWindow : Window
     }
 
     private void OnOpenNowClick(object sender, RoutedEventArgs e) => _app.OpenVisualizer(TriggerSource.Settings);
+
+    /// <summary>Fills the audio delay rows in. Runs again on every change: the slider, Detect delay, the test, another device.</summary>
+    private void ShowDelay()
+    {
+        var delay = AudioDelay;
+        _showing = true;
+        try
+        {
+            DelaySlider.Value = delay.Delay;
+        }
+        finally
+        {
+            _showing = false;
+        }
+
+        DelayLabel.Text = AudioDelaySetting.Label(delay.Delay);
+        DelayCard.Description = new TextBlock { Text = $"For {delay.DeviceName}", MaxLines = 1, TextTrimming = TextTrimming.CharacterEllipsis };
+
+        DetectButton.Content = delay.Detecting ? "Listening…" : "Detect";
+        DetectButton.IsEnabled = !delay.Detecting && !delay.Testing;
+        TestButton.IsEnabled = !delay.Detecting && !delay.Testing;
+        if (delay.MicrophoneDenied)
+        {
+            var link = new HyperlinkButton { Content = "Microphone access is off. Open Settings…", Padding = new Thickness(0) };
+            link.Click += async (_, _) => await Windows.System.Launcher.LaunchUriAsync(AudioDelayController.MicrophoneSettings);
+            DetectCard.Description = link;
+        }
+        else
+        {
+            DetectCard.Description = new TextBlock { Text = delay.Hint ?? "Listens with the mic for a few seconds", TextWrapping = TextWrapping.Wrap };
+        }
+    }
+
+    private void OnDelayChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        if (!_showing)
+        {
+            AudioDelay.Delay = e.NewValue;
+        }
+    }
+
+    private void OnDetectClick(object sender, RoutedEventArgs e) => AudioDelay.Detect();
+
+    private async void OnTestClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ManualDelayDialog(AudioDelay) { XamlRoot = Content.XamlRoot };
+        try
+        {
+            await dialog.ShowAsync();
+        }
+        catch (Exception error) when (error is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            // Only one dialog can be open in a window at a time.
+            Log.Info("settings", $"Can't show the manual delay test: {error.Message}");
+        }
+    }
+
+    // "Automatic" (built-in, else the default input), then every microphone Windows lists right now.
+    private void ShowMicrophones()
+    {
+        var picked = AudioDelay.PickedMicrophone;
+        _showing = true;
+        try
+        {
+            MicrophonePicker.Items.Clear();
+            MicrophonePicker.Items.Add(new ComboBoxItem { Content = "Automatic", Tag = string.Empty });
+            foreach (var microphone in AudioDevices.Microphones())
+            {
+                MicrophonePicker.Items.Add(new ComboBoxItem { Content = microphone.Name, Tag = microphone.Id });
+            }
+
+            // A picked microphone that is unplugged right now shows as Automatic, which is what Detect delay then does.
+            Select(MicrophonePicker, picked ?? string.Empty);
+            if (MicrophonePicker.SelectedIndex < 0)
+            {
+                MicrophonePicker.SelectedIndex = 0;
+            }
+        }
+        finally
+        {
+            _showing = false;
+        }
+    }
+
+    // Microphones come and go, so the list is read again each time it is opened.
+    private void OnMicrophonesOpened(object? sender, object e) => ShowMicrophones();
+
+    private void OnMicrophoneChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_showing && MicrophonePicker.SelectedItem is ComboBoxItem { Tag: string id })
+        {
+            AudioDelay.PickedMicrophone = id.Length > 0 ? id : null;
+        }
+    }
 
     private void FillPresetChoices()
     {
