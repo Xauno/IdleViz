@@ -30,6 +30,12 @@ public sealed class SpotifyTracker
     /// </summary>
     public bool IsKnown { get; private set; }
 
+    /// <summary>
+    /// When Spotify last went from a track to no track while it kept running, or null. Cleared by
+    /// the next track and when Spotify quits. See <see cref="OpenRules.TrackGraceSeconds"/>.
+    /// </summary>
+    public DateTimeOffset? TrackLostAt { get; private set; }
+
     /// <summary>Raised with the new item (null = no track) when the track, its state or its length (by 2 s or more) changed.</summary>
     public event Action<NowPlaying?>? Changed;
 
@@ -50,6 +56,15 @@ public sealed class SpotifyTracker
         var expected = Snapshot(now);
         _reading = reading;
         var item = NowPlaying.From(reading, now);
+        if (item is not null)
+        {
+            TrackLostAt = null;
+        }
+        else if (Current is not null)
+        {
+            TrackLostAt = now;
+        }
+
         Publish(item);
         if (item is not null
             && expected is not null
@@ -70,6 +85,7 @@ public sealed class SpotifyTracker
     public void SessionGone()
     {
         HasSession = false;
+        TrackLostAt = null;
         _reading = null;
         Publish(null);
     }

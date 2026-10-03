@@ -6,7 +6,10 @@ using Windows.Win32;
 
 namespace IdleViz.App;
 
-/// <summary>Draws the tray icon: a five-bar waveform in one colour, white or black to suit the taskbar.</summary>
+/// <summary>
+/// Draws the tray icon: a five-bar waveform in one colour, white or black to suit the taskbar. The
+/// slashed one is shown in turn with it when an open is refused.
+/// </summary>
 internal static class TrayGlyph
 {
     /// <summary>The waveform on a 16 × 16 grid: x, top and bottom of each bar. tools/make-icon.ps1 draws the same shape.</summary>
@@ -24,7 +27,9 @@ internal static class TrayGlyph
     }
 
     /// <summary>The icon at the size the tray uses on this PC's main display.</summary>
-    public static Icon Create(Color color)
+    /// <param name="color">The glyph's colour.</param>
+    /// <param name="slashed">True for the waveform with a line through it, from bottom left to top right.</param>
+    public static Icon Create(Color color, bool slashed = false)
     {
         var size = (int)Math.Round(16 * PInvoke.GetDpiForSystem() / 96.0);
         using var bitmap = new Bitmap(size, size, PixelFormat.Format32bppArgb);
@@ -38,6 +43,11 @@ internal static class TrayGlyph
             foreach (var (x, top, bottom) in s_bars)
             {
                 graphics.DrawLine(pen, x * scale, top * scale, x * scale, bottom * scale);
+            }
+
+            if (slashed)
+            {
+                graphics.DrawLine(pen, 2 * scale, 14 * scale, 14 * scale, 2 * scale);
             }
         }
 
