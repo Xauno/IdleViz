@@ -367,7 +367,7 @@ The visuals now move to Spotify's sound, and a page that stops answering is repl
 | ---- | ------------ |
 | `IdleViz.Core/AudioAnalyzer.cs`, `AutoGain.cs`, `AudioFrame.cs`, `SampleRing.cs`, `TapHealth.cs` | Ported from the Swift files of the same names: automatic gain, the 64-band spectrum, Butterchurn's byte arrays and the packed frame the page unpacks. Apple's vDSP FFT is replaced by a plain radix-2 FFT, scaled to give the same values; a test checks it against the direct sum. |
 | `IdleViz.Core/PageStatus.cs` | Reads `window.idlevizStatus()` as untrusted JSON (depth, counts and text lengths capped), and `PageWatchdog`. Ported from `PageStatus.swift`. |
-| `IdleViz.Core/CustomPresetPayload.cs` | What `setCustomPresets` gets. For now only the list of presets that hung the page; the custom folder and plugins fill it in W7c. |
+| `IdleViz.Core/CustomPresetPayload.cs` | What `setCustomPresets` gets. For now only the list of presets that hung the page; the custom folder and plugins fill it in W7c (below). |
 | `IdleViz.Core/SpotifyProcess.cs` | Which process to capture: the top of Spotify's process tree. |
 | `IdleViz.App/SpotifyCapture.cs` | Process loopback on that tree, on its own thread. Plays the part of `SpotifyAudioTap.swift`. |
 | `IdleViz.App/AudioPump.cs` | 60 frames a second while the window is open. Ported from `AudioPump.swift`. |
@@ -390,7 +390,7 @@ Reloading the old WebView instead does not work: after its renderer was ended, W
 - The target process is found by parent, not by main window, so a Spotify in the tray is captured too.
 - The high-resolution timer instead of the spike's busy-wait.
 - A frame is dropped when two are waiting on the UI thread, on top of the Mac's two-in-the-page rule.
-- The hung list lives in the page view until W7c gives it a home in the preset library.
+- The hung list lives in the page view until W7c gives it a home in the preset library (done in W7c).
 
 **Seen when checking** (Debug build, Spotify 1.301 from the Store, idle trigger off for the test):
 
@@ -441,3 +441,41 @@ The page loads when the app starts, so the preset list is there before the first
 **Found while checking, not fixed here:** with `--show-settings`, the settings window opening at the same moment as the app crashed it in about 4 starts out of 5 (an access violation in the XAML runtime). Main does the same, so it predates W7b; it's flagged as a separate fix. Opening settings once the page is ready works every time.
 
 **Not tried:** picking a different preset in the Visualizer picker, and **Shuffle from** Custom (there are no custom presets until W7c). The like and skip keys are W8c.
+
+### W7c: your own presets and plugins
+
+The custom presets folder, `%APPDATA%\IdleViz\Presets\`, is read, watched and handed to the page, with the Presets section of settings (brief section 4.4).
+
+| File | What it does |
+| ---- | ------------ |
+| `IdleViz.Core/CustomPresets.cs` | Scanning the folder (`.json`, `.js`, `.milk`, subfolders, at most 5,000 files, hidden files and folders and links skipped, sorted as File Explorer sorts), plugin names from `export const meta`, import names ("Tunnel (2).milk"), and the `.milk` checks: the cache key (SHA-256 of the converter version and the file, the same key the Mac computes), the "is this a Milkdrop preset" test, and the check of what the converter returns. Ported from `CustomPresets.swift`. |
+| `IdleViz.Core/CustomPresetPayload.cs` | The entries for the page: a file served from the presets address, a `.milk` file from its cached conversion, a bundled plugin from `web\visuals`. |
+| `IdleViz.App/PresetLibrary.cs` | Reads the folder off the UI thread, watches it with `FileSystemWatcher` (300 ms settle time, the cache's own writes ignored, a full rescan if Windows drops events), converts new `.milk` files one at a time and caches them in `Presets\.cache\` (a hidden folder), deletes stale cache files, keeps the hung list by file version, and does Import, Open, Reveal. Ported from `PresetLibrary.swift`. |
+| `IdleViz.App/MilkConverter.cs` | Converts one `.milk` file in a hidden WebView on `converter.html`, given up after 10 s. Ported from `MilkConverter.swift`. |
+| `IdleViz.App/WebServer.cs` | The request handler, moved out of `PageView` so the converter page is served the same way (without the presets address). |
+| `IdleViz.App/PresetController.cs`, `SettingsWindow.xaml` | The Presets section: the trust warning, Import…, Folder with the counts, Rescan, and Failed to load with Reveal, hidden when nothing failed. |
+
+**The converter page** has its own WebView2 profile (`converter`), so it gets a renderer process of its own: a file that hangs the converter can't stall the visuals. WebView2's `ExecuteScriptAsync` doesn't wait for a promise, so the page stores the result of `convertMilk` and the app asks for it every 50 ms, up to 10 s.
+
+**A crash found on the way.** The page's `CoreWebView2` was only a local in `CreateController`. Its event handlers live on that wrapper, so when a garbage collection freed it, WebView2 called a freed handler (an access violation in the runtime), or the handlers silently stopped and the page never finished loading. This was the cause of the "settings at launch" crash flagged in W7b. It came and went with how much the app allocated while starting: W7c's start-up work made it happen in most starts. Both WebViews now keep their `CoreWebView2` for as long as their controller. Found here and in a separate session at the same time; the `PageView` half is that session's PR (#41), and the converter's is here.
+
+**Chosen here without asking the owner** (they asked for the build to keep going):
+
+- **Import…** is a button with a small menu, **Files…** or **Folder…**: a Windows picker chooses files or a folder, not both, which the Mac's panel can.
+- The conversion cache folder is marked hidden, as a leading dot hides it on the Mac.
+- A failed file's row shows its path in the folder ("pack/not-a-preset.milk"), as the Mac's does, since a file that never loaded has no name from the page.
+
+**Seen when checking** (Debug build, settings driven through UI Automation, idle trigger off for the test):
+
+| Case | Result |
+| --- | --- |
+| Folder with a plugin, a plugin that throws, one that hangs, a `.milk` file and a text file that isn't one | The `.milk` file converted in under a second and was cached in the hidden `.cache` folder; the other `.milk` file was listed as "Not a Milkdrop preset"; the page listed 400 presets (395 bundled, the Aurora plugin and 4 custom) |
+| A `.json` copied in while running | Picked up within a second: 401 presets |
+| Single preset set to the Pulse plugin, opened | The plugin drew 300 frames in 5 s, with audio |
+| Single preset set to the plugin that loops forever | The page was replaced twice, 10 s in all: the first freeze came before the page had named its preset, so only the second replacement could mark the plugin. It was then listed under Failed to load as "Stopped responding", and the next page went on with a bundled preset at 60 fps |
+| Settings, Presets section | As in the brief: the warning, Import…, "396 bundled, 5 custom", Rescan, Failed to load with Reveal |
+| 8 starts in a row after the `CoreWebView2` fix | All 8 reached Ready; before it, 0 of 8 did and 3 crashed |
+| Reveal on a failed file | A File Explorer window opened (whether the file was selected in it couldn't be read by script) |
+| Import…, Files… | The Windows file picker opened; the copying itself is covered by unit tests (a taken name gets a number, a folder is copied whole, nothing is replaced) |
+
+**Not tried:** choosing a file in the picker by hand and Import of a folder through the picker (the script couldn't drive the Windows dialog), a `.milk` file that hangs the converter (none at hand), a plugin that throws while in Shuffle, and a pack of hundreds of files.

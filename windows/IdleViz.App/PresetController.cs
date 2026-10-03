@@ -13,10 +13,11 @@ internal sealed class PresetController
     private readonly SettingsStore _store;
     private Dictionary<string, string> _names = new(StringComparer.Ordinal);
 
-    public PresetController(PageView page, SettingsStore store)
+    public PresetController(PageView page, SettingsStore store, PresetLibrary library)
     {
         _page = page;
         _store = store;
+        Library = library;
         Settings = PresetSettings.Read(store);
         LastShown = store.GetString(PresetSettings.LastShownKey);
         page.PresetsLoaded += presets =>
@@ -36,8 +37,36 @@ internal sealed class PresetController
             _store.SetString(PresetSettings.LastShownKey, id);
             Changed?.Invoke();
         };
+        page.FailuresChanged += failures =>
+        {
+            PageFailures = failures;
+            Changed?.Invoke();
+        };
+        page.Hung += library.MarkHung;
+        library.PayloadChanged += page.SendCustomPresets;
+        library.Changed += () => Changed?.Invoke();
         page.SendPresetSettings(Settings);
+        library.Start();
     }
+
+    /// <summary>The custom presets folder.</summary>
+    public PresetLibrary Library { get; }
+
+    /// <summary>Presets and plugins the page couldn't load.</summary>
+    public IReadOnlyList<PresetFailure> PageFailures { get; private set; } = [];
+
+    /// <summary>Everything that failed to load: files that didn't convert, then what the page reported.</summary>
+    public IReadOnlyList<PresetFailure> Failures
+    {
+        get
+        {
+            var converted = Library.ConversionFailures;
+            var known = converted.Select(failure => failure.Id).ToHashSet(StringComparer.Ordinal);
+            return [.. converted, .. PageFailures.Where(failure => !known.Contains(failure.Id))];
+        }
+    }
+
+    public int BundledCount => Presets.Count(preset => !preset.IsCustom);
 
     /// <summary>Raised on the UI thread after the settings, the preset list or the last-shown preset changed.</summary>
     public event Action? Changed;

@@ -88,7 +88,8 @@ public partial class App : Application
         var spotify = _spotify;
         var page = _visualizer.Page;
         // Before the page loads, so its first state carries the stored controls.
-        _presets = new PresetController(page, _settings);
+        var converter = new MilkConverter(() => page.Environment, page.Parent);
+        _presets = new PresetController(page, _settings, new PresetLibrary(_dispatcher, AppPaths.PresetsFolder, converter));
         _audio = new AudioPump(_dispatcher, () => spotify.Tracker.Current?.State == SpotifyPlayerState.Playing, page.SendAudioFrame);
         _visualizer.Opened += _audio.Start;
         _visualizer.Opened += page.StartStatusChecks;
@@ -289,6 +290,7 @@ public partial class App : Application
         StopWaiting();
         _idle?.Dispose();
         _audio?.Dispose();
+        _presets?.Library.Dispose();
         _spotify?.Dispose();
         _visualizer?.Dispose();
         _hotkeyWindow?.Dispose();

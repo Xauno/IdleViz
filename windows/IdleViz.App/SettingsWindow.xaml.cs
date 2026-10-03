@@ -35,6 +35,9 @@ public sealed partial class SettingsWindow : Window
     // The ids behind the Visualizer picker's names, in the same order.
     private List<string> _singleIds = [];
 
+    // What the Failed to load list shows, so it is only rebuilt when that changes.
+    private IReadOnlyList<PresetFailure> _shownFailures = [];
+
     public SettingsWindow(App app)
     {
         _app = app;
@@ -188,6 +191,9 @@ public sealed partial class SettingsWindow : Window
 
             FavoritesButton.Content = $"Manage ({settings.Favorites.Count})";
             BlocklistButton.Content = $"Manage ({settings.Blocked.Count})";
+
+            FolderCard.Description = $"{Presets.BundledCount} bundled, {Presets.Library.CustomCount} custom";
+            ShowFailures(Presets.Failures);
         }
         finally
         {
@@ -217,6 +223,79 @@ public sealed partial class SettingsWindow : Window
             SinglePicker.SelectedIndex = index;
         }
     }
+
+    private void ShowFailures(IReadOnlyList<PresetFailure> failures)
+    {
+        if (failures.SequenceEqual(_shownFailures))
+        {
+            return;
+        }
+
+        _shownFailures = failures;
+        FailedHeader.Text = $"Failed to load ({failures.Count})";
+        FailedHeader.Visibility = failures.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        FailedList.Children.Clear();
+        foreach (var failure in failures)
+        {
+            var card = new CommunityToolkit.WinUI.Controls.SettingsCard
+            {
+                Header = new TextBlock { Text = Presets.Name(failure.Id), TextTrimming = TextTrimming.CharacterEllipsis },
+                Description = new TextBlock { Text = failure.Error, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis },
+            };
+            if (Presets.Library.FileFor(failure.Id) is not null)
+            {
+                var id = failure.Id;
+                var reveal = new Button { Content = "Reveal" };
+                AutomationProperties.SetName(reveal, $"Reveal {Presets.Name(id)}");
+                reveal.Click += (_, _) => Presets.Library.Reveal(id);
+                card.Content = reveal;
+            }
+
+            FailedList.Children.Add(card);
+        }
+    }
+
+    private async void OnImportFilesClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(AppWindow.Id);
+            foreach (var extension in PresetImport.Extensions)
+            {
+                picker.FileTypeFilter.Add(extension);
+            }
+
+            var files = await picker.PickMultipleFilesAsync();
+            if (files is { Count: > 0 })
+            {
+                Presets.Library.Import(files.Select(file => file.Path));
+            }
+        }
+        catch (Exception error) when (error is System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            Log.Info("settings", $"The file picker failed: {error.Message}");
+        }
+    }
+
+    private async void OnImportFolderClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new Microsoft.Windows.Storage.Pickers.FolderPicker(AppWindow.Id);
+            if (await picker.PickSingleFolderAsync() is { } folder)
+            {
+                Presets.Library.Import([folder.Path]);
+            }
+        }
+        catch (Exception error) when (error is System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            Log.Info("settings", $"The folder picker failed: {error.Message}");
+        }
+    }
+
+    private void OnOpenFolderClick(object sender, RoutedEventArgs e) => Presets.Library.OpenFolder();
+
+    private void OnReloadClick(object sender, RoutedEventArgs e) => Presets.Library.Reload();
 
     private static void Select<T>(ComboBox picker, T value)
     {
