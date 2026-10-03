@@ -37,6 +37,34 @@ internal sealed class SpotifyCapture : IDisposable
     /// <summary>True while Spotify is running and its audio is being captured.</summary>
     public bool IsCapturing => _capturing;
 
+    /// <summary>
+    /// Raised on the capture thread with the error text when the capture couldn't be started, and
+    /// with null when it started. Spotify not running is not a problem.
+    /// </summary>
+    public event Action<string?>? ProblemChanged;
+
+    /// <summary>
+    /// Checks whether Spotify's audio could be captured right now, without capturing any: null if
+    /// it could or Spotify isn't running, else the error text. Call from a thread-pool thread.
+    /// </summary>
+    public static string? Probe()
+    {
+        if (SpotifyProcess.Root(Processes()) is not { } processId)
+        {
+            return null;
+        }
+
+        try
+        {
+            Marshal.ReleaseComObject(Open(processId));
+            return null;
+        }
+        catch (Exception error)
+        {
+            return StillRunning(processId) ? error.Message : null;
+        }
+    }
+
     /// <summary>Starts the capture for one more user: the open window, or Detect delay. It runs while anyone uses it.</summary>
     public void Retain()
     {
@@ -126,6 +154,12 @@ internal sealed class SpotifyCapture : IDisposable
             catch (Exception error)
             {
                 Log.Info("audio", $"Capturing Spotify ({processId}) failed: {error.Message}");
+                // Spotify quitting in the middle of the attempt fails too, and is no problem.
+                if (StillRunning(processId))
+                {
+                    ProblemChanged?.Invoke(error.Message);
+                }
+
                 stop.WaitOne(s_retry);
             }
             finally
@@ -140,26 +174,9 @@ internal sealed class SpotifyCapture : IDisposable
     private void Capture(int processId, ManualResetEvent stop)
     {
         using var process = System.Diagnostics.Process.GetProcessById(processId);
-        var client = Activate(processId);
+        var client = Open(processId);
         try
         {
-            var format = new WAVEFORMATEX
-            {
-                wFormatTag = 3, // WAVE_FORMAT_IEEE_FLOAT
-                nChannels = Channels,
-                nSamplesPerSec = SampleRate,
-                wBitsPerSample = 32,
-                nBlockAlign = Channels * 4,
-                nAvgBytesPerSec = SampleRate * Channels * 4,
-            };
-            const uint Flags = PInvoke.AUDCLNT_STREAMFLAGS_LOOPBACK | PInvoke.AUDCLNT_STREAMFLAGS_EVENTCALLBACK
-                | PInvoke.AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | PInvoke.AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
-            unsafe
-            {
-                // A 20 ms buffer; packets come every 10 ms.
-                client.Initialize(AUDCLNT_SHAREMODE.AUDCLNT_SHAREMODE_SHARED, Flags, 200_000, 0, &format, null);
-            }
-
             using var ready = new AutoResetEvent(false);
             client.SetEventHandle(new HANDLE(ready.SafeWaitHandle.DangerousGetHandle()));
             object service;
@@ -173,6 +190,7 @@ internal sealed class SpotifyCapture : IDisposable
             client.Start();
             _capturing = true;
             Log.Info("audio", $"Capturing Spotify ({processId}) at {SampleRate} Hz");
+            ProblemChanged?.Invoke(null);
             WaitHandle[] handles = [stop, ready];
             var lastCheck = Environment.TickCount64;
             while (true)
@@ -224,6 +242,40 @@ internal sealed class SpotifyCapture : IDisposable
 
             capture.ReleaseBuffer(frames);
             capture.GetNextPacketSize(out packet);
+        }
+    }
+
+    private static bool StillRunning(int processId) => SpotifyProcess.Root(Processes()) == processId;
+
+    // A capture client for Spotify's process tree, set up but not started.
+    private static IAudioClient Open(int processId)
+    {
+        var client = Activate(processId);
+        try
+        {
+            var format = new WAVEFORMATEX
+            {
+                wFormatTag = 3, // WAVE_FORMAT_IEEE_FLOAT
+                nChannels = Channels,
+                nSamplesPerSec = SampleRate,
+                wBitsPerSample = 32,
+                nBlockAlign = Channels * 4,
+                nAvgBytesPerSec = SampleRate * Channels * 4,
+            };
+            const uint Flags = PInvoke.AUDCLNT_STREAMFLAGS_LOOPBACK | PInvoke.AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+                | PInvoke.AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | PInvoke.AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
+            unsafe
+            {
+                // A 20 ms buffer; packets come every 10 ms.
+                client.Initialize(AUDCLNT_SHAREMODE.AUDCLNT_SHAREMODE_SHARED, Flags, 200_000, 0, &format, null);
+            }
+
+            return client;
+        }
+        catch
+        {
+            Marshal.ReleaseComObject(client);
+            throw;
         }
     }
 

@@ -18,6 +18,9 @@ internal static class TrayGlyph
         (2, 7, 9), (5, 4, 12), (8, 2, 14), (11, 5, 11), (14, 7, 9),
     ];
 
+    /// <summary>The colour while a warning is showing: a yellow that reads on a light and on a dark taskbar.</summary>
+    public static Color WarningColor { get; } = Color.FromArgb(0xF5, 0xB8, 0x00);
+
     /// <summary>The colour for the current taskbar: black on a light one, white on a dark one.</summary>
     public static Color TaskbarColor()
     {

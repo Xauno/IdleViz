@@ -8,6 +8,16 @@
   </Window.SystemBackdrop>
 
   <StackPanel x:Name="Root" Padding="4" VerticalAlignment="Top">
+    <StackPanel.Resources>
+      <!-- A plain row that only shows a background while hovered or pressed, like the rows of a Windows flyout. -->
+      <SolidColorBrush x:Key="ButtonBackground" Color="Transparent" />
+      <SolidColorBrush x:Key="ButtonBorderBrush" Color="Transparent" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
+      <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
+      <StaticResource x:Key="ButtonBackgroundPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+      <StaticResource x:Key="ButtonBackgroundPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+    </StackPanel.Resources>
+
     <Button
       x:Name="SettingsRow"
       Padding="12,8"
@@ -15,17 +25,7 @@
       HorizontalContentAlignment="Left"
       Click="OnSettingsClick"
       Content="Settings"
-      CornerRadius="4">
-      <!-- A plain row that only shows a background while hovered or pressed, like the rows of a Windows flyout. -->
-      <Button.Resources>
-        <SolidColorBrush x:Key="ButtonBackground" Color="Transparent" />
-        <SolidColorBrush x:Key="ButtonBorderBrush" Color="Transparent" />
-        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
-        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
-        <StaticResource x:Key="ButtonBackgroundPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
-        <StaticResource x:Key="ButtonBackgroundPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
-      </Button.Resources>
-    </Button>
+      CornerRadius="4" />
 
     <Rectangle Height="1" Margin="0,4" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
 
@@ -43,5 +43,8 @@
         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
         Style="{StaticResource CaptionTextBlockStyle}" />
     </Grid>
+
+    <!-- One row per problem, only while something is wrong. -->
+    <StackPanel x:Name="WarningRows" />
   </StackPanel>
 </Window>

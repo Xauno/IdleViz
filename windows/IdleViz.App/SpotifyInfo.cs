@@ -23,6 +23,7 @@ internal sealed class SpotifyInfo : IDisposable
     private readonly TypedEventHandler<GlobalSystemMediaTransportControlsSession, TimelinePropertiesChangedEventArgs> _timelineChanged;
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private GlobalSystemMediaTransportControlsSession? _session;
+    private bool _starting;
     private bool _reading;
     private bool _readAgain;
     private bool _failureLogged;
@@ -48,22 +49,56 @@ internal sealed class SpotifyInfo : IDisposable
     /// <summary>The cover of a track as JPEG, PNG or WebP bytes, or null if Spotify gave none.</summary>
     public byte[]? ArtworkFor(NowPlaying item) => _artwork.Image(item.Id);
 
+    /// <summary>
+    /// Raised on the UI thread after each attempt to reach the media controls: the error text when
+    /// it failed, null when it worked. Spotify not running is not a problem.
+    /// </summary>
+    public event Action<string?>? ProblemChanged;
+
+    /// <summary>Raised when Spotify's session appeared: Spotify was started, or played its first track.</summary>
+    public event Action? SessionFound;
+
     public async void Start()
     {
+        if (_starting || _manager is not null)
+        {
+            return;
+        }
+
+        _starting = true;
         try
         {
-            _manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
+            var manager = await GlobalSystemMediaTransportControlsSessionManager.RequestAsync();
             if (_disposed)
             {
                 return;
             }
 
+            _manager = manager;
             _manager.SessionsChanged += _sessionsChanged;
             FindSession();
         }
         catch (Exception error)
         {
             Log.Info("spotify", $"Can't read what Spotify is playing: the media controls are not available. {error.Message}");
+            ProblemChanged?.Invoke(error.Message);
+        }
+        finally
+        {
+            _starting = false;
+        }
+    }
+
+    /// <summary>Tries the media controls again, for the warning: asks for them if that failed at launch, else reads Spotify's session.</summary>
+    public void Recheck()
+    {
+        if (_manager is null)
+        {
+            Start();
+        }
+        else
+        {
+            FindSession();
         }
     }
 
@@ -128,6 +163,7 @@ internal sealed class SpotifyInfo : IDisposable
         catch (Exception error)
         {
             LogFailure(error);
+            ProblemChanged?.Invoke(error.Message);
             return;
         }
 
@@ -141,12 +177,15 @@ internal sealed class SpotifyInfo : IDisposable
             }
 
             Tracker.SessionGone();
+            // The media controls answered; there is just nothing to read.
+            ProblemChanged?.Invoke(null);
             return;
         }
 
         if (!had)
         {
             Log.Info("spotify", $"Following the session {session.SourceAppUserModelId}");
+            SessionFound?.Invoke();
         }
 
         Refresh();
@@ -221,6 +260,7 @@ internal sealed class SpotifyInfo : IDisposable
                             timeline.LastUpdatedTime.Year > 2000 ? timeline.LastUpdatedTime : null),
                         DateTimeOffset.Now);
                     _failureLogged = false;
+                    ProblemChanged?.Invoke(null);
                     if (Tracker.Current is { } item)
                     {
                         await ReadArtwork(properties.Thumbnail, item, session);
@@ -230,6 +270,11 @@ internal sealed class SpotifyInfo : IDisposable
                 {
                     Tracker.ReadFailed();
                     LogFailure(error);
+                    // A session that went away during the reading fails too, and is no problem.
+                    if (session == _session)
+                    {
+                        ProblemChanged?.Invoke(error.Message);
+                    }
                 }
             }
             while (_readAgain);

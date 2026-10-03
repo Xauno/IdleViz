@@ -230,6 +230,7 @@ In `IdleViz.Core`: `DismissTracker.cs` (ported with its tests), `KeyboardInput.c
 | `--hang-page` | Makes the page loop forever 5 s after each open, to try the stuck-page recovery (W7a). First launch only. |
 | `--detect-delay` | Runs Detect delay 5 s after launch, as the button in settings would (W7d). First launch only. |
 | `--pretend-battery` | Behaves as a laptop running on its battery, so the battery rows show (W8a). First launch only. |
+| `--pretend-warning` | Shows both warnings, with made-up error text (W8b). First launch only. |
 
 **A second launch** with no URL (clicking the Start menu entry while it runs) opens the settings window, since there is no other window to bring forward. This was not asked; it is the usual behaviour of a Windows tray app.
 
@@ -576,3 +577,43 @@ The open visualizer now keeps the display awake, up to a limit, and the idle and
 | The sleep notice (`PBT_APMSUSPEND`) sent to the app | "The PC is going to sleep", "Closing: DisplayChanged", closed 30 ms later |
 
 **Not tried:** a real battery (unplugging with the window open, the role Windows reports on a laptop), a real sleep, and a real display change (unplugging a monitor, changing the resolution or scale). The rules behind them are unit-tested. The limit changing while the window is open was not tried either: the pickers have no time short enough to wait for.
+
+### W8b: warnings
+
+While something is wrong, the tray icon is yellow and the flyout has one row per problem (brief section 6.10, decision J4).
+
+| File | What it does |
+| ---- | ------------ |
+| `IdleViz.Core/Warnings.cs` | `WarningKind`, `Warning` (title, explanation, error text) and `WarningList`, which holds what is showing and announces changes once. |
+| `IdleViz.App/SpotifyCapture.cs` | Reports when the capture couldn't start and when it did. `Probe` asks Windows for a capture of Spotify without starting it. |
+| `IdleViz.App/SpotifyInfo.cs` | Reports whether the media controls could be reached. `Recheck` tries again. |
+| `IdleViz.App/TrayIcon.cs`, `TrayGlyph.cs` | The glyph in yellow (`#F5B800`) and the tooltip "IdleViz, something needs attention" while a warning shows. The refusal flash keeps the colour. |
+| `IdleViz.App/FlyoutWindow.xaml` | A row per warning: a yellow warning glyph, the title, "Show details ›". |
+| `IdleViz.App/SettingsWindow.xaml.cs` | The details dialog. |
+
+**The two problems** (J4):
+
+- **Spotify audio can't be captured:** Spotify is running, and Windows refused the process-loopback capture or didn't answer within 5 s.
+- **Can't read what Spotify is playing:** the media controls couldn't be requested, their session list couldn't be read, or reading Spotify's session failed.
+
+Spotify not running is neither. A failure while Spotify is quitting isn't one either: after a failed capture the process is looked for again, and a failed reading only counts if the session is still the current one. Silence while Spotify says "playing" is not a warning (Spotify Connect and a muted Spotify look the same); the log's "packets captured, silent" line records it.
+
+**When they are checked:** when the flyout opens, when Spotify's session appears, and when the visualizer opens. Opening the visualizer starts the real capture, which reports for itself. The other two use `Probe`, on a thread-pool thread, so no audio is captured for a check. A warning clears as soon as its check passes; the flyout adds or removes the row while it is open.
+
+**A click on a row** closes the flyout, opens the settings window and shows a dialog on it: the title, one sentence on what it means, the error text (selectable), **Open log folder** and **Close**.
+
+**Chosen here without asking the owner** (they asked for the build to keep going):
+
+- The details dialog sits on the settings window, like every other dialog of the app, so a click on a row opens settings too.
+- The check for the capture is a probe that sets a capture up and drops it, not a short real capture.
+- `--pretend-warning` (Debug builds); the brief lists "fake a warning state" among the debug switches.
+
+**Seen when checking** (Debug build, driven through UI Automation):
+
+| Case | Result |
+| --- | --- |
+| `--pretend-warning` | Both rows in the flyout, in the order above, each with the yellow glyph and "Show details ›"; the flyout was 195 px high instead of 89 |
+| A click on the first row | The flyout closed, settings opened with the dialog "Spotify audio can't be captured", the explanation, the pretend error text, **Open log folder** and **Close** |
+| Normal start, Spotify running | No rows, nothing logged under `warning`; opening the visualizer captured as before |
+
+**Not tried:** a real failure of either kind, since neither could be caused on the test PC; the yellow icon and the tooltip in the tray itself (the script can't see the icon; it is drawn by the same code as the white one); **Open log folder**.
