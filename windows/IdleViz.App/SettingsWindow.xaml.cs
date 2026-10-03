@@ -57,7 +57,7 @@ public sealed partial class SettingsWindow : Window
         var scale = PInvoke.GetDpiForWindow(Handle) / 96.0;
         AppWindow.Resize(new SizeInt32((int)Math.Round(WidthInPixels * scale), (int)Math.Round(HeightInPixels * scale)));
 
-        ShowIdleChoices();
+        ShowTimes();
         Recorder.Attach(_app);
         Recorder.HotkeyChanged += ShowHotkeyState;
         ShowHotkeyState();
@@ -108,31 +108,98 @@ public sealed partial class SettingsWindow : Window
         }
     }
 
-    // 5, 10, 15 and 30 min, then Off, as on the Mac. A stored value that isn't a choice gets its own entry.
-    private void ShowIdleChoices()
+    /// <summary>Fills the idle, keep-awake and battery rows in from the settings.</summary>
+    private void ShowTimes()
     {
-        var current = _app.IdleMinutes;
-        var minutes = IdleTimeoutSetting.Choices.Append(0).ToList();
+        var times = TimingSettings.Read(_app.Settings);
+        _showing = true;
+        try
+        {
+            ShowMinutes(IdlePicker, IdleChoices, times.IdleMinutes, IdleLabel);
+            ShowMinutes(KeepAwakePicker, KeepAwakeSetting.Choices, times.KeepAwakeMinutes, KeepAwakeSetting.Label);
+            ShowMinutes(BatteryIdlePicker, IdleChoices, times.BatteryIdleMinutes, IdleLabel);
+            ShowMinutes(BatteryKeepAwakePicker, KeepAwakeSetting.Choices, times.BatteryKeepAwakeMinutes, KeepAwakeSetting.Label);
+            BatterySwitch.IsOn = times.UseBatteryTimes;
+        }
+        finally
+        {
+            _showing = false;
+        }
+
+        BatteryCard.Visibility = _app.HasBattery ? Visibility.Visible : Visibility.Collapsed;
+        BatteryIdleCard.Visibility = BatteryKeepAwakeCard.Visibility =
+            _app.HasBattery && times.UseBatteryTimes ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // 5, 10, 15 and 30 min, then Off, as on the Mac.
+    private static IReadOnlyList<int> IdleChoices { get; } = [.. IdleTimeoutSetting.Choices, 0];
+
+    private static string IdleLabel(int minutes) => minutes > 0 ? $"{minutes} min" : "Off";
+
+    // A stored value that isn't a choice gets its own entry.
+    private static void ShowMinutes(ComboBox picker, IReadOnlyList<int> choices, int current, Func<int, string> label)
+    {
+        var minutes = choices.ToList();
         if (!minutes.Contains(current))
         {
             minutes.Insert(0, current);
         }
 
-        foreach (var value in minutes)
+        if (!minutes.SequenceEqual(picker.Items.OfType<ComboBoxItem>().Select(item => (int)item.Tag)))
         {
-            IdlePicker.Items.Add(new ComboBoxItem { Content = value > 0 ? $"{value} min" : "Off", Tag = value });
+            picker.Items.Clear();
+            foreach (var value in minutes)
+            {
+                picker.Items.Add(new ComboBoxItem { Content = label(value), Tag = value });
+            }
         }
 
-        IdlePicker.SelectedIndex = minutes.IndexOf(current);
+        Select(picker, current);
     }
 
-    private void OnIdleChanged(object sender, SelectionChangedEventArgs e)
+    private void ChangeMinutes(ComboBox picker, string key)
     {
-        // Showing the stored value selects it too; that is not a change.
-        if (IdlePicker.SelectedItem is ComboBoxItem { Tag: int minutes } && minutes != _app.IdleMinutes)
+        if (!_showing && picker.SelectedItem is ComboBoxItem { Tag: int minutes })
         {
-            _app.IdleMinutes = minutes;
+            _app.Settings.SetInt(key, minutes);
+            ShowTimes();
         }
+    }
+
+    private void OnIdleChanged(object sender, SelectionChangedEventArgs e) => ChangeMinutes(IdlePicker, IdleTimeoutSetting.Key);
+
+    private void OnKeepAwakeChanged(object sender, SelectionChangedEventArgs e) => ChangeMinutes(KeepAwakePicker, KeepAwakeSetting.Key);
+
+    private void OnBatteryIdleChanged(object sender, SelectionChangedEventArgs e) => ChangeMinutes(BatteryIdlePicker, BatteryTimesSetting.IdleTimeoutKey);
+
+    private void OnBatteryKeepAwakeChanged(object sender, SelectionChangedEventArgs e) =>
+        ChangeMinutes(BatteryKeepAwakePicker, BatteryTimesSetting.KeepAwakeKey);
+
+    private void OnBatteryTimesToggled(object sender, RoutedEventArgs e)
+    {
+        if (_showing)
+        {
+            return;
+        }
+
+        var settings = _app.Settings;
+        if (BatterySwitch.IsOn)
+        {
+            // The first time it is turned on, the battery rows start as copies of the rows above.
+            var times = TimingSettings.Read(settings);
+            if (settings.GetInt(BatteryTimesSetting.IdleTimeoutKey) is null)
+            {
+                settings.SetInt(BatteryTimesSetting.IdleTimeoutKey, times.IdleMinutes);
+            }
+
+            if (settings.GetInt(BatteryTimesSetting.KeepAwakeKey) is null)
+            {
+                settings.SetInt(BatteryTimesSetting.KeepAwakeKey, times.KeepAwakeMinutes);
+            }
+        }
+
+        settings.SetBool(BatteryTimesSetting.EnabledKey, BatterySwitch.IsOn);
+        ShowTimes();
     }
 
     private void OnOpenNowClick(object sender, RoutedEventArgs e) => _app.OpenVisualizer(TriggerSource.Settings);

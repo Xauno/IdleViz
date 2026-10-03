@@ -38,6 +38,23 @@
           <ComboBox x:Name="IdlePicker" MinWidth="110" SelectionChanged="OnIdleChanged" />
         </controls:SettingsCard>
 
+        <controls:SettingsCard Description="Then the PC sleeps as usual" Header="Keep screen awake">
+          <ComboBox x:Name="KeepAwakePicker" MinWidth="110" SelectionChanged="OnKeepAwakeChanged" />
+        </controls:SettingsCard>
+
+        <!-- The three battery rows are not shown at all on a PC with no battery. -->
+        <controls:SettingsCard x:Name="BatteryCard" Header="Different times on battery" Visibility="Collapsed">
+          <ToggleSwitch x:Name="BatterySwitch" MinWidth="0" AutomationProperties.Name="Different times on battery" Toggled="OnBatteryTimesToggled" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard x:Name="BatteryIdleCard" Header="On battery: start after idle" Visibility="Collapsed">
+          <ComboBox x:Name="BatteryIdlePicker" MinWidth="110" SelectionChanged="OnBatteryIdleChanged" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard x:Name="BatteryKeepAwakeCard" Header="On battery: keep screen awake" Visibility="Collapsed">
+          <ComboBox x:Name="BatteryKeepAwakePicker" MinWidth="110" SelectionChanged="OnBatteryKeepAwakeChanged" />
+        </controls:SettingsCard>
+
         <controls:SettingsCard x:Name="HotkeyCard" Header="Open hotkey">
           <local:HotkeyRecorder x:Name="Recorder" />
         </controls:SettingsCard>
