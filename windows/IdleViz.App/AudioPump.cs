@@ -29,6 +29,7 @@ internal sealed class AudioPump : IDisposable
     private ManualResetEvent? _stop;
     private int _queued;
     private Totals _totals;
+    private double _delay;
 
     /// <param name="dispatcher">The UI thread's queue.</param>
     /// <param name="spotifyIsPlaying">Whether Spotify says it's playing. Read on the UI thread.</param>
@@ -40,6 +41,28 @@ internal sealed class AudioPump : IDisposable
         _send = send;
     }
 
+    /// <summary>How long each frame waits before it goes to the page, so the visuals match what the speakers play.</summary>
+    public double Delay
+    {
+        get => Volatile.Read(ref _delay);
+        set => Volatile.Write(ref _delay, value);
+    }
+
+    /// <summary>Starts keeping the capture's signal for Detect delay. The capture runs for this even while the window is closed.</summary>
+    public void StartRecording(double seconds)
+    {
+        _capture.Retain();
+        _capture.Ring.StartRecording((int)(seconds * SpotifyCapture.SampleRate));
+    }
+
+    /// <summary>Stops and returns what the capture delivered, with the time it handed over the first sample on <see cref="AudioClock"/>.</summary>
+    public DelayRecording StopRecording()
+    {
+        var (samples, start) = _capture.Ring.StopRecording();
+        _capture.Release();
+        return new DelayRecording(samples, SpotifyCapture.SampleRate, start);
+    }
+
     public void Start()
     {
         if (_thread is not null)
@@ -47,7 +70,7 @@ internal sealed class AudioPump : IDisposable
             return;
         }
 
-        _capture.Start();
+        _capture.Retain();
         // Frames from the last time the window was open are stale; start from silence.
         _send(AudioFrame.Script(AudioFrame.Silence(0, SpotifyCapture.SampleRate).Packed()));
         _capture.Ring.TakeCounts();
@@ -70,18 +93,24 @@ internal sealed class AudioPump : IDisposable
         _stop.Dispose();
         _thread = null;
         _stop = null;
-        _capture.Stop();
+        _capture.Release();
         var t = _totals;
         Log.Info("audio", $"While open: {t.Frames} frames, {t.Dropped} dropped; {t.Buffers} packets captured, {t.SilentBuffers} silent; loudest {t.LoudestRms:0.000} at gain {t.Gain:0.0}");
     }
 
-    public void Dispose() => Stop();
+    public void Dispose()
+    {
+        Stop();
+        _capture.Dispose();
+    }
 
     private void Run(ManualResetEvent stop)
     {
         var analyzer = new AudioAnalyzer();
         var left = new float[AudioFrame.SampleCount];
         var right = new float[AudioFrame.SampleCount];
+        // Starts empty with every open, so no frame from the last one is shown.
+        var delayLine = new DelayLine<byte[]>();
         using var timer = HighResolutionTimer();
         WaitHandle[] handles = timer is null ? [stop] : [stop, timer];
         var clock = Stopwatch.StartNew();
@@ -118,7 +147,14 @@ internal sealed class AudioPump : IDisposable
             var analysed = analyzer.Analyze(left, right, SpotifyCapture.SampleRate, seconds);
             _totals.LoudestRms = Math.Max(_totals.LoudestRms, analysed.Rms);
             _totals.Gain = analyzer.Gain;
-            Post(AudioFrame.Script(analysed.Packed()));
+            var time = AudioClock.Now;
+            delayLine.Push(analysed.Packed(), time);
+            // Until a frame is old enough, the page keeps showing the last one it got.
+            if (delayLine.Pop(time, Delay) is { } packed)
+            {
+                Post(AudioFrame.Script(packed));
+            }
+
             if (now - lastHealthCheck >= 1)
             {
                 lastHealthCheck = now;

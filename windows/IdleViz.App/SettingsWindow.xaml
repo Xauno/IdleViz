@@ -48,6 +48,44 @@
 
         <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Visualizer" />
 
+        <controls:SettingsCard x:Name="DelayCard" Header="Audio delay">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Slider
+              x:Name="DelaySlider"
+              Width="130"
+              AutomationProperties.Name="Audio delay"
+              IsThumbToolTipEnabled="False"
+              LargeChange="0.1"
+              Maximum="2.5"
+              Minimum="0"
+              SmallChange="0.01"
+              StepFrequency="0.01"
+              ValueChanged="OnDelayChanged" />
+            <TextBlock
+              x:Name="DelayLabel"
+              Width="56"
+              VerticalAlignment="Center"
+              TextAlignment="Right" />
+          </StackPanel>
+        </controls:SettingsCard>
+
+        <controls:SettingsCard x:Name="DetectCard" Header="Detect delay">
+          <Button x:Name="DetectButton" Click="OnDetectClick" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard Description="For Detect delay" Header="Microphone">
+          <!-- Device names are long; a fixed width keeps the row from wrapping, and the box trims them. -->
+          <ComboBox
+            x:Name="MicrophonePicker"
+            Width="200"
+            DropDownOpened="OnMicrophonesOpened"
+            SelectionChanged="OnMicrophoneChanged" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard Description="Match a flash to a beep, no mic" Header="Manual delay test">
+          <Button x:Name="TestButton" Click="OnTestClick" Content="Start" />
+        </controls:SettingsCard>
+
         <controls:SettingsCard Header="Mode">
           <ComboBox x:Name="ModePicker" MinWidth="110" SelectionChanged="OnModeChanged" />
         </controls:SettingsCard>

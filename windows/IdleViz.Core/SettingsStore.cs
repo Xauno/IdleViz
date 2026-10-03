@@ -79,6 +79,36 @@ public sealed class SettingsStore
             ? [.. list.OfType<JsonValue>().Where(item => item.GetValueKind() == JsonValueKind.String).Select(item => item.GetValue<string>())]
             : null;
 
+    /// <summary>A map from names to numbers. Entries that aren't finite numbers are skipped; anything but a map reads as empty.</summary>
+    public IReadOnlyDictionary<string, double> GetDoubleMap(string key)
+    {
+        var map = new Dictionary<string, double>(StringComparer.Ordinal);
+        if (_values[key] is not JsonObject values)
+        {
+            return map;
+        }
+
+        foreach (var (name, node) in values)
+        {
+            if (node is JsonValue value && value.GetValueKind() == JsonValueKind.Number)
+            {
+                var number = value.TryGetValue<double>(out var real) ? real : value.TryGetValue<int>(out var whole) ? whole : double.NaN;
+                if (double.IsFinite(number))
+                {
+                    map[name] = number;
+                }
+            }
+        }
+
+        return map;
+    }
+
+    public void SetDoubleMap(string key, IReadOnlyDictionary<string, double> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        Set(key, new JsonObject(values.Select(pair => KeyValuePair.Create(pair.Key, (JsonNode?)JsonValue.Create(pair.Value)))));
+    }
+
     public void SetInt(string key, int value) => Set(key, JsonValue.Create(value));
 
     public void SetBool(string key, bool value) => Set(key, JsonValue.Create(value));

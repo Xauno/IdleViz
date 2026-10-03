@@ -311,6 +311,35 @@ public class SampleRingTests
         Assert.Equal([0f, 0f, 0f, 0f], Latest(ring, 4).Left);
     }
 
+    [Fact]
+    public void RecordsMonoFromTheFirstBufferAfterTheStart()
+    {
+        var ring = new SampleRing();
+        ring.Append([9, 9], channels: 2, frames: 1, time: 1);
+        ring.StartRecording(maxSamples: 4);
+        ring.Append([1, 0, 0.5f, 0.5f], channels: 2, frames: 2, time: 2);
+        ring.AppendSilence(1, time: 3);
+        // Past the limit: dropped.
+        ring.Append([1, 1, 1, 1], channels: 2, frames: 2, time: 4);
+        var (samples, start) = ring.StopRecording();
+        Assert.Equal([0.5f, 0.5f, 0f, 1f], samples);
+        Assert.Equal(2, start);
+        // The ring itself is unaffected.
+        Assert.Equal([1f, 1f], Latest(ring, 2).Left);
+    }
+
+    [Fact]
+    public void NothingIsRecordedUnlessAsked()
+    {
+        var ring = new SampleRing();
+        ring.Append([1, 1], channels: 2, frames: 1, time: 5);
+        Assert.Equal(([], 0), ring.StopRecording());
+        ring.StartRecording(maxSamples: 8);
+        Assert.Empty(ring.StopRecording().Samples);
+        ring.Append([1, 1], channels: 2, frames: 1, time: 6);
+        Assert.Empty(ring.StopRecording().Samples);
+    }
+
     private static (float[] Left, float[] Right) Latest(SampleRing ring, int count)
     {
         var left = Enumerable.Repeat(-9f, count).ToArray();

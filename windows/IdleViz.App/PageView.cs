@@ -62,6 +62,9 @@ internal sealed class PageView : IDisposable
     /// <summary>The latest preset controls, replayed the same way.</summary>
     private string _presetSettingsScript = new PresetSettings().Script;
 
+    /// <summary>The latest audio delay, replayed the same way. The progress bar needs it to show the position you hear.</summary>
+    private string _audioDelayScript = AudioDelaySetting.Script(0);
+
     /// <param name="parent">The visualizer window. The page fills it.</param>
     /// <param name="dispatcher">The UI thread's queue.</param>
     public PageView(HWND parent, DispatcherQueue dispatcher)
@@ -147,6 +150,13 @@ internal sealed class PageView : IDisposable
     {
         _presetSettingsScript = settings.Script;
         Run(_presetSettingsScript);
+    }
+
+    /// <summary>Tells the page how far the speakers lag behind Spotify, in seconds.</summary>
+    public void SendAudioDelay(double seconds)
+    {
+        _audioDelayScript = AudioDelaySetting.Script(seconds);
+        Run(_audioDelayScript);
     }
 
     /// <summary>Hands one audio frame's script to the page. Frames are dropped, not queued, while the page is busy or loading.</summary>
@@ -366,6 +376,7 @@ internal sealed class PageView : IDisposable
                 Log.Info("page", "Ready");
                 Run(_customPresetsScript);
                 Run(_presetSettingsScript);
+                Run(_audioDelayScript);
                 Run(_nowPlayingScript);
                 FetchPresetList();
             }

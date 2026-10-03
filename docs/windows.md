@@ -228,6 +228,7 @@ In `IdleViz.Core`: `DismissTracker.cs` (ported with its tests), `KeyboardInput.c
 | `--show-flyout` | Opens the tray flyout. |
 | `--show-menu` | Opens the tray menu at the pointer. |
 | `--hang-page` | Makes the page loop forever 5 s after each open, to try the stuck-page recovery (W7a). First launch only. |
+| `--detect-delay` | Runs Detect delay 5 s after launch, as the button in settings would (W7d). First launch only. |
 
 **A second launch** with no URL (clicking the Start menu entry while it runs) opens the settings window, since there is no other window to bring forward. This was not asked; it is the usual behaviour of a Windows tray app.
 
@@ -479,3 +480,55 @@ The custom presets folder, `%APPDATA%\IdleViz\Presets\`, is read, watched and ha
 | Import…, Files… | The Windows file picker opened; the copying itself is covered by unit tests (a taken name gets a number, a folder is copied whole, nothing is replaced) |
 
 **Not tried:** choosing a file in the picker by hand and Import of a folder through the picker (the script couldn't drive the Windows dialog), a `.milk` file that hangs the converter (none at hand), a plugin that throws while in Shuffle, and a pack of hundreds of files.
+
+### W7d: audio delay
+
+The visuals can now wait for the speakers: an **Audio delay** per output device, **Detect delay** with a microphone, and the **Manual delay test** (brief sections 4.4, 4.5 and 6.8).
+
+| File | What it does |
+| ---- | ------------ |
+| `IdleViz.Core/AudioDelay.cs` | `AudioDelaySetting` (key `audioDelayByDevice`, 0 to 2.5 s in 10 ms steps, the label, the `setAudioDelay` call) and `DelayLine`, which holds analysed frames back. Ported from `AudioDelay.swift`. |
+| `IdleViz.Core/DelayDetector.cs` | The measurement: the softened phase transform over 300 Hz to 6 kHz, lags from −0.1 to 2.5 s, and the two tests a peak must pass. Ported with its tests; a plain radix-2 FFT stands in for vDSP. |
+| `IdleViz.Core/BeepTest.cs` | The manual test's timing and its beep. Ported from `BeepTest.swift`. |
+| `IdleViz.Core/Microphones.cs` | Which microphone Detect delay uses (the owner's rule, below). |
+| `IdleViz.Core/SampleRing.cs`, `SettingsStore.cs` | Recording the capture for Detect delay; maps of numbers in the settings file. |
+| `IdleViz.App/AudioDevices.cs` | The default output device with its name and reported latency, the list of microphones, and the notice when the default output changes. |
+| `IdleViz.App/MicrophoneRecorder.cs` | Records one microphone into memory for a few seconds. |
+| `IdleViz.App/BeepTestPlayer.cs` | Plays the test's beeps as one unbroken stream. |
+| `IdleViz.App/AudioDelayController.cs` | Loads and saves the delay per device, follows the default device, runs Detect delay and the manual test. Ported from `AudioDelayController`. |
+| `IdleViz.App/AudioPump.cs`, `SpotifyCapture.cs` | Frames go through the delay line. The capture now counts its users, so Detect delay can run it while the window is closed. |
+| `IdleViz.App/SettingsWindow.xaml`, `ManualDelayDialog.xaml` | The rows and the dialog. |
+
+**The delay.** Every analysed frame waits in a buffer and goes to the page `delay` after it was built. The page and plugins don't know; the page only gets `setAudioDelay`, for the progress bar. The buffer starts empty with every open. The value is saved per output device under its Windows endpoint ID, and switches when the default output device changes (`IMMNotificationClient`). A device with no saved value starts at the stream latency Windows reports for it; that was 0 for the two devices seen here, so in practice a new device starts at 0 until it is measured.
+
+**One difference from the Mac's delay line.** The Mac's `DelayLine.pop` returns the newest due frame and drops the rest. With a delay that is a whole number of frames (every 50 ms is, at 60 frames a second), each frame comes due right at a timer tick, and the tick's jitter decides whether it gets none or the next gets two. Measured here: at 1 s and at 2 s delay only about 45 frames a second reached the page. The Windows version hands out one due frame per call, in order, and only skips ahead when more than two are due. After that: 549 frames in 10 s at a 1 s delay (expected 546), 603 at 100 ms. The Mac version was not changed or measured.
+
+**Detect delay.** Only while Spotify says it's playing. For about 5 s the Spotify capture and one microphone are recorded into memory, then compared off the UI thread (about 0.1 s). The capture's side is stamped when a packet is handed to the app, the microphone's side with the time Windows gives for its first packet, both on the performance counter. A clear result is saved, also when it equals the old value; an unclear one keeps the old value and says so. The microphone is opened only for those 5 s, and nothing is written to disk.
+
+**Which microphone** (the owner's rule): the one picked in the **Microphone** row; else the PC's own; else the default input. A Bluetooth microphone is refused with the reason, picked or not, because recording from a headset's own microphone switches it to call mode and changes the delay being measured. How a device is connected is read from its driver family (`PKEY_Device_EnumeratorName`): `BTH…` is Bluetooth, `USB` is USB, `ROOT` and `SWD` are software-only, anything else counts as the PC's own.
+
+**Microphone privacy.** Windows has one switch for all desktop apps and no prompt. If it is off, the Detect delay row shows a link to the microphone privacy page. This never turns the tray icon yellow.
+
+**Manual delay test.** A dialog on the settings window. One stream of silence with a 60 ms beep every second, every fourth an octave higher. The stream's first sample is placed on the performance counter from how much was still waiting in the device's buffer at the first refill, and the panel is redrawn every frame from the same clock, lit for 120 ms starting `delay` after each beep. Spotify is paused if it was playing and resumed afterwards, through the media controls (`TryPauseAsync`, `TryPlayAsync`); this is the only place the app controls playback. Done saves the delay for the device even if it wasn't moved. If the default output device changes during the test, the beeps start over on the new one.
+
+**Chosen here without asking the owner** (they asked for the build to keep going):
+
+- The **Microphone** row sits under Detect delay and offers "Automatic" and every active microphone. The stored key is `detectDelayMicrophone`. A picked microphone that is unplugged counts as Automatic.
+- A picked Bluetooth microphone is refused like a default one.
+- A microphone that delivers exact silence (a streaming or VR driver's) gets its own hint, "… heard nothing at all. Pick another microphone."
+- The delay line difference above.
+- `--detect-delay`, as the Mac has `-IdleVizDetectDelay`.
+
+**Seen when checking** (Debug build, settings driven through UI Automation; output: a monitor's speakers over HDMI; microphone: a USB one about 50 cm from them):
+
+| Case | Result |
+| --- | --- |
+| Start | "Output device: Odyssey G85SB (NVIDIA High Definition Audio), delay 0 ms (reported by Windows)" |
+| Detect, Automatic | The default input is a VR driver's microphone, which delivered silence: "… heard nothing at all. Pick another microphone. Kept 70 ms." |
+| Detect, USB microphone, three runs | Lags of 68, 58 and 67 ms, saved as 70, 60 and 70 ms. The peak stood 54 to 64 standard deviations above the rest and 5.5 to 6.5 times the runner-up (10 and 1.5 are needed) |
+| Detect with Spotify paused | "Play something in Spotify first, out loud"; the microphone wasn't opened |
+| Installed Release copy | Started with "delay 70 ms (saved)"; the rows, the paused hint and the manual test dialog worked as in the Debug build |
+| Manual delay test | Spotify paused when it started and resumed on Done. The panel lit once a second for about 110 ms, white three times and orange the fourth. **+10 ms** twice changed 70 to 90 ms, and Done saved it |
+| 10 s open at a 1 s delay | 549 frames reached the page, none dropped by the page |
+
+**Not tried:** whether the flash and the beep line up by ear (it needs ears; with the value Detect found, they should at about 70 ms), a Bluetooth output or microphone, a PC with a built-in microphone, the microphone privacy switch turned off, and changing the output device during the test or with the window open.

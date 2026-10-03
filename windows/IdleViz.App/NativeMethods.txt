@@ -69,3 +69,10 @@ CreateWaitableTimerEx
 SetWaitableTimer
 CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 SYNCHRONIZATION_ACCESS_RIGHTS
+IAudioRenderClient
+IMMNotificationClient
+PKEY_Device_FriendlyName
+PKEY_Device_EnumeratorName
+PropVariantClear
+CoTaskMemFree
+AUDCLNT_E_DEVICE_INVALIDATED

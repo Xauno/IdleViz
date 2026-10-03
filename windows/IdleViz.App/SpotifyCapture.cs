@@ -29,6 +29,7 @@ internal sealed class SpotifyCapture : IDisposable
     private readonly Lock _lock = new();
     private Thread? _thread;
     private ManualResetEvent? _stop;
+    private int _users;
     private volatile bool _capturing;
 
     public SampleRing Ring { get; } = new();
@@ -36,11 +37,12 @@ internal sealed class SpotifyCapture : IDisposable
     /// <summary>True while Spotify is running and its audio is being captured.</summary>
     public bool IsCapturing => _capturing;
 
-    public void Start()
+    /// <summary>Starts the capture for one more user: the open window, or Detect delay. It runs while anyone uses it.</summary>
+    public void Retain()
     {
         lock (_lock)
         {
-            if (_thread is not null)
+            if (_users++ > 0)
             {
                 return;
             }
@@ -54,12 +56,18 @@ internal sealed class SpotifyCapture : IDisposable
         }
     }
 
-    public void Stop()
+    /// <summary>Ends one use. The capture stops with its last user.</summary>
+    public void Release()
     {
         Thread? thread;
         ManualResetEvent? stop;
         lock (_lock)
         {
+            if (_users == 0 || --_users > 0)
+            {
+                return;
+            }
+
             thread = _thread;
             stop = _stop;
             _thread = null;
@@ -82,7 +90,15 @@ internal sealed class SpotifyCapture : IDisposable
         Ring.Clear();
     }
 
-    public void Dispose() => Stop();
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            _users = Math.Min(_users, 1);
+        }
+
+        Release();
+    }
 
     private void Run(ManualResetEvent stop)
     {
@@ -194,13 +210,16 @@ internal sealed class SpotifyCapture : IDisposable
         while (packet > 0)
         {
             capture.GetBuffer(out var data, out var frames, out var flags);
+            // When the packet is handed over, not when its samples are stamped: the visuals are
+            // delayed from the moment they get the audio, so Detect delay measures from there too.
+            var time = AudioClock.Now;
             if ((flags & (uint)_AUDCLNT_BUFFERFLAGS.AUDCLNT_BUFFERFLAGS_SILENT) != 0)
             {
-                Ring.AppendSilence((int)frames);
+                Ring.AppendSilence((int)frames, time);
             }
             else
             {
-                Ring.Append(new ReadOnlySpan<float>(data, (int)frames * Channels), Channels, (int)frames);
+                Ring.Append(new ReadOnlySpan<float>(data, (int)frames * Channels), Channels, (int)frames, time);
             }
 
             capture.ReleaseBuffer(frames);

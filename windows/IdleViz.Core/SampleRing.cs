@@ -2,8 +2,7 @@ namespace IdleViz.Core;
 
 /// <summary>
 /// Keeps the most recent stereo samples from the Spotify capture. Written on the capture thread
-/// and read on the UI thread, so everything goes through one lock. Ported from <c>SampleRing.swift</c>
-/// (recording for Detect delay comes with W7d).
+/// and read on the UI thread, so everything goes through one lock. Ported from <c>SampleRing.swift</c>.
 /// </summary>
 public sealed class SampleRing
 {
@@ -16,12 +15,24 @@ public sealed class SampleRing
     private int _buffers;
     private int _zeroBuffers;
 
+    // Mono samples kept for Detect delay while it runs, or null.
+    private float[]? _recording;
+    private int _recorded;
+
+    // When the first recorded buffer arrived.
+    private double _recordingStart;
+
     /// <summary>Adds one buffer of interleaved samples. Mono is copied to both sides; channels past the second are ignored.</summary>
-    public void Append(ReadOnlySpan<float> interleaved, int channels, int frames)
+    /// <param name="interleaved">The samples, frame by frame.</param>
+    /// <param name="channels">Samples per frame.</param>
+    /// <param name="frames">How many frames.</param>
+    /// <param name="time">When the buffer arrived, in seconds, for Detect delay.</param>
+    public void Append(ReadOnlySpan<float> interleaved, int channels, int frames, double time = 0)
     {
         channels = Math.Max(channels, 1);
         lock (_lock)
         {
+            BeginBuffer(time);
             var allZero = true;
             for (var frame = 0; frame < frames; frame++)
             {
@@ -44,10 +55,11 @@ public sealed class SampleRing
     }
 
     /// <summary>Adds one buffer of silence: Windows flags a packet as silent instead of filling it with zeros.</summary>
-    public void AppendSilence(int frames)
+    public void AppendSilence(int frames, double time = 0)
     {
         lock (_lock)
         {
+            BeginBuffer(time);
             for (var frame = 0; frame < frames; frame++)
             {
                 Store(0, 0);
@@ -55,6 +67,30 @@ public sealed class SampleRing
 
             _buffers++;
             _zeroBuffers++;
+        }
+    }
+
+    /// <summary>Starts keeping every sample (as mono), up to <paramref name="maxSamples"/>, next to the usual ring.</summary>
+    public void StartRecording(int maxSamples)
+    {
+        lock (_lock)
+        {
+            // Allocated up front, so the capture thread never has to grow it.
+            _recording = new float[Math.Max(maxSamples, 0)];
+            _recorded = 0;
+            _recordingStart = 0;
+        }
+    }
+
+    /// <summary>Stops recording and returns the samples and the time at which the first of them arrived.</summary>
+    public (float[] Samples, double Start) StopRecording()
+    {
+        lock (_lock)
+        {
+            var samples = _recording is null ? [] : _recording.AsSpan(0, _recorded).ToArray();
+            _recording = null;
+            _recorded = 0;
+            return (samples, _recordingStart);
         }
     }
 
@@ -96,10 +132,22 @@ public sealed class SampleRing
         }
     }
 
+    private void BeginBuffer(double time)
+    {
+        if (_recording is not null && _recorded == 0)
+        {
+            _recordingStart = time;
+        }
+    }
+
     private void Store(float left, float right)
     {
         _left[_head] = left;
         _right[_head] = right;
         _head = (_head + 1) % Capacity;
+        if (_recording is not null && _recorded < _recording.Length)
+        {
+            _recording[_recorded++] = (left + right) / 2;
+        }
     }
 }

@@ -121,6 +121,22 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void MapsOfNumbersSurviveAReloadAndSkipEntriesOfTheWrongType()
+    {
+        var settings = new SettingsStore(FilePath);
+        settings.SetDoubleMap("audioDelayByDevice", new Dictionary<string, double> { ["speakers"] = 0.02, ["headphones"] = 0.21 });
+        Assert.Equal(
+            new Dictionary<string, double> { ["speakers"] = 0.02, ["headphones"] = 0.21 },
+            new SettingsStore(FilePath).GetDoubleMap("audioDelayByDevice"));
+
+        File.WriteAllText(FilePath, """{ "audioDelayByDevice": { "a": 0.2, "b": "text", "c": 1, "d": null, "e": [1] }, "idleTimeout": 5 }""");
+        var reloaded = new SettingsStore(FilePath);
+        Assert.Equal(new Dictionary<string, double> { ["a"] = 0.2, ["c"] = 1 }, reloaded.GetDoubleMap("audioDelayByDevice"));
+        Assert.Empty(reloaded.GetDoubleMap("idleTimeout"));
+        Assert.Empty(reloaded.GetDoubleMap("missing"));
+    }
+
+    [Fact]
     public void NoTemporaryFileIsLeftBehind()
     {
         var settings = new SettingsStore(FilePath);
