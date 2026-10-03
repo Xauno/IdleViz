@@ -1,4 +1,3 @@
-using System.Globalization;
 using IdleViz.Core;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -11,13 +10,15 @@ using Windows.Win32.Foundation;
 namespace IdleViz.App;
 
 /// <summary>
-/// The settings window: small, portrait, fixed size, one page that scrolls. Closing it only closes
-/// the window; the app keeps running in the tray.
+/// The settings window: small, portrait, one page that scrolls, with the rows that hang off another
+/// row folded into it. The width is fixed and the height can be dragged. Closing it only closes the
+/// window; the app keeps running in the tray.
 /// </summary>
 public sealed partial class SettingsWindow : Window
 {
     private const double WidthInPixels = 440;
     private const double HeightInPixels = 680;
+    private const double MinHeightInPixels = 360;
 
     // Segoe Fluent Icons: Heart and HeartFill.
     private const int HeartGlyph = 0xE006;
@@ -50,14 +51,17 @@ public sealed partial class SettingsWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBar);
 
+        var scale = PInvoke.GetDpiForWindow(Handle) / 96.0;
+        var width = (int)Math.Round(WidthInPixels * scale);
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
-            presenter.IsResizable = false;
+            // Only the height can be dragged: the rows are laid out for this width.
             presenter.IsMaximizable = false;
+            presenter.PreferredMinimumWidth = presenter.PreferredMaximumWidth = width;
+            presenter.PreferredMinimumHeight = (int)Math.Round(MinHeightInPixels * scale);
         }
 
-        var scale = PInvoke.GetDpiForWindow(Handle) / 96.0;
-        AppWindow.Resize(new SizeInt32((int)Math.Round(WidthInPixels * scale), (int)Math.Round(HeightInPixels * scale)));
+        AppWindow.Resize(new SizeInt32(width, (int)Math.Round(HeightInPixels * scale)));
 
         ShowTimes();
         Recorder.Attach(_app);
@@ -186,9 +190,8 @@ public sealed partial class SettingsWindow : Window
             _showing = false;
         }
 
-        BatteryCard.Visibility = _app.HasBattery ? Visibility.Visible : Visibility.Collapsed;
-        BatteryIdleCard.Visibility = BatteryKeepAwakeCard.Visibility =
-            _app.HasBattery && times.UseBatteryTimes ? Visibility.Visible : Visibility.Collapsed;
+        BatteryExpander.Visibility = _app.HasBattery ? Visibility.Visible : Visibility.Collapsed;
+        BatteryIdleCard.IsEnabled = BatteryKeepAwakeCard.IsEnabled = times.UseBatteryTimes;
     }
 
     // 5, 10, 15 and 30 min, then Off, as on the Mac.
@@ -260,6 +263,7 @@ public sealed partial class SettingsWindow : Window
 
         settings.SetBool(BatteryTimesSetting.EnabledKey, BatterySwitch.IsOn);
         ShowTimes();
+        Unfold(BatteryExpander, BatterySwitch.IsOn);
     }
 
     // Each picker leaves out the key the other one uses.
@@ -367,6 +371,7 @@ public sealed partial class SettingsWindow : Window
         if (!_showing)
         {
             _app.Settings.SetBool(OverlaySetting.Key, OverlaySwitch.IsOn);
+            ShowDisplays();
         }
     }
 
@@ -435,11 +440,22 @@ public sealed partial class SettingsWindow : Window
         }
 
         var chosen = others.Count(settings.Covers);
-        OtherDisplaysButton.Content = others.Count == 0 ? "None connected" : chosen == others.Count ? "All" : chosen == 0 ? "None" : $"{chosen} of {others.Count}";
+        OtherDisplaysButton.Content = others.Count == 0 ? "None connected" : chosen == others.Count ? "All" : chosen == 0 ? "None" : $"{chosen} of {others.Count} displays";
 
         MultiDisplayWarning.IsOpen = settings.Enabled;
-        PlacementCard.IsEnabled = CloseOnInputCard.IsEnabled = OverlayDisplayCard.IsEnabled = settings.Enabled;
+        PlacementCard.IsEnabled = CloseOnInputCard.IsEnabled = settings.Enabled;
         OtherDisplaysCard.IsEnabled = settings.Enabled && others.Count > 0;
+
+        // With one display covered the overlay has only one place to be.
+        OverlayDisplayCard.IsEnabled = settings.Enabled && OverlaySwitch.IsOn;
+        if (settings.Enabled)
+        {
+            OverlayDisplayCard.ClearValue(CommunityToolkit.WinUI.Controls.SettingsCard.DescriptionProperty);
+        }
+        else
+        {
+            OverlayDisplayCard.Description = "Multi-display only";
+        }
     }
 
     // A picker keeps its items unless they changed: emptying one from inside its own selection event takes the app down.
@@ -483,6 +499,7 @@ public sealed partial class SettingsWindow : Window
         {
             _app.Settings.SetBool(MultiDisplaySettings.EnabledKey, MultiDisplaySwitch.IsOn);
             ShowDisplays();
+            Unfold(MultiDisplayExpander, MultiDisplaySwitch.IsOn);
         }
     }
 
@@ -542,7 +559,7 @@ public sealed partial class SettingsWindow : Window
         }
 
         DelayLabel.Text = AudioDelaySetting.Label(delay.Delay);
-        DelayCard.Description = new TextBlock { Text = $"For {delay.DeviceName}", MaxLines = 1, TextTrimming = TextTrimming.CharacterEllipsis };
+        DelayExpander.Description = new TextBlock { Text = $"For {delay.DeviceName}", MaxLines = 1, TextTrimming = TextTrimming.CharacterEllipsis };
 
         DetectButton.Content = delay.Detecting ? "Listening…" : "Detect";
         DetectButton.IsEnabled = !delay.Detecting && !delay.Testing;
@@ -555,7 +572,7 @@ public sealed partial class SettingsWindow : Window
         }
         else
         {
-            DetectCard.Description = new TextBlock { Text = delay.Hint ?? "Listens with the mic for a few seconds", TextWrapping = TextWrapping.Wrap };
+            DetectCard.Description = new TextBlock { Text = delay.Hint ?? "Listens for a few seconds", TextWrapping = TextWrapping.Wrap };
         }
     }
 
@@ -632,7 +649,7 @@ public sealed partial class SettingsWindow : Window
 
         foreach (var seconds in PresetSettings.SecondsChoices)
         {
-            SecondsPicker.Items.Add(new ComboBoxItem { Content = seconds.ToString(CultureInfo.InvariantCulture), Tag = seconds });
+            SecondsPicker.Items.Add(new ComboBoxItem { Content = PresetSettings.SecondsLabel(seconds), Tag = seconds });
         }
 
         foreach (var blend in PresetSettings.BlendChoices)
@@ -688,7 +705,8 @@ public sealed partial class SettingsWindow : Window
             FavoritesButton.Content = $"Manage ({settings.Favorites.Count})";
             BlocklistButton.Content = $"Manage ({settings.Blocked.Count})";
 
-            FolderCard.Description = $"{Presets.BundledCount} bundled, {Presets.Library.CustomCount} custom";
+            var failed = Presets.Failures.Count;
+            LibraryExpander.Description = $"{Presets.BundledCount} bundled, {Presets.Library.CustomCount} custom" + (failed > 0 ? $", {failed} failed to load" : string.Empty);
             ShowFailures(Presets.Failures);
         }
         finally
@@ -728,26 +746,55 @@ public sealed partial class SettingsWindow : Window
         }
 
         _shownFailures = failures;
-        FailedHeader.Text = $"Failed to load ({failures.Count})";
-        FailedHeader.Visibility = failures.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         FailedList.Children.Clear();
+        if (failures.Count == 0)
+        {
+            return;
+        }
+
+        // The rows sit under the Library rows, so they are drawn like them: a line above, the same insets.
+        var line = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"];
+        var secondary = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+        FailedList.Children.Add(new Border
+        {
+            BorderBrush = line,
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(32, 12, 44, 4),
+            Child = new TextBlock
+            {
+                Text = $"Failed to load ({failures.Count})",
+                Style = (Style)Application.Current.Resources["BodyStrongTextBlockStyle"],
+            },
+        });
         foreach (var failure in failures)
         {
-            var card = new CommunityToolkit.WinUI.Controls.SettingsCard
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            text.Children.Add(new TextBlock { Text = Presets.Name(failure.Id), TextTrimming = TextTrimming.CharacterEllipsis });
+            text.Children.Add(new TextBlock
             {
-                Header = new TextBlock { Text = Presets.Name(failure.Id), TextTrimming = TextTrimming.CharacterEllipsis },
-                Description = new TextBlock { Text = failure.Error, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis },
-            };
+                Text = failure.Error,
+                Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
+                Foreground = secondary,
+                TextWrapping = TextWrapping.Wrap,
+                MaxLines = 2,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            });
+
+            var row = new Grid { ColumnSpacing = 12, Padding = new Thickness(32, 8, 44, 8) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.Children.Add(text);
             if (Presets.Library.FileFor(failure.Id) is not null)
             {
                 var id = failure.Id;
-                var reveal = new Button { Content = "Reveal" };
+                var reveal = new Button { Content = "Reveal", VerticalAlignment = VerticalAlignment.Center };
                 AutomationProperties.SetName(reveal, $"Reveal {Presets.Name(id)}");
                 reveal.Click += (_, _) => Presets.Library.Reveal(id);
-                card.Content = reveal;
+                Grid.SetColumn(reveal, 1);
+                row.Children.Add(reveal);
             }
 
-            FailedList.Children.Add(card);
+            FailedList.Children.Add(row);
         }
     }
 
@@ -799,6 +846,16 @@ public sealed partial class SettingsWindow : Window
         if (item is not null && !ReferenceEquals(picker.SelectedItem, item))
         {
             picker.SelectedItem = item;
+        }
+    }
+
+    // Opens a folded row when its switch is turned on, so the rows it has just brought to life are seen.
+    // Turning it off leaves the row as it is.
+    private static void Unfold(CommunityToolkit.WinUI.Controls.SettingsExpander expander, bool on)
+    {
+        if (on)
+        {
+            expander.IsExpanded = true;
         }
     }
 

@@ -1,7 +1,7 @@
 # Agent instructions
 
 ## Project
-See [project.md](project.md) for the full plan: what the app does, its architecture, and the build order. Author docs live in [docs/](docs/), for example [docs/custom-visualizer.md](docs/custom-visualizer.md).
+See [project.md](project.md) for the full plan: what the app does, its architecture, and the build order. Author docs live in [docs/](docs/), for example [docs/custom-visualizer.md](docs/custom-visualizer.md). Work the Windows app has that the Mac app still needs is listed in [docs/mac-todo.md](docs/mac-todo.md).
 
 ## Rules
 

@@ -31,8 +31,17 @@
                wider than this window, which would stack every row. -->
           <x:Double x:Key="SettingsCardWrapThreshold">300</x:Double>
           <x:Double x:Key="SettingsCardWrapNoIconThreshold">200</x:Double>
+          <!-- The rows inside an expander are inset for an icon by default. There are none here, and the
+               room is needed for the labels. -->
+          <Thickness x:Key="SettingsExpanderItemPadding">32,8,44,8</Thickness>
         </StackPanel.Resources>
-        <TextBlock Margin="0,6,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="General" />
+
+        <!-- An action, not a setting, so it sits above the sections. -->
+        <controls:SettingsCard Margin="0,6,0,0" Description="Needs a Spotify track" Header="Open the visualizer">
+          <Button Click="OnOpenNowClick" Content="Open now" Style="{StaticResource AccentButtonStyle}" />
+        </controls:SettingsCard>
+
+        <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Opening" />
 
         <controls:SettingsCard Description="Needs a Spotify track" Header="Start after idle">
           <ComboBox x:Name="IdlePicker" MinWidth="110" SelectionChanged="OnIdleChanged" />
@@ -42,44 +51,28 @@
           <ComboBox x:Name="KeepAwakePicker" MinWidth="110" SelectionChanged="OnKeepAwakeChanged" />
         </controls:SettingsCard>
 
-        <!-- The three battery rows are not shown at all on a PC with no battery. -->
-        <controls:SettingsCard x:Name="BatteryCard" Header="Different times on battery" Visibility="Collapsed">
+        <!-- Not shown at all on a PC with no battery. The two rows inside only count while the switch is on. -->
+        <controls:SettingsExpander x:Name="BatteryExpander" Header="Different times on battery" Visibility="Collapsed">
           <ToggleSwitch x:Name="BatterySwitch" MinWidth="0" AutomationProperties.Name="Different times on battery" Toggled="OnBatteryTimesToggled" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard x:Name="BatteryIdleCard" Header="On battery: start after idle" Visibility="Collapsed">
-          <ComboBox x:Name="BatteryIdlePicker" MinWidth="110" SelectionChanged="OnBatteryIdleChanged" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard x:Name="BatteryKeepAwakeCard" Header="On battery: keep screen awake" Visibility="Collapsed">
-          <ComboBox x:Name="BatteryKeepAwakePicker" MinWidth="110" SelectionChanged="OnBatteryKeepAwakeChanged" />
-        </controls:SettingsCard>
+          <controls:SettingsExpander.Items>
+            <controls:SettingsCard x:Name="BatteryIdleCard" Header="Start after idle">
+              <ComboBox x:Name="BatteryIdlePicker" MinWidth="110" AutomationProperties.Name="On battery: start after idle" SelectionChanged="OnBatteryIdleChanged" />
+            </controls:SettingsCard>
+            <controls:SettingsCard x:Name="BatteryKeepAwakeCard" Header="Keep screen awake">
+              <ComboBox x:Name="BatteryKeepAwakePicker" MinWidth="110" AutomationProperties.Name="On battery: keep screen awake" SelectionChanged="OnBatteryKeepAwakeChanged" />
+            </controls:SettingsCard>
+          </controls:SettingsExpander.Items>
+        </controls:SettingsExpander>
 
         <controls:SettingsCard x:Name="HotkeyCard" Header="Open hotkey">
           <local:HotkeyRecorder x:Name="Recorder" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard Description="Favorites what's on screen" Header="Like key">
-          <ComboBox x:Name="LikeKeyPicker" MinWidth="110" SelectionChanged="OnLikeKeyChanged" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard Description="Next visualizer, in Shuffle" Header="Skip key">
-          <ComboBox x:Name="SkipKeyPicker" MinWidth="110" SelectionChanged="OnSkipKeyChanged" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard Header="Open now">
-          <Button Click="OnOpenNowClick" Content="Open" />
         </controls:SettingsCard>
 
         <controls:SettingsCard x:Name="StartupCard" Header="Run at startup">
           <ToggleSwitch x:Name="StartupSwitch" MinWidth="0" AutomationProperties.Name="Run at startup" Toggled="OnStartupToggled" />
         </controls:SettingsCard>
 
-        <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Visualizer" />
-
-        <controls:SettingsCard Header="Show Spotify overlay">
-          <ToggleSwitch x:Name="OverlaySwitch" MinWidth="0" AutomationProperties.Name="Show Spotify overlay" Toggled="OnOverlayToggled" />
-        </controls:SettingsCard>
+        <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Look" />
 
         <controls:SettingsCard Header="Brightness">
           <StackPanel Orientation="Horizontal" Spacing="8">
@@ -102,72 +95,51 @@
           </StackPanel>
         </controls:SettingsCard>
 
-        <controls:SettingsCard x:Name="DelayCard" Header="Audio delay">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Slider
-              x:Name="DelaySlider"
-              Width="130"
-              AutomationProperties.Name="Audio delay"
-              IsThumbToolTipEnabled="False"
-              LargeChange="0.1"
-              Maximum="2.5"
-              Minimum="0"
-              SmallChange="0.01"
-              StepFrequency="0.01"
-              ValueChanged="OnDelayChanged" />
-            <TextBlock
-              x:Name="DelayLabel"
-              Width="56"
-              VerticalAlignment="Center"
-              TextAlignment="Right" />
-          </StackPanel>
-        </controls:SettingsCard>
+        <!-- The row inside only counts while the overlay is on and more than one display is used. -->
+        <controls:SettingsExpander Header="Show Spotify overlay">
+          <ToggleSwitch x:Name="OverlaySwitch" MinWidth="0" AutomationProperties.Name="Show Spotify overlay" Toggled="OnOverlayToggled" />
+          <controls:SettingsExpander.Items>
+            <controls:SettingsCard x:Name="OverlayDisplayCard" Header="Show it on">
+              <ComboBox x:Name="OverlayDisplayPicker" Width="170" AutomationProperties.Name="Spotify overlay on" SelectionChanged="OnOverlayDisplayChanged" />
+            </controls:SettingsCard>
+          </controls:SettingsExpander.Items>
+        </controls:SettingsExpander>
 
-        <controls:SettingsCard x:Name="DetectCard" Header="Detect delay">
-          <Button x:Name="DetectButton" Click="OnDetectClick" />
-        </controls:SettingsCard>
+        <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Presets" />
 
-        <controls:SettingsCard Description="For Detect delay" Header="Microphone">
-          <!-- Device names are long; a fixed width keeps the row from wrapping, and the box trims them. -->
-          <ComboBox
-            x:Name="MicrophonePicker"
-            Width="200"
-            DropDownOpened="OnMicrophonesOpened"
-            SelectionChanged="OnMicrophoneChanged" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard Description="Match a flash to a beep, no mic" Header="Manual delay test">
-          <Button x:Name="TestButton" Click="OnTestClick" Content="Start" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard Header="Mode">
-          <ComboBox x:Name="ModePicker" MinWidth="110" SelectionChanged="OnModeChanged" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard x:Name="ShuffleFromCard" Header="Shuffle from">
-          <ComboBox x:Name="ShuffleFromPicker" MinWidth="110" SelectionChanged="OnShuffleFromChanged" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard x:Name="SecondsCard" Header="Seconds per preset">
-          <ComboBox x:Name="SecondsPicker" MinWidth="110" SelectionChanged="OnSecondsChanged" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard x:Name="BlendCard" Header="Blend time">
-          <ComboBox x:Name="BlendPicker" MinWidth="110" SelectionChanged="OnBlendChanged" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard x:Name="SingleCard" Header="Visualizer">
-          <!-- Preset names are long; a fixed width keeps the row from wrapping, and the box trims them. -->
-          <ComboBox x:Name="SinglePicker" Width="200" SelectionChanged="OnSingleChanged" />
-        </controls:SettingsCard>
+        <!-- Shuffle shows its three rows inside, Single its one. -->
+        <controls:SettingsExpander x:Name="ModeExpander" Header="Mode" IsExpanded="True">
+          <ComboBox x:Name="ModePicker" MinWidth="110" AutomationProperties.Name="Mode" SelectionChanged="OnModeChanged" />
+          <controls:SettingsExpander.Items>
+            <controls:SettingsCard x:Name="ShuffleFromCard" Header="Shuffle from">
+              <ComboBox x:Name="ShuffleFromPicker" MinWidth="110" AutomationProperties.Name="Shuffle from" SelectionChanged="OnShuffleFromChanged" />
+            </controls:SettingsCard>
+            <controls:SettingsCard x:Name="SecondsCard" Header="Time per preset">
+              <ComboBox x:Name="SecondsPicker" MinWidth="110" AutomationProperties.Name="Time per preset" SelectionChanged="OnSecondsChanged" />
+            </controls:SettingsCard>
+            <controls:SettingsCard x:Name="BlendCard" Description="The fade between presets" Header="Blend time">
+              <ComboBox x:Name="BlendPicker" MinWidth="110" AutomationProperties.Name="Blend time" SelectionChanged="OnBlendChanged" />
+            </controls:SettingsCard>
+            <controls:SettingsCard x:Name="SingleCard" Header="Visualizer">
+              <!-- Preset names are long; a fixed width keeps the row from wrapping, and the box trims them. -->
+              <ComboBox x:Name="SinglePicker" Width="200" AutomationProperties.Name="Visualizer" SelectionChanged="OnSingleChanged" />
+            </controls:SettingsCard>
+          </controls:SettingsExpander.Items>
+        </controls:SettingsExpander>
 
         <controls:SettingsCard x:Name="LastShownCard" Header="Last shown">
           <StackPanel Orientation="Horizontal" Spacing="4">
             <ToggleButton x:Name="FavoriteButton" Click="OnFavoriteClick">
-              <FontIcon x:Name="FavoriteIcon" FontSize="14" Glyph="&#xE006;" />
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <FontIcon x:Name="FavoriteIcon" FontSize="14" Glyph="&#xE006;" />
+                <TextBlock Text="Favorite" />
+              </StackPanel>
             </ToggleButton>
             <ToggleButton x:Name="BlockButton" Click="OnBlockClick">
-              <FontIcon FontSize="14" Glyph="&#xE733;" />
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <FontIcon FontSize="14" Glyph="&#xE733;" />
+                <TextBlock Text="Block" />
+              </StackPanel>
             </ToggleButton>
           </StackPanel>
         </controls:SettingsCard>
@@ -176,83 +148,127 @@
           <Button x:Name="FavoritesButton" Click="OnFavoritesClick" />
         </controls:SettingsCard>
 
-        <controls:SettingsCard Header="Blocklist">
+        <controls:SettingsCard Description="Never shown in Shuffle" Header="Blocklist">
           <Button x:Name="BlocklistButton" Click="OnBlocklistClick" />
         </controls:SettingsCard>
 
+        <controls:SettingsExpander x:Name="LibraryExpander" Header="Library">
+          <controls:SettingsExpander.ItemsHeader>
+            <!-- Presets carry equations that run as code, so the warning covers them as well as plugins. -->
+            <InfoBar
+              BorderThickness="0"
+              CornerRadius="0"
+              IsClosable="False"
+              IsOpen="True"
+              Message="Custom plugins and presets are code. Only import ones you trust."
+              Severity="Warning" />
+          </controls:SettingsExpander.ItemsHeader>
+          <controls:SettingsExpander.Items>
+            <controls:SettingsCard Description=".json, .js, .milk" Header="Import presets">
+              <Button x:Name="ImportButton" AutomationProperties.Name="Import presets" Content="Import&#x2026;">
+                <Button.Flyout>
+                  <MenuFlyout Placement="Bottom">
+                    <MenuFlyoutItem Click="OnImportFilesClick" Text="Files&#x2026;" />
+                    <MenuFlyoutItem Click="OnImportFolderClick" Text="Folder&#x2026;" />
+                  </MenuFlyout>
+                </Button.Flyout>
+              </Button>
+            </controls:SettingsCard>
+            <controls:SettingsCard Description="Where custom presets are kept" Header="Presets folder">
+              <Button AutomationProperties.Name="Open the presets folder" Click="OnOpenFolderClick" Content="Open folder" />
+            </controls:SettingsCard>
+            <controls:SettingsCard Description="After changing files in the folder" Header="Reload presets">
+              <Button AutomationProperties.Name="Reload presets" Click="OnReloadClick" Content="Reload" />
+            </controls:SettingsCard>
+          </controls:SettingsExpander.Items>
+          <controls:SettingsExpander.ItemsFooter>
+            <!-- Empty when nothing has failed. -->
+            <StackPanel x:Name="FailedList" />
+          </controls:SettingsExpander.ItemsFooter>
+        </controls:SettingsExpander>
+
+        <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Keys" />
+
+        <controls:SettingsCard Description="Favorites what's on screen" Header="Like key">
+          <ComboBox x:Name="LikeKeyPicker" MinWidth="110" SelectionChanged="OnLikeKeyChanged" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard Description="Next visualizer, in Shuffle" Header="Skip key">
+          <ComboBox x:Name="SkipKeyPicker" MinWidth="110" SelectionChanged="OnSkipKeyChanged" />
+        </controls:SettingsCard>
+
+        <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Audio sync" />
+
+        <controls:SettingsExpander x:Name="DelayExpander" Header="Audio delay">
+          <TextBlock x:Name="DelayLabel" VerticalAlignment="Center" />
+          <controls:SettingsExpander.Items>
+            <!-- The slider gets the row's whole width: it has 250 steps. -->
+            <controls:SettingsCard HorizontalContentAlignment="Stretch" ContentAlignment="Vertical" Header="Set by hand">
+              <Slider
+                x:Name="DelaySlider"
+                HorizontalAlignment="Stretch"
+                AutomationProperties.Name="Audio delay"
+                IsThumbToolTipEnabled="False"
+                LargeChange="0.1"
+                Maximum="2.5"
+                Minimum="0"
+                SmallChange="0.01"
+                StepFrequency="0.01"
+                ValueChanged="OnDelayChanged" />
+            </controls:SettingsCard>
+            <controls:SettingsCard x:Name="DetectCard" Header="Detect with the microphone">
+              <Button x:Name="DetectButton" AutomationProperties.Name="Detect delay" Click="OnDetectClick" />
+            </controls:SettingsCard>
+            <controls:SettingsCard Header="Microphone">
+              <!-- Device names are long; a fixed width keeps the row from wrapping, and the box trims them. -->
+              <ComboBox
+                x:Name="MicrophonePicker"
+                Width="200"
+                AutomationProperties.Name="Microphone"
+                DropDownOpened="OnMicrophonesOpened"
+                SelectionChanged="OnMicrophoneChanged" />
+            </controls:SettingsCard>
+            <controls:SettingsCard Description="Match a flash to a beep, no mic" Header="Manual delay test">
+              <Button x:Name="TestButton" AutomationProperties.Name="Start the manual delay test" Click="OnTestClick" Content="Start" />
+            </controls:SettingsCard>
+          </controls:SettingsExpander.Items>
+        </controls:SettingsExpander>
+
         <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Displays" />
 
-        <!-- Shown while more than one display is switched on. -->
-        <InfoBar
-          x:Name="MultiDisplayWarning"
-          IsClosable="False"
-          IsOpen="False"
-          Severity="Warning" />
-
         <controls:SettingsCard Header="Main display">
-          <ComboBox x:Name="MainDisplayPicker" Width="200" SelectionChanged="OnMainDisplayChanged" />
+          <ComboBox x:Name="MainDisplayPicker" Width="200" AutomationProperties.Name="Main display" SelectionChanged="OnMainDisplayChanged" />
         </controls:SettingsCard>
 
-        <controls:SettingsCard Description="Shows the visualizer on other displays too" Header="Use more than one display">
+        <!-- The three rows inside only count while the switch is on. -->
+        <controls:SettingsExpander x:Name="MultiDisplayExpander" Description="Shows the visualizer on other displays too" Header="Use more than one display">
           <ToggleSwitch x:Name="MultiDisplaySwitch" MinWidth="0" AutomationProperties.Name="Use more than one display" Toggled="OnMultiDisplayToggled" />
-        </controls:SettingsCard>
-
-        <!-- The four rows below only count while the switch above is on. -->
-        <controls:SettingsCard x:Name="OtherDisplaysCard" Header="Other displays">
-          <DropDownButton x:Name="OtherDisplaysButton" MinWidth="110" AutomationProperties.Name="Other displays">
-            <DropDownButton.Flyout>
-              <MenuFlyout x:Name="OtherDisplaysMenu" Placement="Bottom" />
-            </DropDownButton.Flyout>
-          </DropDownButton>
-        </controls:SettingsCard>
-
-        <controls:SettingsCard x:Name="PlacementCard" Header="Placement">
-          <ComboBox x:Name="PlacementPicker" Width="200" SelectionChanged="OnPlacementChanged" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard x:Name="CloseOnInputCard" Description="Off: the hotkey or the tray icon closes it" Header="Close on input">
-          <ToggleSwitch x:Name="CloseOnInputSwitch" MinWidth="0" AutomationProperties.Name="Close on input" Toggled="OnCloseOnInputToggled" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard x:Name="OverlayDisplayCard" Header="Spotify overlay on">
-          <ComboBox x:Name="OverlayDisplayPicker" Width="200" SelectionChanged="OnOverlayDisplayChanged" />
-        </controls:SettingsCard>
-
-        <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Presets" />
-
-        <!-- Presets carry equations that run as code, so the warning covers them as well as plugins. -->
-        <InfoBar
-          IsClosable="False"
-          IsOpen="True"
-          Message="Custom plugins and presets are code. Only import ones you trust."
-          Severity="Warning" />
-
-        <controls:SettingsCard Description=".json, .js, .milk" Header="Import&#x2026;">
-          <Button x:Name="ImportButton" Content="Import">
-            <Button.Flyout>
-              <MenuFlyout Placement="Bottom">
-                <MenuFlyoutItem Click="OnImportFilesClick" Text="Files&#x2026;" />
-                <MenuFlyoutItem Click="OnImportFolderClick" Text="Folder&#x2026;" />
-              </MenuFlyout>
-            </Button.Flyout>
-          </Button>
-        </controls:SettingsCard>
-
-        <controls:SettingsCard x:Name="FolderCard" Header="Folder">
-          <Button Click="OnOpenFolderClick" Content="Open" />
-        </controls:SettingsCard>
-
-        <controls:SettingsCard Header="Rescan">
-          <Button Click="OnReloadClick" Content="Reload" />
-        </controls:SettingsCard>
-
-        <!-- Hidden when nothing has failed. -->
-        <TextBlock
-          x:Name="FailedHeader"
-          Margin="0,18,0,6"
-          Style="{StaticResource BodyStrongTextBlockStyle}"
-          Visibility="Collapsed" />
-        <StackPanel x:Name="FailedList" Spacing="3" />
+          <controls:SettingsExpander.ItemsHeader>
+            <!-- Open while the switch is on. -->
+            <InfoBar
+              x:Name="MultiDisplayWarning"
+              BorderThickness="0"
+              CornerRadius="0"
+              IsClosable="False"
+              IsOpen="False"
+              Severity="Warning" />
+          </controls:SettingsExpander.ItemsHeader>
+          <controls:SettingsExpander.Items>
+            <controls:SettingsCard x:Name="OtherDisplaysCard" Header="Other displays">
+              <DropDownButton x:Name="OtherDisplaysButton" MinWidth="110" AutomationProperties.Name="Other displays">
+                <DropDownButton.Flyout>
+                  <MenuFlyout x:Name="OtherDisplaysMenu" Placement="Bottom" />
+                </DropDownButton.Flyout>
+              </DropDownButton>
+            </controls:SettingsCard>
+            <controls:SettingsCard x:Name="PlacementCard" Header="Placement">
+              <ComboBox x:Name="PlacementPicker" Width="200" AutomationProperties.Name="Placement" SelectionChanged="OnPlacementChanged" />
+            </controls:SettingsCard>
+            <controls:SettingsCard x:Name="CloseOnInputCard" Description="Off: the hotkey or the tray icon closes it" Header="Close on input">
+              <ToggleSwitch x:Name="CloseOnInputSwitch" MinWidth="0" AutomationProperties.Name="Close on input" Toggled="OnCloseOnInputToggled" />
+            </controls:SettingsCard>
+          </controls:SettingsExpander.Items>
+        </controls:SettingsExpander>
       </StackPanel>
     </ScrollViewer>
   </Grid>

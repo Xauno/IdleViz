@@ -58,7 +58,7 @@ Answers the owner gave to the open points in section 9 of the brief, on 2 Octobe
 | ----- | -------- |
 | J1 | Code lives in `windows/` in this repository and loads `IdleViz/web/` as it is. xUnit for tests. Lint is `dotnet format` plus the built-in analyzers, warnings as errors. |
 | Packages | A few well-known third-party packages are fine (H.NotifyIcon.WinUI, NAudio, CsWin32). Each new one is named in its pull request and in the table above. |
-| J2 | Settings window as suggested: about 440 × 680, title "IdleViz Settings", "PC" for "Mac", "Run at startup", the Mac's sheets as `ContentDialog`s, the trust warning as an `InfoBar`. |
+| J2 | Settings window as suggested: about 440 × 680, title "IdleViz Settings", "PC" for "Mac", "Run at startup", the Mac's sheets as `ContentDialog`s, the trust warning as an `InfoBar`. The layout was later regrouped; see "Settings window regrouped". |
 | J3 | Low-level keyboard and mouse hooks while the visualizer is open. Like and skip work without focus. The key or click that closes the visualizer is swallowed, so it never reaches the app behind. |
 | J4 | Two warnings: "Spotify audio can't be captured" and "Can't read what Spotify is playing". Clicking one opens a small dialog with the error text and a button that opens the log folder. |
 | J5 | Inno Setup, per-user install in `%LOCALAPPDATA%\Programs\IdleViz`, built by `windows/build-installer.ps1`. Presets folder `%APPDATA%\IdleViz\Presets\`. A taken import name is numbered as in File Explorer: "Tunnel (2).milk". |
@@ -722,3 +722,72 @@ A stored display that isn't connected falls back: the main display to the primar
 | Settings window | The Displays section; with the switch off the four rows below it are greyed out and there is no warning; switched on through UI Automation, the warning showed and `multiDisplay` true was stored |
 
 **Not tried:** the pickers and the Other displays menu by hand (only the switch was driven), three or more displays, displays at different scales, a display unplugged while several are covered, the like heart on a second display, the installed Release copy, and how much the frame rate actually drops (nothing measured it).
+
+### Settings window regrouped
+
+Not a step of the brief: the owner found the window clunky after W9. It had about 30 rows in one flat scroll under four headings, with rows that depend on another row drawn as its equals. The settings themselves, their keys and their defaults did not change; only where the rows sit and what they are called. The Mac window still has the old layout; [mac-todo.md](mac-todo.md) lists what to bring over.
+
+**Chosen by the owner:** one page with expanders, not a section list on the left; portrait, 440 wide; the height can be dragged; the six sections and their order; dependent rows greyed out, not hidden; **Open now** out of the list.
+
+| Section | Rows (folded rows in brackets) |
+| ------- | ------------------------------ |
+| (above the sections) | **Open the visualizer**, with the **Open now** button |
+| Opening | Start after idle, Keep screen awake, Different times on battery (Start after idle, Keep screen awake), Open hotkey, Run at startup |
+| Look | Brightness, Show Spotify overlay (Show it on) |
+| Presets | Mode (Shuffle from, Time per preset and Blend time, or Visualizer), Last shown, Favorites, Blocklist, Library (the trust warning, Import presets, Presets folder, Reload presets, Failed to load) |
+| Keys | Like key, Skip key |
+| Audio sync | Audio delay (Set by hand, Detect with the microphone, Microphone, Manual delay test) |
+| Displays | Main display, Use more than one display (the GPU warning, Other displays, Placement, Close on input) |
+
+| File | What changed |
+| ---- | ------------ |
+| `SettingsWindow.xaml` | The layout above. A folded row is a `SettingsExpander` from the toolkit package already in use, so there is no new package. |
+| `SettingsWindow.xaml.cs` | Fixed width with a height that can be dragged (`PreferredMinimumWidth` and `PreferredMaximumWidth` of the presenter, at least 360 tall). Turning a switch on opens its row. The failed files are drawn as plain rows at the foot of **Library**. |
+| `IdleViz.Core/PresetSettings.cs` | `SecondsLabel`: "30 s", "2 min". |
+
+**How it behaves:**
+
+- A switch that has rows folded into it greys them out while it is off, and opens the row when it is turned on. Turning it off leaves the row open. Which rows are open is not stored: **Mode** starts open, the others closed.
+- **Different times on battery** is still not shown at all on a PC with no battery. The **Mode** row still swaps its rows between Shuffle and Single, as these are alternatives.
+- **Show it on** is greyed out, with "Multi-display only" under it, unless the overlay and **Use more than one display** are both on.
+- The audio delay's value is on the **Audio delay** row, and the slider inside it runs the width of the row: 250 steps were too many for 130 px.
+- The failed count is on the **Library** row ("396 bundled, 0 custom, 2 failed to load"), since the list is folded away.
+- The rows inside an expander are inset 32 px, not the toolkit's 58, which leaves room for an icon this window doesn't have.
+
+**Renamed** (the UI Automation names of the controls are in brackets where they differ from the label, for test scripts):
+
+| Before | Now |
+| ------ | --- |
+| Open now, button **Open** | Open the visualizer, button **Open now** |
+| On battery: start after idle / keep screen awake | Start after idle / Keep screen awake, inside the battery row (pickers still named "On battery: …") |
+| Seconds per preset, "30" | Time per preset, "30 s", "2 min" |
+| Last shown, two icon buttons | The buttons say **Favorite** and **Block** |
+| Import…, button **Import** | Import presets, button **Import…** |
+| Folder, button **Open** | Presets folder, button **Open folder** |
+| Rescan, button **Reload** | Reload presets |
+| Audio delay slider on the row | Audio delay shows the value; **Set by hand** has the slider |
+| Detect delay | Detect with the microphone (button "Detect delay") |
+| Spotify overlay on | Show it on (picker "Spotify overlay on") |
+| Other displays: "1 of 2" | "1 of 2 displays" |
+
+**Chosen here without asking the owner:**
+
+- The wording of every renamed row above, and the new short descriptions ("The fade between presets", "Never shown in Shuffle", "Where custom presets are kept", "After changing files in the folder").
+- **Open now** is a card at the top of the page with an accent button, and scrolls with the page.
+- **Mode** swaps its rows instead of greying them out, and starts open.
+- The overlay's display picker moved from Displays to the overlay row under Look.
+- The trust warning is only seen with **Library** open, where the import rows are. Before, it was always on the page.
+- The **Placement** choices and the **Shuffle from** names are as before.
+
+**Seen when checking** (Debug build on the owner's PC, driven through UI Automation, the window captured from the screen):
+
+| Case | Result |
+| --- | --- |
+| The window as it opens, 440 × 680 | Open now, Opening, Look and the start of Presets fit without scrolling |
+| Dragged to 1380 tall by `SetWindowPos` | The width stayed 440; everything down to Keys fits |
+| Each expander opened | Rows inset under their parent; no label wraps; the delay slider runs the row's width |
+| `--pretend-battery` | The battery row appears, with its two rows greyed out while the switch is off |
+| **Use more than one display** turned on, then off | The row opened, the warning showed inside it and the three rows became usable; off greyed them out and closed the warning |
+| Overlay on, multi-display off | **Show it on** greyed out with "Multi-display only" |
+
+**Not tried:** dragging the window's edge by hand, the Single mode rows, the **Failed to load** rows (no file failed on this PC), the dialogs opened from the new rows, a display with another scale, and the installed Release copy.

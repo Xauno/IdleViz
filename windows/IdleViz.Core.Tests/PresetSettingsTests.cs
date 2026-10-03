@@ -143,6 +143,14 @@ public sealed class PresetSettingsTests
     [InlineData(1, "1 s")]
     [InlineData(2.7, "2.7 s")]
     public void BlendLabel(double seconds, string label) => Assert.Equal(label, PresetSettings.BlendLabel(seconds));
+
+    [Theory]
+    [InlineData(15, "15 s")]
+    [InlineData(45, "45 s")]
+    [InlineData(60, "1 min")]
+    [InlineData(90, "90 s")]
+    [InlineData(300, "5 min")]
+    public void SecondsLabel(int seconds, string label) => Assert.Equal(label, PresetSettings.SecondsLabel(seconds));
 }
 
 public sealed class PresetInfoTests

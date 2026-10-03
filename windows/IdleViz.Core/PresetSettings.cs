@@ -171,6 +171,10 @@ public sealed class PresetSettings
         _ => null,
     };
 
+    /// <summary>"30 s", "2 min". Whole minutes are shown as minutes.</summary>
+    public static string SecondsLabel(int seconds) =>
+        seconds >= 60 && seconds % 60 == 0 ? $"{(seconds / 60).ToString(CultureInfo.InvariantCulture)} min" : $"{seconds.ToString(CultureInfo.InvariantCulture)} s";
+
     /// <summary>"0 s", "2.7 s".</summary>
     public static string BlendLabel(double seconds) => $"{seconds.ToString("0.#", CultureInfo.InvariantCulture)} s";
 
