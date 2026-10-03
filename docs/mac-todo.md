@@ -2,7 +2,7 @@
 
 The Windows app has two things the Mac app doesn't have yet. Both were built and checked on Windows only. This file is the brief for the session on a Mac that brings them over. Delete each part once its PR is merged, and the file when it is empty.
 
-Before either: [project.md](../project.md) is the Mac plan, [mockups.html](../mockups.html) the Mac UI reference, and [AGENTS.md](../AGENTS.md) the rules (ask before any judgement call; one PR per step, with tests; update the README). The owner also wants the delay line frame drop fixed first if it isn't yet (PR 47, `fix/mac-delay-line-drops`).
+Before either: [project.md](../project.md) is the Mac plan, [mockups.html](../mockups.html) the Mac UI reference, and [AGENTS.md](../AGENTS.md) the rules (ask before any judgement call; one PR per step, with tests; update the README). The delay line frame drop is fixed in code (PR 47, merged without a run on a Mac); the owner wants it tested on the Mac before anything else.
 
 Where the Windows version made a choice "without asking the owner", it is listed in [windows.md](windows.md) under that heading. Don't carry those over silently: ask the owner whether the Mac should do the same.
 
