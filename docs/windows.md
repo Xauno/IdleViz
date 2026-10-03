@@ -227,6 +227,7 @@ In `IdleViz.Core`: `DismissTracker.cs` (ported with its tests), `KeyboardInput.c
 | `--show-settings` | Opens the settings window. |
 | `--show-flyout` | Opens the tray flyout. |
 | `--show-menu` | Opens the tray menu at the pointer. |
+| `--hang-page` | Makes the page loop forever 5 s after each open, to try the stuck-page recovery (W7a). First launch only. |
 
 **A second launch** with no URL (clicking the Start menu entry while it runs) opens the settings window, since there is no other window to bring forward. This was not asked; it is the usual behaviour of a Windows tray app.
 
@@ -307,7 +308,7 @@ The visualizer window now holds the shared page in WebView2, with the Spotify ov
 
 **What the page can't do.** Web messages and host objects are off, so the page has no way to call the app. Every permission request (microphone, camera and the rest) is denied, and so are new windows and downloads. The top frame may only show the app's own pages, and frames only those or `about:blank`. Context menus, zoom, the status bar, browser shortcut keys, autofill and script dialogs are off. DevTools are on in Debug builds only.
 
-**Loading.** The page loads at launch into the hidden window, so the first open shows it at once. After the navigation completes, the app asks every 50 ms (for up to 10 s) whether `nowPlaying`, `setPresetSettings` and `setCustomPresets` exist, and only then sends the overlay its data, as on the Mac. If the renderer crashes or hangs, the page is loaded again; if the whole browser process goes, a new WebView2 is made. (Replacing a page stuck in a plugin's endless loop, with the status checks, is W7a.)
+**Loading.** The page loads at launch into the hidden window, so the first open shows it at once. After the navigation completes, the app asks every 50 ms (for up to 10 s) whether `nowPlaying`, `setPresetSettings` and `setCustomPresets` exist, and only then sends the overlay its data, as on the Mac. If the renderer crashes or hangs, the page is loaded again; if the whole browser process goes, a new WebView2 is made. (Replacing a page stuck in a plugin's endless loop came with the status checks in W7a, below.)
 
 **While hidden** the page is not visible and is suspended. Measured: the app and its WebView2 processes used 0.2 % of one core over 10 s between opens, and about 410 MB of memory together.
 
@@ -357,3 +358,48 @@ Each skip is logged in category `idle` with its reason ("powershell is playing s
 Not tried by hand: locking (the script can't unlock again), Remote Desktop, a fullscreen app and presentation mode. They are unit-tested against the shell's and the session's values.
 
 **Not yet:** battery times (W8a, they change the timeout on battery), and waiting for input after the keep-awake limit (W8a; `IdleWatcher.WaitForInput` is there for it).
+
+### W7a: Spotify's audio and the stuck page
+
+The visuals now move to Spotify's sound, and a page that stops answering is replaced.
+
+| File | What it does |
+| ---- | ------------ |
+| `IdleViz.Core/AudioAnalyzer.cs`, `AutoGain.cs`, `AudioFrame.cs`, `SampleRing.cs`, `TapHealth.cs` | Ported from the Swift files of the same names: automatic gain, the 64-band spectrum, Butterchurn's byte arrays and the packed frame the page unpacks. Apple's vDSP FFT is replaced by a plain radix-2 FFT, scaled to give the same values; a test checks it against the direct sum. |
+| `IdleViz.Core/PageStatus.cs` | Reads `window.idlevizStatus()` as untrusted JSON (depth, counts and text lengths capped), and `PageWatchdog`. Ported from `PageStatus.swift`. |
+| `IdleViz.Core/CustomPresetPayload.cs` | What `setCustomPresets` gets. For now only the list of presets that hung the page; the custom folder and plugins fill it in W7c. |
+| `IdleViz.Core/SpotifyProcess.cs` | Which process to capture: the top of Spotify's process tree. |
+| `IdleViz.App/SpotifyCapture.cs` | Process loopback on that tree, on its own thread. Plays the part of `SpotifyAudioTap.swift`. |
+| `IdleViz.App/AudioPump.cs` | 60 frames a second while the window is open. Ported from `AudioPump.swift`. |
+| `IdleViz.App/PageView.cs` | Sends the frames, asks the page for its status once a second, and replaces it when it stops answering. |
+
+**Capture.** As the W2 spike found: `ActivateAudioInterfaceAsync` on `VAD\Process_Loopback`, "include the process tree", 32-bit float, 48 kHz, stereo, event-driven, 10 ms packets. The target is the `Spotify.exe` whose parent isn't a `Spotify.exe` (the spike used the one with the main window, which a Spotify closed to the tray may not have; not tried); should there be two, the one with more Spotify children. While Spotify isn't running it looks again every 2 s, and once a second it checks the captured process still runs, so a Spotify that quits and starts again is followed (seen: back 4 s after the restart). Packets Windows flags as silent go into the ring as zeros. The capture runs only while the window is open, and starts in about 30 ms. Nothing needs a permission, and no recording indicator appears.
+
+**Frames.** A thread wakes 60 times a second on a high-resolution waitable timer (the ordinary timers tick every 15.6 ms, which can't make 60 even frames; the spike's busy-wait used a core), takes the newest 1024 samples, analyses them and posts the frame's script to the UI thread, which hands it to the page. A frame is dropped rather than queued when two are already waiting on the UI thread or two are already in the page, as on the Mac. The first frame after an open is silence, so the page never starts from the last open's sound. While Spotify says it's playing but 5 s in a row bring only silence, the log says so once: Spotify is playing on another device or is muted in the Windows mixer. (On the Mac the same sign means System Audio Recording isn't allowed; Windows has no such permission.)
+
+**Status checks.** While the window is open the app asks `window.idlevizStatus()` once a second. Each new preset on screen and each newly failed preset is logged. If no answer has come for 3 s, the page is replaced:
+
+1. Every renderer process of IdleViz's own WebView2 environment is ended. A renderer stuck in a loop otherwise keeps a core busy.
+2. The WebView is closed and a new one is made and loads the page, then gets the state again.
+3. The preset that was on screen goes into the `hung` list sent with `setCustomPresets`. The page shows it as "Stopped responding" and doesn't show it again until IdleViz restarts.
+
+Reloading the old WebView instead does not work: after its renderer was ended, WebView2 124 never reported the crash, and navigating it again crashed the app (an access violation in the runtime). A new WebView avoids both. Seen with `--hang-page`: the page froze, was replaced 4 s later, the new page was ready 0.5 s after that and drew 60 frames a second with audio again.
+
+**Chosen here without asking the owner** (they asked for the build to keep going):
+
+- The target process is found by parent, not by main window, so a Spotify in the tray is captured too.
+- The high-resolution timer instead of the spike's busy-wait.
+- A frame is dropped when two are waiting on the UI thread, on top of the Mac's two-in-the-page rule.
+- The hung list lives in the page view until W7c gives it a home in the preset library.
+
+**Seen when checking** (Debug build, Spotify 1.301 from the Store, idle trigger off for the test):
+
+| Case | Result |
+| --- | --- |
+| Spotify playing, window open 12 s | 724 frames sent in 12 s, none dropped; the page drew 660 frames in 11 s and got 660 audio frames; gain 5.7 (a low Spotify volume) |
+| Spotify paused, a 440 Hz tone from another program | 801 packets captured, all silent; loudest level 0. The visuals hear only Spotify |
+| Spotify quit and restarted while open | "Spotify (2588) quit", "Spotify isn't running; sending silence", then "Capturing Spotify (21516)" 4 s later |
+| `--hang-page` | Replaced 4 s after the hang, ready 0.5 s later, the frozen preset listed as "Stopped responding" |
+| Cost while open, 20 s | The app 6.6 % of one core, its WebView2 processes 26.9 %, as the spike measured |
+
+**Not yet:** the audio delay (W7d), and the "Spotify audio can't be captured" warning in the tray (W8b); a failed capture is only logged for now.

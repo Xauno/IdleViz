@@ -20,12 +20,13 @@ public class LaunchOptionsTests
     [Fact]
     public void ReadsTheDebugSwitches()
     {
-        var options = LaunchOptions.Parse(["--no-dismiss", "--SHOW-SETTINGS", "--open-at-launch", "--show-flyout", "--show-menu"]);
+        var options = LaunchOptions.Parse(["--no-dismiss", "--SHOW-SETTINGS", "--open-at-launch", "--show-flyout", "--show-menu", "--hang-page"]);
         Assert.True(options.ShowFlyout);
         Assert.True(options.ShowMenu);
         Assert.True(options.NoDismiss);
         Assert.True(options.ShowSettings);
         Assert.True(options.OpenAtLaunch);
+        Assert.True(options.HangPage);
         Assert.Null(options.Command);
     }
 
