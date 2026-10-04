@@ -165,7 +165,7 @@ There is no track ID or Spotify URL, so a track change has to be recognised from
 - `IdleViz.Core` starts with `Fade.cs` (`CloseReason`, the fade times) and `Trigger.cs` (`TriggerSource`, the `idleviz://` commands), ported from the Swift files of the same names with their tests. The URL parser takes text, not a URL object, because Windows hands the protocol URL over as a command-line argument that may be anything.
 - The app is a tray icon and nothing else: tooltip "IdleViz", and a right-click menu with **Exit**. It has no window, flyout, hotkey or visualizer yet.
 - The right-click menu is the native Windows popup menu. The library's XAML menu needs a window to live in, and the app has none.
-- The setup file is about 62 MB and installs about 234 MB, because the .NET runtime and the Windows App SDK are inside it.
+- The setup file is about 49 MB and installs about 189 MB, because the .NET runtime and the Windows App SDK are inside it. It was 64 MB and 240 MB before the unused parts were left out; see [The setup file, trimmed](#the-setup-file-trimmed).
 
 ### W1: open/close shell
 
@@ -797,3 +797,23 @@ Not a step of the brief: the owner found the window clunky after W9. It had abou
 | Overlay on, multi-display off | **Show it on** greyed out with "Multi-display only" |
 
 **Not tried:** dragging the window's edge by hand, the Single mode rows, the **Failed to load** rows (no file failed on this PC), the dialogs opened from the new rows, a display with another scale, and the installed Release copy.
+
+### The setup file, trimmed
+
+Nothing in the setup file is Mac-only: it holds the published Windows app, and of the shared files only `IdleViz/web/`, which the app needs. Its size is the .NET runtime and the Windows App SDK. Two parts of the SDK that the app never uses are left out, which took the setup file from 64 to 49 MB and the installed folder from 240 to 189 MB.
+
+| Left out | How | Saved, installed |
+| -------- | --- | ---------------- |
+| The on-device AI parts: `onnxruntime.dll`, `DirectML.dll`, `Microsoft.Windows.AI.*` and the semantic index | `IdleViz.App.csproj` names `Microsoft.WindowsAppSDK.AI`, `Microsoft.WindowsAppSDK.ML` and `Microsoft.Windows.AI.MachineLearning` with `ExcludeAssets="all"`. They can't simply be dropped, because `Microsoft.WindowsAppSDK` and the two UI packages ask for them. | about 50 MB |
+| WinUI's own texts in 85 languages (`de-DE\Microsoft.ui.xaml.dll.mui` and so on) | The `KeepOnlyEnglishWinUITexts` target in `IdleViz.App.csproj` puts them on the SDK's own exclusion list, `MicrosoftWindowsAppSDKFilesExcluded`. `en-us` stays. | about 3 MB |
+
+- The three AI packages have their versions in `Directory.Packages.props`. They have to be the versions `Microsoft.WindowsAppSDK` asks for; when that package is updated, a lower version here fails the restore with a downgrade error, and the three are raised to match.
+- The texts are what WinUI's standard controls say themselves: the names a screen reader reads for them and the cut, copy and paste menu of a text box. On a PC set to another language these are now in English, like everything else in the app.
+- `installer/test-installer.ps1` checks after the first install that neither part is in the folder, so an SDK update that brings them back fails CI.
+- Checked on the test PC with the trimmed build installed over the old one: the app starts, the page loads its presets, the visualizer opens from `idleviz://open` and captures Spotify, and the settings window opens (a Debug build with `--show-settings`, rebuilt from nothing so it has the same files).
+
+**Chosen here without asking the owner** (they were away and asked for no questions):
+
+- Only `en-us` is kept, rather than a handful of common languages.
+- The AI parts are kept out through the package references rather than by deleting files after the publish, so the app's manifest doesn't list files that aren't there.
+- `Microsoft.WindowsAppSDK.Search` and `Microsoft.WindowsAppSDK.Widgets` (about 6 MB installed) are also unused but were not part of what was agreed, so they stay.

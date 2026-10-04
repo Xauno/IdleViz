@@ -29,6 +29,12 @@
     <PackageReference Include="H.NotifyIcon.WinUI" />
     <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
     <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <!-- The on-device AI parts of the Windows App SDK, which the app never calls. Named here only to
+         keep them out of the app folder: about 50 MB, most of it onnxruntime.dll and DirectML.dll.
+         Their versions in Directory.Packages.props are the ones Microsoft.WindowsAppSDK asks for. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.AI" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.ML" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Windows.AI.MachineLearning" ExcludeAssets="all" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -40,5 +46,13 @@
     <!-- The page, shared with the Mac app. It is served from the "web" folder next to the exe. -->
     <Content Include="..\..\IdleViz\web\**\*" Link="web\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!-- WinUI brings its own texts (the names screen readers say for controls, the text box menu) in
+       86 languages, one folder each. The app is in English only, so only en-us is kept. -->
+  <Target Name="KeepOnlyEnglishWinUITexts" BeforeTargets="AddMicrosoftWindowsAppSDKPayloadFilesFromComponents" DependsOnTargets="GetWindowsAppSDKNativePlatform">
+    <ItemGroup>
+      <MicrosoftWindowsAppSDKFilesExcluded Include="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\**\*.mui" Exclude="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\en-us\*.mui" />
+    </ItemGroup>
+  </Target>
 
 </Project>
