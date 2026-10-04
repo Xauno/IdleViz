@@ -48,6 +48,11 @@ Write-Host 'First install, default options, into a chosen folder'
 Invoke-Setup @("/DIR=`"$installDir`"")
 Assert-That (Test-Path $exe) 'the app is in the chosen folder'
 Assert-That (Test-Path (Join-Path $installDir 'IdleViz.pri')) 'the compiled XAML is there'
+# The parts of the Windows App SDK the app doesn't use (see IdleViz.App.csproj). An SDK update can bring them back.
+$aiFiles = @(Get-ChildItem $installDir -File | Where-Object Name -Match '^(onnxruntime|DirectML|Microsoft\.Windows\.AI\.)')
+Assert-That ($aiFiles.Count -eq 0) "the unused AI libraries are left out (found: $($aiFiles.Name -join ', '))"
+$textFolders = @(Get-ChildItem $installDir -Recurse -Filter '*.mui' | ForEach-Object { $_.Directory.Name } | Sort-Object -Unique)
+Assert-That (($textFolders -join ',') -eq 'en-us') "WinUI's texts are there in English only (found: $($textFolders -join ', '))"
 Assert-That (Test-Path $startMenuShortcut) 'there is a Start menu entry'
 Assert-That (-not (Test-Path $desktopShortcut)) 'there is no desktop shortcut'
 Assert-That ((Get-StartupCommand) -eq "`"$exe`"") 'it runs at startup'
