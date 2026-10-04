@@ -189,14 +189,18 @@ A Windows 11 version is in [`windows/`](windows/): the same page in WebView2, wi
 
 **Requirements:** Windows 11. To build: the .NET 10 SDK and [Inno Setup 6](https://jrsoftware.org/isinfo.php).
 
-**Install:** there is no download. In PowerShell, from the repo:
+**Install:** download `IdleViz-Setup.exe` from the [Releases page](https://github.com/Xauno/IdleViz/releases) and run it. Each version tag gets a release with the setup file; until the first tag is pushed the page is empty, and you build it yourself as below. The setup file isn't signed, so Windows SmartScreen warns about a downloaded one: choose **More info**, then **Run anyway**.
+
+The wizard has a welcome page, the license, the install folder and three options: **Start menu entry** (ticked), **Desktop shortcut** (not ticked) and **Run at startup** (ticked). It installs for your user only, in `%LOCALAPPDATA%\Programs\IdleViz` unless you pick another folder, so there is no admin prompt. Running a newer setup file updates the installed copy in its folder, without asking for the folder again, and **Run at startup** then starts as the switch in IdleViz's settings last left it. Uninstall from **Settings → Apps → Installed apps**.
+
+To build it yourself, in PowerShell, from the repo:
 
 ```powershell
 cd windows
 .\build-installer.ps1 -Install
 ```
 
-This builds the app and `windows\artifacts\IdleViz-Setup.exe`, runs it without questions, and starts IdleViz. It installs for your user only, in `%LOCALAPPDATA%\Programs\IdleViz`, so there is no admin prompt, and adds a Start menu entry. Run it again after pulling changes to update. Without `-Install` it only builds the setup file, which you can run yourself. Uninstall from **Settings → Apps → Installed apps**.
+This builds the app and `windows\artifacts\IdleViz-Setup.exe`, runs it without questions (so with the options as ticked above, or as they were at the last install), and starts IdleViz. Run it again after pulling changes to update. Without `-Install` it only builds the setup file, which you can run yourself to get the wizard.
 
 **Use:** what works so far.
 

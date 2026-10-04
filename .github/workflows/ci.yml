@@ -109,6 +109,11 @@ jobs:
         shell: pwsh
         run: ./build-installer.ps1
 
+      # Installs, updates and uninstalls on the runner, and checks the files, shortcuts and registry.
+      - name: Test installer
+        shell: pwsh
+        run: ./installer/test-installer.ps1
+
   # One stable check name for branch protection, so adding or renaming jobs never needs a settings change.
   ci-passed:
     name: CI passed
