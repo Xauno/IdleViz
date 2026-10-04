@@ -32,7 +32,7 @@ Where the Windows version made a choice "without asking the owner", it is listed
 - **The stuck page.** On Windows, replacing a stuck page ends every renderer, so the mirrors are remade too. WKWebView has a process per web view, so this may not apply; check before porting it.
 - **Keep awake, sleep and display changes** already close the visualizer; check they close every window.
 
-The README says "Not built on the Mac: more than one display" in the Mac section and lists it under Planned. Change both when this is done.
+The README says the Mac app uses the main display only in its status note, in the "macOS and Windows compared" table and under "On the Mac" in Usage, and lists it under Planned. Change all four when this is done.
 
 ## 2. The settings window, regrouped
 
