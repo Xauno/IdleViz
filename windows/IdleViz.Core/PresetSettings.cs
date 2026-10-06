@@ -72,13 +72,19 @@ public sealed class PresetSettings
     /// </summary>
     public string FollowScript(string preset) => ScriptFor(PresetMode.Single, preset);
 
-    private string ScriptFor(PresetMode mode, string single)
+    /// <summary>
+    /// The call for a preview from the Favorites or Blocklist dialog: held on that one preset, and
+    /// with no blend, so the visualizer opens on it instead of fading to it from the last one.
+    /// </summary>
+    public string PreviewScript(string preset) => ScriptFor(PresetMode.Single, preset, blendSeconds: 0);
+
+    private string ScriptFor(PresetMode mode, string single, double? blendSeconds = null)
     {
         // Sorted keys, as the Mac sends them. The default encoder escapes quotes, backslashes, "<" and
         // every non-ASCII character (U+2028 and U+2029 included), so preset names can't break out.
         var json = new JsonObject
         {
-            ["blendSeconds"] = BlendSeconds,
+            ["blendSeconds"] = blendSeconds ?? BlendSeconds,
             ["blocked"] = new JsonArray([.. _blocked.Select(id => (JsonNode)JsonValue.Create(id))]),
             ["favorites"] = new JsonArray([.. _favorites.Select(id => (JsonNode)JsonValue.Create(id))]),
             ["mode"] = Name(mode),

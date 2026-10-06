@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+  x:Class="IdleViz.App.PresetPickerDialog"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  Title="Visualizer"
+  CloseButtonText="Done"
+  DefaultButton="Close">
+
+  <Grid Width="320" Height="400" RowSpacing="8">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <AutoSuggestBox
+      x:Name="SearchBox"
+      AutomationProperties.Name="Search"
+      PlaceholderText="Search"
+      QueryIcon="Find"
+      TextChanged="OnSearchChanged" />
+
+    <!-- A plain list of names, which the list can virtualize: there are a few hundred. -->
+    <ListView
+      x:Name="Rows"
+      Grid.Row="1"
+      Padding="0"
+      AutomationProperties.Name="Visualizer"
+      SelectionChanged="OnSelectionChanged"
+      SelectionMode="Single">
+      <ListView.ItemTemplate>
+        <DataTemplate x:DataType="x:String">
+          <TextBlock Text="{x:Bind}" TextTrimming="CharacterEllipsis" />
+        </DataTemplate>
+      </ListView.ItemTemplate>
+    </ListView>
+
+    <TextBlock
+      x:Name="EmptyText"
+      Grid.Row="1"
+      HorizontalAlignment="Center"
+      VerticalAlignment="Center"
+      Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+      Text="No presets match."
+      Visibility="Collapsed" />
+  </Grid>
+</ContentDialog>

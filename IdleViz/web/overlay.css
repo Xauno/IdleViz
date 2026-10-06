@@ -280,6 +280,27 @@ body {
   width: calc(var(--region-width) * 0.03125);
   height: calc(var(--region-width) * 0.03125);
 }
+/* The name of the preset on screen, for the "Show visualizer title" setting. Kept small: about
+   21px on a 3440px display, and never under 12px. */
+.preset-title {
+  position: absolute;
+  top: calc(var(--region-width) * 0.012);
+  left: calc(var(--region-width) * 0.012);
+  max-width: 60%;
+  font-family: var(--overlay-font);
+  font-size: max(12px, calc(var(--region-width) * 0.006));
+  font-weight: 600;
+  color: rgb(255 255 255 / 85%);
+  text-shadow: 0 1px 6px rgb(0 0 0 / 70%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity var(--fade) ease;
+}
+.preset-title.shown {
+  opacity: 1;
+}
 @keyframes like-pop {
   0% {
     opacity: 0;

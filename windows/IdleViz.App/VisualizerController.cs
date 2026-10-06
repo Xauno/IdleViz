@@ -76,10 +76,10 @@ internal sealed class VisualizerController : IDisposable
 
     private IEnumerable<VisualizerWindow> AllWindows => [_window, .. _mirrors.Select(mirror => mirror.Window)];
 
-    /// <summary>The like and skip keys. Read each time the window opens.</summary>
-    public Func<VisualizerKeys> Keys { get; set; } = () => new VisualizerKeys(null, null);
+    /// <summary>The like, skip and block keys. Read each time the window opens.</summary>
+    public Func<VisualizerKeys> Keys { get; set; } = () => new VisualizerKeys(null, null, null);
 
-    /// <summary>Raised when the like or the skip key is pressed while the window is open.</summary>
+    /// <summary>Raised when the like, skip or block key is pressed while the window is open.</summary>
     public event Action<VisualizerAction>? KeyPressed;
 
     /// <summary>Raised when the window has opened.</summary>

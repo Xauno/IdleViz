@@ -120,6 +120,17 @@ export function clampBrightness(value) {
   return Math.min(Math.max(value, 0.5), 1);
 }
 
+const MAX_TITLE_LENGTH = 200;
+
+/**
+ * The preset's name as the corner title shows it: trimmed and cut to a sane length, or empty for
+ * anything that isn't text. The name comes from a preset file, so it isn't trusted.
+ * @param {unknown} value
+ */
+export function presetTitle(value) {
+  return typeof value === "string" ? value.trim().slice(0, MAX_TITLE_LENGTH) : "";
+}
+
 /** The overlay is laid out on a stage this wide and scaled to the display. */
 export const STAGE_WIDTH = 1920;
 const MAX_REGIONS = 16;

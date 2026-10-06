@@ -72,6 +72,24 @@ public sealed class DisplaySettingsTests : IDisposable
     }
 
     [Fact]
+    public void ThePresetTitleIsOffUnlessSwitchedOn()
+    {
+        var settings = Store;
+        Assert.False(PresetTitleSetting.Value(settings));
+        settings.SetBool(PresetTitleSetting.Key, true);
+        Assert.True(PresetTitleSetting.Value(settings));
+        settings.SetString(PresetTitleSetting.Key, "yes");
+        Assert.False(PresetTitleSetting.Value(settings));
+    }
+
+    [Fact]
+    public void PresetTitleScript()
+    {
+        Assert.Equal("window.setPresetTitleEnabled?.(true)", PresetTitleSetting.Script(true));
+        Assert.Equal("window.setPresetTitleEnabled?.(false)", PresetTitleSetting.Script(false));
+    }
+
+    [Fact]
     public void OverlayScript()
     {
         Assert.Equal("window.setOverlayEnabled?.(true)", OverlaySetting.Script(true));

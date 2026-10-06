@@ -13,6 +13,9 @@ internal sealed class PresetController
     private readonly SettingsStore _store;
     private Dictionary<string, string> _names = new(StringComparer.Ordinal);
 
+    // The preset a preview holds the page on, or null.
+    private string? _preview;
+
     public PresetController(PageView page, SettingsStore store, PresetLibrary library)
     {
         _page = page;
@@ -84,7 +87,27 @@ internal sealed class PresetController
 
     public string Name(string id) => _names.TryGetValue(id, out var name) ? name : PresetInfo.FallbackName(id);
 
-    /// <summary>Runs the like or skip key.</summary>
+    /// <summary>
+    /// Holds the page on one preset, whatever the controls say, until <see cref="EndPreview"/>. The
+    /// stored controls don't change.
+    /// </summary>
+    public void Preview(string id)
+    {
+        _preview = id;
+        Send();
+    }
+
+    /// <summary>Hands the page back to the stored controls after a preview.</summary>
+    public void EndPreview()
+    {
+        if (_preview is not null)
+        {
+            _preview = null;
+            Send();
+        }
+    }
+
+    /// <summary>Runs the like, skip or block key.</summary>
     public async void Perform(VisualizerAction action)
     {
         if (action == VisualizerAction.Skip)
@@ -96,6 +119,16 @@ internal sealed class PresetController
         // LastShown can be a second behind, so ask the page what is on screen right now.
         if (await _page.CurrentPreset() is not { } id)
         {
+            return;
+        }
+
+        if (action == VisualizerAction.Block)
+        {
+            // Shuffle would leave a blocked preset by itself, but over the whole blend time. Skipping
+            // first moves on as fast as the skip key does. Single mode has nowhere to move on to.
+            _page.SkipPreset();
+            Update(settings => settings.SetBlocked(id, true));
+            Log.Info("presets", $"Blocked {id}");
             return;
         }
 
@@ -116,7 +149,9 @@ internal sealed class PresetController
         }
 
         Settings.Save(_store);
-        _page.SendPresetSettings(Settings);
+        Send();
         Changed?.Invoke();
     }
+
+    private void Send() => _page.SendPresetSettings(Settings, _preview is { } id ? Settings.PreviewScript(id) : null);
 }

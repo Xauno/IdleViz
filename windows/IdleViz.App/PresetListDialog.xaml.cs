@@ -8,22 +8,27 @@ namespace IdleViz.App;
 
 /// <summary>
 /// The Favorites or Blocklist dialog: one tab lists the presets on the list, where they can be
-/// removed, the other every preset with a search box, where they can be added. Ported from
-/// <c>PresetListSheet</c> in <c>PresetControls.swift</c>.
+/// removed, the other every preset, where they can be added. Both have the search box, and every
+/// row a button that opens the visualizer on that preset. Ported from <c>PresetListSheet</c> in
+/// <c>PresetControls.swift</c>.
 /// </summary>
 public sealed partial class PresetListDialog : ContentDialog
 {
     private readonly PresetList _list;
     private readonly PresetController _presets;
+    private readonly Action<string> _preview;
     private readonly ObservableCollection<PresetRow> _rows = [];
 
-    internal PresetListDialog(PresetList list, PresetController presets)
+    /// <param name="list">Favorites or Blocklist.</param>
+    /// <param name="presets">The preset controls.</param>
+    /// <param name="preview">Opens the visualizer on a preset.</param>
+    internal PresetListDialog(PresetList list, PresetController presets, Action<string> preview)
     {
         _list = list;
         _presets = presets;
+        _preview = preview;
         InitializeComponent();
         Title = list.Title();
-        EmptyText.Text = list.EmptyText();
         Rows.ItemsSource = _rows;
         ShowRows();
     }
@@ -34,29 +39,31 @@ public sealed partial class PresetListDialog : ContentDialog
     {
         var ids = _list.Ids(_presets.Settings);
         ListedTab.Text = $"On the list ({ids.Count})";
-        SearchBox.Visibility = ShowingAll ? Visibility.Visible : Visibility.Collapsed;
+        // A preset on the list may be gone from the library, so those rows are made from the ids.
+        var source = ShowingAll
+            ? _presets.Presets
+            : [.. ids.Select(id => new PresetInfo(id, _presets.Name(id), id.StartsWith("custom:", StringComparison.Ordinal) ? "custom" : "bundled"))];
         _rows.Clear();
-        if (ShowingAll)
+        foreach (var preset in PresetLists.Search(source, SearchBox.Text))
         {
-            foreach (var preset in PresetLists.Search(_presets.Presets, SearchBox.Text))
-            {
-                _rows.Add(new PresetRow(preset.Id, preset.Name, preset.IsCustom, ids.Contains(preset.Id), _list));
-            }
-        }
-        else
-        {
-            foreach (var id in ids)
-            {
-                _rows.Add(new PresetRow(id, _presets.Name(id), id.StartsWith("custom:", StringComparison.Ordinal), listed: true, _list));
-            }
+            _rows.Add(new PresetRow(preset.Id, preset.Name, preset.IsCustom, ids.Contains(preset.Id), _list));
         }
 
-        EmptyText.Visibility = !ShowingAll && ids.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyText.Text = !ShowingAll && ids.Count == 0 ? _list.EmptyText() : "No presets match.";
+        EmptyText.Visibility = _rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnTabChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args) => ShowRows();
 
-    private void OnSearchChanged(object sender, TextChangedEventArgs e) => ShowRows();
+    private void OnSearchChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args) => ShowRows();
+
+    private void OnPreviewClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: PresetRow row })
+        {
+            _preview(row.Id);
+        }
+    }
 
     private void OnRowClick(object sender, RoutedEventArgs e)
     {
@@ -120,6 +127,8 @@ public sealed partial class PresetRow : INotifyPropertyChanged
     }
 
     public string ButtonText => Listed ? "Remove" : "Add";
+
+    public string PreviewLabel => $"Preview {Name}";
 
     /// <summary>What a screen reader says: "Remove Geiss - Swirlie 5 from favorites".</summary>
     public string ButtonLabel => Listed

@@ -74,6 +74,7 @@ internal sealed class PageView : IDisposable
     private string _audioDelayScript = AudioDelaySetting.Script(0);
     private string _brightnessScript = BrightnessSetting.Script(BrightnessSetting.DefaultValue);
     private string _overlayEnabledScript = OverlaySetting.Script(true);
+    private string _presetTitleScript = PresetTitleSetting.Script(false);
 
     /// <summary>Which displays the window covers, replayed the same way. Empty until the window first opens.</summary>
     private string _layoutScript = string.Empty;
@@ -168,6 +169,7 @@ internal sealed class PageView : IDisposable
         mirror._audioDelayScript = _audioDelayScript;
         mirror._brightnessScript = _brightnessScript;
         mirror._overlayEnabledScript = _overlayEnabledScript;
+        mirror._presetTitleScript = _presetTitleScript;
         _mirrors.Add(mirror);
     }
 
@@ -258,10 +260,12 @@ internal sealed class PageView : IDisposable
     }
 
     /// <summary>Hands the preset controls to the page, which applies them at once.</summary>
-    public void SendPresetSettings(PresetSettings settings)
+    /// <param name="settings">The controls.</param>
+    /// <param name="script">The call to send in place of the controls' own, for a preview held on one preset.</param>
+    public void SendPresetSettings(PresetSettings settings, string? script = null)
     {
         _presetSettings = settings;
-        _presetSettingsScript = settings.Script;
+        _presetSettingsScript = script ?? settings.Script;
         Run(_presetSettingsScript);
         SendMirrorPreset();
     }
@@ -296,6 +300,17 @@ internal sealed class PageView : IDisposable
         foreach (var mirror in _mirrors)
         {
             mirror.SendOverlayEnabled(enabled);
+        }
+    }
+
+    /// <summary>Shows or hides the name of the preset on screen, in the top left corner.</summary>
+    public void SendPresetTitleEnabled(bool enabled)
+    {
+        _presetTitleScript = PresetTitleSetting.Script(enabled);
+        Run(_presetTitleScript);
+        foreach (var mirror in _mirrors)
+        {
+            mirror.SendPresetTitleEnabled(enabled);
         }
     }
 
@@ -573,6 +588,7 @@ internal sealed class PageView : IDisposable
                 Run(_audioDelayScript);
                 Run(_brightnessScript);
                 Run(_overlayEnabledScript);
+                Run(_presetTitleScript);
                 Run(_layoutScript);
                 Run(_nowPlayingScript);
                 FetchPresetList();

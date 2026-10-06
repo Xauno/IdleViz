@@ -1,8 +1,8 @@
 # To do on the Mac
 
-The Windows app has two things the Mac app doesn't have yet. Both were built and checked on Windows only. This file is the brief for the session on a Mac that brings them over. Delete each part once its PR is merged, and the file when it is empty.
+The Windows app has three things the Mac app doesn't have yet. All were built and checked on Windows only. This file is the brief for the session on a Mac that brings them over. Delete each part once its PR is merged, and the file when it is empty.
 
-Before either: [project.md](../project.md) is the Mac plan, [mockups.html](../mockups.html) the Mac UI reference, and [AGENTS.md](../AGENTS.md) the rules (ask before any judgement call; one PR per step, with tests; update the README). The delay line frame drop is fixed in code (PR 47, merged without a run on a Mac); the owner wants it tested on the Mac before anything else.
+Before any of them: [project.md](../project.md) is the Mac plan, [mockups.html](../mockups.html) the Mac UI reference, and [AGENTS.md](../AGENTS.md) the rules (ask before any judgement call; one PR per step, with tests; update the README). The delay line frame drop is fixed in code (PR 47, merged without a run on a Mac); the owner wants it tested on the Mac before anything else.
 
 Where the Windows version made a choice "without asking the owner", it is listed in [windows.md](windows.md) under that heading. Don't carry those over silently: ask the owner whether the Mac should do the same.
 
@@ -70,3 +70,17 @@ The Mac window (`IdleViz/App/SettingsWindow.swift`, `PresetControls.swift`, and 
 - Do part 1 first or leave the Displays section out until it exists.
 
 Update the Mac parts of the README (Features, Usage) to the new section and row names when this is done.
+
+## 3. Recorded keys, the block key, preset search and preview, the visualizer title
+
+**What it is:** [windows.md, "Keys, preset search and preview, close on input, visualizer title"](windows.md#keys-preset-search-and-preview-close-on-input-visualizer-title). The owner asked for these on Windows; ask which of them the Mac should get before building any.
+
+| Windows | What the Mac needs |
+| ------- | ------------------ |
+| `KeyRecorder.xaml`, `VisualizerKeys.CanBe` and `Label` | **Like key** and **Skip key** recorded by pressing a key instead of picked from a list: Esc keeps the old key, a button turns the key off, a key another row uses is refused. The Mac matches keys by position (key codes), so decide with the owner which keys can be recorded and how they are named. |
+| `VisualizerAction.Block`, `blockKey`, `PresetController.Perform` | A **Block key**, default B: blocks the preset on screen, and in Shuffle skips to the next one first, so it leaves as fast as with the skip key. No page change is needed. |
+| `PresetPickerDialog.xaml` | The **Visualizer** picker of Single mode as a list with a search box. |
+| `PresetListDialog.xaml` | The search box on both tabs of the Favorites and Blocklist sheets, and a **Preview** button on every row. |
+| `PresetSettings.PreviewScript`, `PresetController.Preview` and `EndPreview`, `App.PreviewPreset` | A preview opens the visualizer under the usual open rules, with the page held on one preset (Single mode, no blend) while the stored controls stay as they are; they are sent again when the visualizer starts to close or the open is refused. |
+| `PresetTitleSetting`, `PageView.SendPresetTitleEnabled` | The **Show visualizer title** switch (key `showPresetTitle`, off by default). The page does the rest and is already shared: `setPresetTitleEnabled` in `overlay.js`, `idlevizPresetTitle` in `visualizer.js`, `.preset-title` in `overlay.css`. |
+| **Close on input** under Opening | The Mac has no such switch at all yet; it comes with part 1's "Close on input off" question. On Windows it no longer depends on **Use more than one display**. |
