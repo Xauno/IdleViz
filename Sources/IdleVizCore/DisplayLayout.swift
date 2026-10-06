@@ -1,6 +1,6 @@
 import Foundation
 
-/// One display, reduced to what decides whether the visualizer still fits it.
+/// One display, reduced to what decides whether the visualizer still fits it and where its window goes.
 public struct Display: Sendable, Equatable {
     /// The `CGDirectDisplayID`.
     public let id: UInt32
@@ -8,11 +8,17 @@ public struct Display: Sendable, Equatable {
     public let frame: CGRect
     /// Pixels per point.
     public let scale: Double
+    /// The display's UUID, which settings store it by. Unlike `id` it survives a restart or another port.
+    public let uuid: String
+    /// The name macOS shows for it, or nil if it has none.
+    public let model: String?
 
-    public init(id: UInt32, frame: CGRect, scale: Double) {
+    public init(id: UInt32, frame: CGRect, scale: Double, uuid: String = "", model: String? = nil) {
         self.id = id
         self.frame = frame
         self.scale = scale
+        self.uuid = uuid
+        self.model = model
     }
 }
 

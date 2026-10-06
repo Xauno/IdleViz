@@ -3,7 +3,8 @@ import IdleVizCore
 import os
 import WebKit
 
-/// The one web page: visualizer, dim layer and overlay. Swift talks to it only with
+/// The web page: visualizer, dim layer and overlay. There is one main page, and with more than one
+/// display mirrored a further one per display, which follows the main page. Swift talks to it only with
 /// `evaluateJavaScript`; there is no `WKScriptMessageHandler`, so the page can't call into the app.
 @MainActor
 final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
@@ -31,6 +32,16 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
     /// The latest brightness and overlay switch, replayed the same way.
     private var brightnessScript = BrightnessSetting.script(for: BrightnessSetting.defaultValue)
     private var overlayEnabledScript = OverlaySetting.script(for: true)
+    /// The latest layout: which displays the window covers. Empty until the window first opens.
+    private var layoutScript = ""
+    /// The pages of other displays. They are sent what this page is sent and follow its preset.
+    private var mirrors: [PageView] = []
+    /// The controls this page was last sent, kept to hold the mirrors on one preset of them.
+    private var presetSettings = PresetSettings()
+    /// The preset the mirrors were last told to show.
+    private var mirroredPreset: String?
+    private var mirrorTimer: Timer?
+    private var checkingMirrors = false
     /// Called with the presets the page reports as failed, each time that list changes.
     var onFailures: (([PresetFailure]) -> Void)?
     /// Called with the preset that was on screen when the page stopped answering.
@@ -72,12 +83,14 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func show(_ payload: OverlayPayload?) {
         nowPlayingScript = OverlayPayload.script(for: payload)
+        mirrors.forEach { $0.show(payload) }
         guard loaded else { return }
         webView.evaluateJavaScript(nowPlayingScript)
     }
 
     func send(customPresets: CustomPresetPayload) {
         customPresetsScript = customPresets.script
+        mirrors.forEach { $0.send(customPresets: customPresets) }
         guard loaded else { return }
         webView.evaluateJavaScript(customPresetsScript)
         fetchPresetList()
@@ -91,36 +104,43 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func send(audioDelay: TimeInterval) {
         audioDelayScript = AudioDelaySetting.script(for: audioDelay)
+        mirrors.forEach { $0.send(audioDelay: audioDelay) }
         guard loaded else { return }
         webView.evaluateJavaScript(audioDelayScript)
     }
 
     func send(brightness: Double) {
         brightnessScript = BrightnessSetting.script(for: brightness)
+        mirrors.forEach { $0.send(brightness: brightness) }
         guard loaded else { return }
         webView.evaluateJavaScript(brightnessScript)
     }
 
     func send(overlayEnabled: Bool) {
         overlayEnabledScript = OverlaySetting.script(for: overlayEnabled)
+        mirrors.forEach { $0.send(overlayEnabled: overlayEnabled) }
         guard loaded else { return }
         webView.evaluateJavaScript(overlayEnabledScript)
     }
 
     func send(presetSettings: PresetSettings) {
+        self.presetSettings = presetSettings
         presetSettingsScript = presetSettings.script
+        sendMirrorPreset()
         guard loaded else { return }
         webView.evaluateJavaScript(presetSettingsScript)
     }
 
-    /// Asks the page for the next preset (the skip key).
+    /// Asks the page for the next preset (the skip key). Pages on other displays follow.
     func skipPreset() {
         guard loaded else { return }
         webView.evaluateJavaScript(VisualizerKeys.skipScript)
+        syncMirrors()
     }
 
     /// Shows the heart that confirms the like key.
     func showLike(_ liked: Bool) {
+        mirrors.forEach { $0.showLike(liked) }
         guard loaded else { return }
         webView.evaluateJavaScript(VisualizerKeys.likeScript(liked: liked))
     }
@@ -135,6 +155,7 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     /// Hands one packed audio frame to the page. Frames are dropped, not queued, while the page is busy or loading.
     func send(audioFrame: Data) {
+        mirrors.forEach { $0.send(audioFrame: audioFrame) }
         guard loaded, framesInFlight < 2 else { return }
         framesInFlight += 1
         webView.evaluateJavaScript(AudioFrame.script(for: audioFrame)) { [weak self] _, _ in
@@ -143,8 +164,10 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     /// While the window is open, asks the page once a second how it's doing. A page that stops
-    /// answering (a preset or plugin stuck in a loop) is replaced.
+    /// answering (a preset or plugin stuck in a loop) is replaced. The pages of other displays are
+    /// checked the same way, and kept on this page's preset.
     func startStatusChecks() {
+        mirrors.forEach { $0.startStatusChecks() }
         guard statusTimer == nil else { return }
         watchdog.start(at: ProcessInfo.processInfo.systemUptime)
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
@@ -152,11 +175,21 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
         RunLoop.main.add(timer, forMode: .common)
         statusTimer = timer
+        guard !mirrors.isEmpty else { return }
+        let mirrorTimer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncMirrors() }
+        }
+        RunLoop.main.add(mirrorTimer, forMode: .common)
+        self.mirrorTimer = mirrorTimer
+        syncMirrors()
     }
 
     func stopStatusChecks() {
+        mirrors.forEach { $0.stopStatusChecks() }
         statusTimer?.invalidate()
         statusTimer = nil
+        mirrorTimer?.invalidate()
+        mirrorTimer = nil
         watchdog.stop()
     }
 
@@ -200,6 +233,7 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         loadID += 1
         framesInFlight = 0
         lastStatus = nil
+        checkingMirrors = false
     }
 
     /// A page stuck in a JavaScript loop can't be reloaded: the navigation never starts
@@ -225,12 +259,6 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         let key = "_webProcessIdentifier"
         guard webView.responds(to: Selector(key)), let pid = webView.value(forKey: key) as? Int32, pid > 0 else { return nil }
         return pid
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        guard webView === self.webView else { return }
-        loadID += 1
-        waitUntilReady(load: loadID, attempt: 0)
     }
 
     /// WebKit can report the navigation as finished before the page's modules have run (seen in
@@ -262,8 +290,77 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         webView.evaluateJavaScript(audioDelayScript)
         webView.evaluateJavaScript(brightnessScript)
         webView.evaluateJavaScript(overlayEnabledScript)
+        if !layoutScript.isEmpty { webView.evaluateJavaScript(layoutScript) }
         webView.evaluateJavaScript(nowPlayingScript)
         fetchPresetList()
+    }
+}
+
+// MARK: - Other displays
+
+extension PageView {
+    /// Adds the page of another display. It gets what this page has been sent so far, and from now
+    /// on everything this page is sent.
+    func addMirror(_ mirror: PageView) {
+        mirror.nowPlayingScript = nowPlayingScript
+        mirror.customPresetsScript = customPresetsScript
+        mirror.presetSettingsScript = mirrorPresetScript
+        mirror.audioDelayScript = audioDelayScript
+        mirror.brightnessScript = brightnessScript
+        mirror.overlayEnabledScript = overlayEnabledScript
+        mirrors.append(mirror)
+    }
+
+    func removeMirror(_ mirror: PageView) {
+        mirrors.removeAll { $0 === mirror }
+    }
+
+    /// The main page's settings, held on the preset it shows. Until that preset is known they are
+    /// sent as they are, and a page on another display shuffles by itself for a moment.
+    private var mirrorPresetScript: String {
+        mirroredPreset.map { presetSettings.followScript(preset: $0) } ?? presetSettingsScript
+    }
+
+    private func sendMirrorPreset() {
+        let script = mirrorPresetScript
+        for mirror in mirrors {
+            mirror.presetSettingsScript = script
+            if mirror.loaded { mirror.webView.evaluateJavaScript(script) }
+        }
+    }
+
+    /// Asks this page which preset is on screen and, if it changed, has the pages on other displays
+    /// blend to it. Runs a few times a second while the window is open.
+    private func syncMirrors() {
+        guard !mirrors.isEmpty, !checkingMirrors, loaded else { return }
+        checkingMirrors = true
+        let load = loadID
+        webView.evaluateJavaScript("window.idlevizStatus?.()") { [weak self] reply, _ in
+            MainActor.assumeIsolated {
+                guard let self, load == self.loadID else { return }
+                self.checkingMirrors = false
+                guard let preset = PageStatus(reply: reply)?.preset, preset != self.mirroredPreset else { return }
+                self.mirroredPreset = preset
+                self.sendMirrorPreset()
+            }
+        }
+    }
+
+    /// Tells the page which displays its window covers, each time the window opens.
+    func send(layout: PlannedWindow) {
+        layoutScript = layout.script
+        guard loaded else { return }
+        webView.evaluateJavaScript(layoutScript)
+    }
+}
+
+// MARK: - WKNavigationDelegate, WKUIDelegate
+
+extension PageView {
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard webView === self.webView else { return }
+        loadID += 1
+        waitUntilReady(load: loadID, attempt: 0)
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {

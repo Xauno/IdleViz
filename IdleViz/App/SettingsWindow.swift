@@ -4,7 +4,7 @@ import KeyboardShortcuts
 import SwiftUI
 
 /// Separate settings window, per mockups.html section 2: one scrolling page with the General,
-/// Visualizer and Presets sections.
+/// Visualizer, Displays and Presets sections.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let presets: PresetController
@@ -32,15 +32,21 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         let view = SettingsView(presets: presets, audioDelay: audioDelay, openNow: openNow)
         let hosting = NSHostingController(rootView: view)
         hosting.sizingOptions = []
+        var height = 560.0
+        #if DEBUG
+        // Launch argument `-IdleVizSettingsHeight 1400` makes the window taller, to see more of it at once.
+        let wanted = UserDefaults.standard.double(forKey: "IdleVizSettingsHeight")
+        if wanted > 0 { height = wanted }
+        #endif
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 340, height: 560),
+            contentRect: NSRect(x: 0, y: 0, width: 340, height: height),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Settings"
         window.contentViewController = hosting
-        window.setContentSize(NSSize(width: 340, height: 560))
+        window.setContentSize(NSSize(width: 340, height: height))
         window.collectionBehavior = [.fullScreenNone]
         window.standardWindowButton(.zoomButton)?.isEnabled = false
         window.isReleasedWhenClosed = false
@@ -61,6 +67,7 @@ struct SettingsView: View {
     @AppStorage(BatteryTimesSetting.keepAwakeKey) private var keepAwakeBattery = KeepAwakeSetting.defaultMinutes
     @AppStorage(OverlaySetting.key) private var showOverlay = true
     @AppStorage(BrightnessSetting.key) private var brightness = BrightnessSetting.defaultValue
+    @AppStorage(MultiDisplaySettings.closeOnInputKey) private var closeOnInput = true
     @AppStorage(VisualizerKeys.likeKey) private var likeKey = VisualizerKeys.defaultLike
     @AppStorage(VisualizerKeys.skipKey) private var skipKey = VisualizerKeys.defaultSkip
 
@@ -86,6 +93,10 @@ struct SettingsView: View {
                     }
                 }
                 KeyboardShortcuts.Recorder("Open hotkey", name: .openVisualizer)
+                Toggle(isOn: $closeOnInput) {
+                    Text("Close on input")
+                    Text("Off: the hotkey or Open now closes it")
+                }
                 keyPicker($likeKey, taken: skipKey) {
                     Text("Like key")
                     Text("Favorites what's on screen")
@@ -101,6 +112,7 @@ struct SettingsView: View {
             }
             Section("Visualizer") {
                 Toggle("Show Spotify overlay", isOn: $showOverlay)
+                OverlayDisplayPicker()
                 LabeledContent("Brightness") {
                     HStack(spacing: 6) {
                         Slider(value: $brightness, in: BrightnessSetting.range)
@@ -114,6 +126,9 @@ struct SettingsView: View {
                 }
                 AudioDelayControls(audioDelay: audioDelay)
                 PresetControls(presets: presets)
+            }
+            Section("Displays") {
+                DisplayControls()
             }
             PresetFolderControls(presets: presets)
         }

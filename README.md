@@ -11,7 +11,7 @@ There are two apps, one for macOS and one for Windows 11. Both show the same pag
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: in development.** Every step in the [Roadmap](#roadmap) is built for both apps. The Windows app has a setup file on the [Releases page](https://github.com/Xauno/IdleViz/releases); the Mac app is built from source. The Mac app runs on the main display only, while the Windows app can cover several. The Windows app has only been used on one PC, a desktop with two displays and no battery, so its battery times are untested on real hardware.
+> **Status: in development.** Every step in the [Roadmap](#roadmap) is built for both apps. The Windows app has a setup file on the [Releases page](https://github.com/Xauno/IdleViz/releases); the Mac app is built from source. Both can cover one display or several; on the Mac that was only checked with one display connected. The Windows app has only been used on one PC, a desktop with two displays and no battery, so its battery times are untested on real hardware.
 
 ## Contents
 
@@ -78,7 +78,7 @@ Both apps do all of this. Where they differ is in [macOS and Windows compared](#
 | ---------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | Getting it             | Built from source with Xcode                                                                      | `IdleViz-Setup.exe` from the [Releases page](https://github.com/Xauno/IdleViz/releases), or built yourself |
 | Where it lives         | Menu bar                                                                                          | Tray (notification area)                                                                                   |
-| Displays               | The main display only                                                                             | One or several: the same visualizer on each, or one picture extended across them                           |
+| Displays               | One or several, as on Windows; **Extend** needs "Displays have separate Spaces" turned off        | One or several: the same visualizer on each, or one picture extended across them                           |
 | Permissions            | A welcome window asks for Spotify control and Spotify audio; the microphone is asked at Detect    | No prompts; the microphone follows the Windows privacy setting                                             |
 | When something's wrong | Yellow icon while a permission is missing                                                         | Yellow icon while Spotify's sound or track can't be read                                                   |
 | Now playing comes from | Spotify itself                                                                                    | The Windows media controls                                                                                 |
@@ -86,12 +86,12 @@ Both apps do all of this. Where they differ is in [macOS and Windows compared](#
 | Idle open is skipped   | While the screen is locked or another app keeps the display awake                                 | While locked, over Remote Desktop, with something fullscreen, or while another app is making sound         |
 | Like and skip keys     | Work while the visualizer has keyboard focus; picked from a list                                  | Work even if another window has the keyboard; almost any key, recorded by pressing it; plus a block key    |
 | Keys that leave it open | Brightness, keyboard backlight, playback and volume                                              | Playback and volume                                                                                        |
-| Settings window        | **General** and **Visualizer**                                                                    | Six sections: **Opening**, **Look**, **Presets**, **Keys**, **Audio sync**, **Displays**                   |
+| Settings window        | **General**, **Visualizer** and **Displays**                                                      | Six sections: **Opening**, **Look**, **Presets**, **Keys**, **Audio sync**, **Displays**                   |
 | Presets folder         | `~/Library/Application Support/IdleViz/Presets/`                                                  | `%APPDATA%\IdleViz\Presets\`                                                                               |
 | Log                    | `log stream`, subsystem `com.xauno.IdleViz`                                                       | `%LOCALAPPDATA%\IdleViz\logs\idleviz.log`                                                                  |
 | Quit                   | ⌘Q while settings is focused                                                                      | **Exit** in the tray icon's right-click menu                                                               |
 
-The things the Windows app has that the Mac app doesn't yet (more than one display, the regrouped settings window, and the newer settings: recorded keys, the block key, preset search and preview, **Close on input** and the visualizer title) are listed under [Planned](#planned).
+The things the Windows app has that the Mac app doesn't yet (the regrouped settings window, and the newer settings: recorded keys, the block key, preset search and preview and the visualizer title) are listed under [Planned](#planned).
 
 ## Requirements
 
@@ -174,11 +174,13 @@ This builds the app and `windows\artifacts\IdleViz-Setup.exe`, runs it without q
 ### On the Mac
 
 - **Menu bar:** click the waveform icon for a small popup with **Settings…** (⌘,) and the current open hotkey. A yellow icon means a permission is missing: the popup then has a row for each, and clicking one opens the welcome window (if macOS hasn't asked yet) or the System Settings page where it's switched on.
-- **Open:** the URL is opened with `open idleviz://open` in Terminal. The visualizer covers the main display; other displays keep showing the desktop.
+- **Open:** the URL is opened with `open idleviz://open` in Terminal. The visualizer covers the main display; other displays keep showing the desktop unless **Use more than one display** is on.
+- **Close on input:** a switch under **General** in settings. Turned off, the visualizer stays until you press the hotkey again, press **Open now** again or the keep-awake limit is reached. The pointer stays visible, the keyboard stays with the app you were in, and the like and skip keys are off.
+- **Displays:** in settings under **Displays**. **Main display** is the display the visualizer opens on: the one macOS calls main, or one you pick. Turn on **Use more than one display** to cover others too. **Other displays** ticks which ones (all of them unless you change it). **Placement** is **Same on each display**, where every display runs its own copy of the visualizer with the same preset and the same sound, or **Extend across displays**, where one picture runs across all of them. macOS only lets a window run across displays while **Displays have separate Spaces** is off (System Settings → Desktop & Dock; it is on by default and changing it needs a log out). While it is on, the row shows a warning and each display runs its own visualizer instead. **Show it on**, under **Show Spotify overlay**, puts the track, cover and progress bar on the main display, on one display you pick, or on all of them. These rows are greyed out while **Use more than one display** is off. Covering more than one display takes more GPU power; the section shows a warning while the switch is on. A change made while the visualizer is open applies the next time it opens. This was built with one display connected, so it has not been seen on a real second display yet.
 - **Close:** a trackpad gesture closes it too. Besides the media keys, the brightness and keyboard backlight keys leave it open. The other top-row keys (Mission Control, Spotlight, Dictation, Focus) still close it, and so do F1–F12 pressed as standard function keys and the fn key itself.
 - **Like and skip:** the keys are matched by their position on a US keyboard, and they and the media keys only work while the visualizer has keyboard focus (if macOS refused to activate the app, they close it like any other key). After **L**, a filled heart appears next to the track title for a moment; pressing it again takes the preset off, and the heart is then an outline. With the overlay off, paused or hidden, the heart shows in the top-right corner instead.
 - **Idle:** it doesn't open while the screen is locked or another app keeps the display awake (a video, a call, a presentation).
-- **Settings:** two sections, **General** and **Visualizer**, with the preset controls under **Presets**. Close the window with its red button; ⌘Q quits the app while settings is focused.
+- **Settings:** three sections, **General**, **Visualizer** and **Displays**, with the preset controls under **Presets**. Close the window with its red button; ⌘Q quits the app while settings is focused.
 - **Launch at login:** the switch in settings adds IdleViz to your login items. It works best from the copy in `/Applications`. macOS may ask you to allow it under System Settings → General → Login Items.
 - **Now playing:** the overlay updates whenever Spotify's track or state changes, and re-syncs the progress bar every 5 s while the window is open. Music ads show an "Advertisement" label with the progress bar. The app also logs each change:
 
@@ -274,9 +276,8 @@ The steps are from [windows-port.html](windows-port.html) and [docs/windows.md](
 
 These are in the Windows app and still to come on the Mac. The brief is [docs/mac-todo.md](docs/mac-todo.md).
 
-- **More than one display on the Mac.** The Windows app has it (step W9): a main display, further displays that either each run the same visualizer or share one extended picture, a choice of display for the now-playing overlay, and a switch for whether input closes it. The Mac app still uses the main display only. No step in `project.md` covers the Mac side yet; it's listed there under "Later".
 - **The regrouped settings window on the Mac.** The Windows settings window has six sections with the rows that depend on another row folded into it. The Mac window still has its two sections.
-- **The newer settings on the Mac.** Keys that are recorded by pressing them instead of picked from a list, a block key, search in every preset list, a preview from the Favorites and Blocklist lists, **Close on input** and **Show visualizer title**. The title is drawn by the shared page, so the Mac only needs the switch.
+- **The newer settings on the Mac.** Keys that are recorded by pressing them instead of picked from a list, a block key, search in every preset list, a preview from the Favorites and Blocklist lists, and **Show visualizer title**. The title is drawn by the shared page, so the Mac only needs the switch.
 
 ## Development
 

@@ -135,10 +135,21 @@ public struct PresetSettings: Sendable, Equatable, Encodable {
 
     /// The call that hands the settings to the page. `JSONEncoder` escapes quotes and backslashes in
     /// preset names; U+2028/U+2029 are escaped too, since older JavaScript rejects them raw.
-    public var script: String {
+    public var script: String { script(for: self) }
+
+    /// The call for a page on another display, which shows whatever the main page shows: the same
+    /// settings, but held on that one preset. The page blends to it like to any other change.
+    public func followScript(preset: String) -> String {
+        var held = self
+        held.mode = .single
+        held.single = preset
+        return script(for: held)
+    }
+
+    private func script(for settings: PresetSettings) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let json = (try? encoder.encode(self)).flatMap { String(data: $0, encoding: .utf8) } ?? "null"
+        let json = (try? encoder.encode(settings)).flatMap { String(data: $0, encoding: .utf8) } ?? "null"
         let safe = json
             .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
             .replacingOccurrences(of: "\u{2029}", with: "\\u2029")

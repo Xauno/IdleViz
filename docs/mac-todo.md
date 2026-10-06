@@ -1,38 +1,27 @@
 # To do on the Mac
 
-The Windows app has three things the Mac app doesn't have yet. All were built and checked on Windows only. This file is the brief for the session on a Mac that brings them over. Delete each part once its PR is merged, and the file when it is empty.
+The Windows app has two things the Mac app doesn't have yet, and one the Mac has but that was never run on a real second display. All were built and checked on Windows only. This file is the brief for the session on a Mac that brings them over. Delete each part once its PR is merged, and the file when it is empty.
 
-Before any of them: [project.md](../project.md) is the Mac plan, [mockups.html](../mockups.html) the Mac UI reference, and [AGENTS.md](../AGENTS.md) the rules (ask before any judgement call; one PR per step, with tests; update the README). The delay line frame drop is fixed in code (PR 47, merged without a run on a Mac); the owner wants it tested on the Mac before anything else.
+Before any of them: [project.md](../project.md) is the Mac plan, [mockups.html](../mockups.html) the Mac UI reference, and [AGENTS.md](../AGENTS.md) the rules (ask before any judgement call; one PR per step, with tests; update the README).
 
 Where the Windows version made a choice "without asking the owner", it is listed in [windows.md](windows.md) under that heading. Don't carry those over silently: ask the owner whether the Mac should do the same.
 
-## 1. More than one display
+## 1. More than one display: test it with a second display
 
-**What it is:** [windows.md, "W9: more than one display"](windows.md#w9-more-than-one-display). Read the whole section; it has the settings, the two placements, the overlay layout, what **Close on input** off means, and what the owner chose.
+Built and merged, but only ever run with one display connected, using the Debug switch `-IdleVizSplitDisplay YES` (the two halves of the main display stand in for two displays). What it is and how it differs from Windows is in [project.md](../project.md) under "Brought over from the Windows app". Delete this part once these have been seen on a real second display:
 
-**Already shared, nothing to port:** the page. `IdleViz/web/` is used by both apps, so the overlay regions (`setOverlayRegions` in `overlay.js`, `overlay-state.js`, `overlay.css`, `index.html`) and the render width cap (`setRenderWidthCap` in `visualizer.js`, `visualizer-state.js`) are there. The Mac app never sends a layout today, so the page shows one region: the whole window.
-
-**To port, C# to Swift:**
-
-| Windows | What the Mac needs |
-| ------- | ------------------ |
-| `windows/IdleViz.Core/MultiDisplay.cs` and `MultiDisplayTests.cs` | The same in `Sources/IdleVizCore/` with its tests: `MultiDisplaySettings` (six stored values, same keys and defaults), `DisplayPlan.For(settings, displays)`, `DisplayLabel`. Displays are stored by the name Windows gives them; the Mac needs its own stable name for a display (ask the owner which: the display's UUID is the usual one). |
-| `windows/IdleViz.Core/PresetSettings.cs`, `FollowScript` | The same in `PresetSettings.swift`: the preset controls held on one preset, for a page that follows the main page. |
-| `windows/IdleViz.Core/DisplayLayout.cs` | The Mac equivalent from `NSScreen` frames. Mind that AppKit's y axis points up and the page wants rectangles from the top left, in device pixels. |
-| `windows/IdleViz.App/VisualizerController.cs` | One window and page per mirrored display, made ahead and kept hidden, shown, faded and hidden together. |
-| `windows/IdleViz.App/PageView.cs` (`SyncMirrors`, `SendLayout`) | The main page forwards what it is sent to its mirrors, asks for its preset every 250 ms and passes a change on, and sends each window its layout. |
-| `windows/IdleViz.App/VisualizerWindow.cs`, `Show(PlannedWindow)` | A window on any display or across several, not always the main one. |
-| `windows/IdleViz.App/Displays.cs` | The connected displays and their names for settings. |
-| The Displays rows in `SettingsWindow.xaml` | The same rows in `IdleViz/App/SettingsWindow.swift`, laid out as in part 2. |
-
-**Things that will differ on the Mac, so ask or check:**
-
-- **Extend across displays.** On Windows one window covers the rectangle that encloses the displays. On a Mac, a window only spans displays when "Displays have separate Spaces" is off in System Settings; with it on (the default) a window shows on one display only. Find out what works and ask the owner how to handle the default case before building it.
-- **Close on input off.** On Windows no hooks are installed, the window doesn't take focus and the pointer stays visible. Work out the Mac equivalent with the existing dismiss code (`DismissTracker`, the event monitors) and the activation rules.
-- **The stuck page.** On Windows, replacing a stuck page ends every renderer, so the mirrors are remade too. WKWebView has a process per web view, so this may not apply; check before porting it.
-- **Keep awake, sleep and display changes** already close the visualizer; check they close every window.
-
-The README says the Mac app uses the main display only in its status note, in the "macOS and Windows compared" table and under "On the Mac" in Usage, and lists it under Planned. Change all four when this is done.
+- **Same on each display:** both displays show the visualizer on the same preset, each with its own picture. They open, fade and close together.
+- **The names** in **Main display**, **Other displays** and **Show it on** are the ones macOS shows, and a choice survives unplugging the display and plugging it back in, also into another port.
+- **Main display** set to the second display: the visualizer opens there, and the overlay follows it.
+- **Other displays** with the second display unticked: only the main one is covered.
+- **Show it on** set to the main display, the other one, and **All displays**. With the like key, the heart shows on every display that has the overlay.
+- **Extend across displays** with "Displays have separate Spaces" on (the default): the warning shows in settings and each display runs its own visualizer.
+- **Extend across displays** with it off (System Settings → Desktop & Dock, then log out and in): one picture across both displays, the overlay at each display's own bottom edge, and the main display's part as sharp as when it is covered alone. This is the case most likely to need a fix: nothing has shown yet that one borderless window really covers two displays.
+- **Displays at different scales** (the built-in Retina display with a 1× monitor), mirrored and extended.
+- **Over a fullscreen app** on the second display: the visualizer covers it. Then switch a display on in settings and try again without restarting the app.
+- **Close on input off** with the visualizer on one display: keep typing in an app on the other display, then click on the visualizer. The hotkey closes it.
+- **Unplug the second display** while the visualizer is open, and put the Mac to sleep: every window closes.
+- **Frame rate** with two displays covered, in `log stream --level debug --predicate 'subsystem == "com.xauno.IdleViz" AND category == "page"'`.
 
 ## 2. The settings window, regrouped
 
@@ -67,7 +56,6 @@ The Mac window (`IdleViz/App/SettingsWindow.swift`, `PresetControls.swift`, and 
 - Mac wording where it already differs: "Launch at login", "Mac" for "PC", "Show in Finder" for the folder.
 - Rows only the Mac has (the permission rows, anything else in the window today): which section each goes in.
 - `mockups.html` shows the old layout. Ask whether to update it.
-- Do part 1 first or leave the Displays section out until it exists.
 
 Update the Mac parts of the README (Features, Usage) to the new section and row names when this is done.
 
@@ -83,4 +71,4 @@ Update the Mac parts of the README (Features, Usage) to the new section and row 
 | `PresetListDialog.xaml` | The search box on both tabs of the Favorites and Blocklist sheets, and a **Preview** button on every row. |
 | `PresetSettings.PreviewScript`, `PresetController.Preview` and `EndPreview`, `App.PreviewPreset` | A preview opens the visualizer under the usual open rules, with the page held on one preset (Single mode, no blend) while the stored controls stay as they are; they are sent again when the visualizer starts to close or the open is refused. |
 | `PresetTitleSetting`, `PageView.SendPresetTitleEnabled` | The **Show visualizer title** switch (key `showPresetTitle`, off by default). The page does the rest and is already shared: `setPresetTitleEnabled` in `overlay.js`, `idlevizPresetTitle` in `visualizer.js`, `.preset-title` in `overlay.css`. |
-| **Close on input** under Opening | The Mac has no such switch at all yet; it comes with part 1's "Close on input off" question. On Windows it no longer depends on **Use more than one display**. |
+| **Close on input** under Opening | The Mac has the switch, under **General** until the window is regrouped. The like and skip rows don't grey out yet while it is off. |

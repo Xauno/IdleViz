@@ -26,7 +26,7 @@ A menu-bar app that opens a fullscreen music visualizer with a Spotify now-playi
 | Ad in or between podcasts     | Yes    | None                                      |
 | Playing on another device (Spotify Connect) | Yes | Same as the rows above. The visuals get silence and drift slowly. |
 
-**Non-goals:** other players (Apple Music, browsers), Spotify's Web API (no login/OAuth/Premium dependency), a `.saver` bundle, third-party visualizer apps (Synesthesia etc.), multi-display (see "Later"), and distribution to other people. The app is for personal use: no notarization, Developer ID or auto-updates. If that ever changes, the app name must not contain "Spotify" (Spotify's brand rules).
+**Non-goals:** other players (Apple Music, browsers), Spotify's Web API (no login/OAuth/Premium dependency), a `.saver` bundle, third-party visualizer apps (Synesthesia etc.), and distribution to other people. The app is for personal use: no notarization, Developer ID or auto-updates. If that ever changes, the app name must not contain "Spotify" (Spotify's brand rules).
 
 ---
 
@@ -495,8 +495,21 @@ Each step is one pull request. At the end of each step, update the README (Roadm
 
 ## Later
 
-- **First, before rebuilding the Windows port's new features on the Mac: test the delay line in the running app, and fix it if it is still off.** `DelayLine.pop` used to drop about a quarter of the frames at delays that are a whole number of frames (every 50 ms). The fix was written on a Windows PC and has only been through the unit tests in CI; the frame rate in the Mac app was never measured, before or after. Measure the frames per second that reach the page at delays of 0.1, 1.0 and 2.5 s (about 60 expected; the old logic gave about 45 on Windows), and run `swift build && swift test`.
-- Multi-display on the Mac: one window per `NSScreen`, visualizer on each (or mirrored), overlay on main only or all, and handle display changes while open (`NSApplication.didChangeScreenParametersNotification`). The Windows app has this already (W9 in [docs/windows.md](docs/windows.md)), with the settings and the page calls (`setRenderWidthCap`, `setOverlayRegions`) the Mac version should reuse.
+- Nothing is planned beyond what [docs/mac-todo.md](docs/mac-todo.md) lists.
+
+## Brought over from the Windows app
+
+Not steps of the build order: the Windows port got these first, and the Mac followed. What each one is, and what the owner chose, is in [docs/windows.md](docs/windows.md); only what differs on the Mac is here.
+
+- **The delay line, measured.** `DelayLine.pop` used to drop about a quarter of the frames at delays that are a whole number of frames. The fix was written on a Windows PC, so it was measured here afterwards: a Debug build with the visualizer open, counting the audio frames the page reports each second, gave 60 a second at delays of 0, 0.1, 1.0 and 2.5 s. The Debug copy had no audio permission, so the frames were silent ones; they take the same path through the delay line.
+- **More than one display** (W9 on Windows). `MultiDisplay.swift` holds the settings and `DisplayPlan`; `WindowController` keeps a window for every connected display and a page for each covered one; the main `PageView` forwards what it is sent to the others and keeps them on its preset.
+  - Displays are stored by their UUID (`CGDisplayCreateUUIDFromDisplayID`), which survives a restart and another port, and named in settings by the name macOS gives them.
+  - Window frames and overlay regions are in points, not pixels. The page scales the regions by the window's width, so the unit doesn't matter to it.
+  - **Extend across displays** needs "Displays have separate Spaces" turned off, since macOS otherwise shows a window on one display only. While it is on (`NSScreen.screensHaveSeparateSpaces`), settings shows a warning and each display gets its own window, as with **Same on each display** (the owner's choice).
+  - A window made while the app is regular (settings open) can't join another app's fullscreen Space, so a hidden window is made for every connected display at launch and on a display change, not when a display is switched on in settings. A display plugged in while settings is open gets its window then, and it is not shown over fullscreen apps until the next launch.
+  - **Close on input** off: no event monitors and no hidden pointer, the app isn't activated and the windows can't become key, so the keyboard stays where it was. Clicks on the visualizer are swallowed, not passed to what is under it; such a click activates IdleViz, as any click on a window does, and the app that had focus gets it back when the visualizer closes.
+  - A stuck page ends only its own web content process, so the other pages are left alone. The preset a following page hung on is kept out of the library the same way as the main page's.
+  - Debug builds take `-IdleVizSplitDisplay YES`, which treats the two halves of the main display as two displays. Mirror, extend, the overlay's display and **Close on input** off were checked that way; nothing has run on a real second display. The checks still to do are in [docs/mac-todo.md](docs/mac-todo.md).
 
 ## Requirements
 
