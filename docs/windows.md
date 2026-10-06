@@ -671,7 +671,7 @@ The last step: the remaining settings rows and the two keys that work while the 
 
 ### W9: more than one display
 
-Not a step of the brief: the owner asked for it after W8c. The Mac app still uses one display.
+Not a step of the brief: the owner asked for it after W8c. The Mac app got it later; what differs there is in [project.md](../project.md) under "Brought over from the Windows app".
 
 | File | What it does |
 | ---- | ------------ |

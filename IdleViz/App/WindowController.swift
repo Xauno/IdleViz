@@ -5,11 +5,14 @@ import os
 /// Borderless windows can't become key by default. Being key lets a local event
 /// monitor see keys without Accessibility or Input Monitoring permission.
 final class VisualizerWindow: NSWindow {
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+    /// False while input is ignored ("Close on input" off): the keyboard stays with the app that has it.
+    var takesFocus = true
 
-    static func make(on screen: NSScreen, content: NSView) -> VisualizerWindow {
-        let window = VisualizerWindow(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+    override var canBecomeKey: Bool { takesFocus }
+    override var canBecomeMain: Bool { takesFocus }
+
+    static func make(frame: CGRect, content: NSView? = nil) -> VisualizerWindow {
+        let window = VisualizerWindow(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
         window.level = .screenSaver
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         window.backgroundColor = .black
@@ -17,12 +20,15 @@ final class VisualizerWindow: NSWindow {
         window.hasShadow = false
         window.isReleasedWhenClosed = false
         window.acceptsMouseMovedEvents = true
-        window.contentView = content
-        window.setFrame(screen.frame, display: false)
+        if let content { window.contentView = content }
+        window.setFrame(frame, display: false)
         return window
     }
 }
 
+/// Opens and closes the visualizer: fades, focus, the cursor and the dismiss watcher. There is one
+/// main window with the main page. With more than one display mirrored there is a further window,
+/// with a page of its own, for each other display; extended, the main window covers them all.
 @MainActor
 final class WindowController {
     private enum State { case closed, open, closing }
@@ -32,6 +38,11 @@ final class WindowController {
     private var window: VisualizerWindow?
     // Created at launch and kept loaded, so the page is ready the first time the window opens.
     let page = PageView()
+    /// A hidden window for each further display that is connected, whether or not it is covered.
+    /// See `prepare` for why they are made before they are needed.
+    private var otherWindows: [VisualizerWindow] = []
+    /// The pages of the other displays that are covered. `mirrors[n]` sits in `otherWindows[n]`.
+    private var mirrors: [PageView] = []
     private var state = State.closed
     /// Counts fades, so the end of one that was replaced by another does nothing.
     private var fadeID = 0
@@ -55,50 +66,102 @@ final class WindowController {
         #endif
     }()
 
+    /// Whether input closes the window that is open now: the debug switch and the "Close on input" setting.
+    private(set) var closesOnInput = true
+
     /// False again as soon as it starts to fade out.
     var isOpen: Bool { state == .open }
 
-    /// Creates the hidden window. Call this at launch, while the app is still an accessory:
-    /// macOS decides when a window is created whether it may join other apps' fullscreen Spaces,
-    /// and a window created while the app is regular (settings open) never can.
-    func prepare(on screen: NSScreen) {
-        guard window == nil else { return }
-        window = VisualizerWindow.make(on: screen, content: page.view)
+    /// The windows in use, the main one first.
+    private var openWindows: [VisualizerWindow] {
+        (window.map { [$0] } ?? []) + otherWindows.prefix(mirrors.count)
     }
 
-    func open(on screen: NSScreen, source: TriggerSource) {
+    /// Creates the hidden windows, and the pages of the other displays that are covered, so that an
+    /// open finds them loaded. Call it at launch, while the app is still an accessory, and when the
+    /// Displays settings or the displays change: macOS decides when a window is created whether it
+    /// may join other apps' fullscreen Spaces, and a window created while the app is regular
+    /// (settings open) never can. So every connected display gets its window here, not only the
+    /// covered ones, and switching a display on in settings finds a window that already exists.
+    /// It waits while the visualizer is open; the next open catches up.
+    @discardableResult
+    func prepare() -> DisplayPlan? {
+        guard state == .closed else { return nil }
+        let plan = Displays.plan
+        if window == nil { window = VisualizerWindow.make(frame: plan.windows[0].frame, content: page.view) }
+
+        let wanted = max(NSScreen.screens.count, plan.windows.count) - 1
+        while otherWindows.count < wanted {
+            otherWindows.append(VisualizerWindow.make(frame: plan.windows[0].frame))
+        }
+        while mirrors.count > plan.windows.count - 1 {
+            let mirror = mirrors.removeLast()
+            page.removeMirror(mirror)
+            otherWindows[mirrors.count].contentView = NSView()
+        }
+        while mirrors.count < plan.windows.count - 1 {
+            let mirror = PageView()
+            // A preset that hangs a page hangs it on every display, so it is kept out the same way.
+            mirror.onHung = { [weak self] preset in self?.page.onHung?(preset) }
+            page.addMirror(mirror)
+            otherWindows[mirrors.count].contentView = mirror.view
+            mirrors.append(mirror)
+            log.notice("Made a page for display \(self.mirrors.count + 1, privacy: .public)")
+        }
+        return plan
+    }
+
+    func open(source: TriggerSource) {
         guard state != .open else { return }
         // Triggered again while it fades out: finish that close first, so everything starts clean.
         if state == .closing { finishClosing() }
-        let window = window ?? VisualizerWindow.make(on: screen, content: page.view)
-        self.window = window
-        window.setFrame(screen.frame, display: false)
+        guard let plan = prepare(), let window else { return }
+        closesOnInput = dismissEnabled && plan.closeOnInput
 
         let frontmost = NSWorkspace.shared.frontmostApplication
         previousApp = frontmost?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : frontmost
 
-        window.ignoresMouseEvents = false
-        window.alphaValue = 0
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
-        window.orderFrontRegardless()
+        let pages = [page] + mirrors
+        for (index, window) in openWindows.enumerated() {
+            window.setFrame(plan.windows[index].frame, display: false)
+            pages[index].send(layout: plan.windows[index])
+            window.takesFocus = plan.closeOnInput
+            window.ignoresMouseEvents = false
+            window.alphaValue = 0
+        }
+        // With input ignored the keyboard stays with the app that has it.
+        if plan.closeOnInput {
+            NSApp.activate()
+            window.makeKeyAndOrderFront(nil)
+        }
+        openWindows.forEach { $0.orderFrontRegardless() }
         state = .open
-        fade(window, to: 1, seconds: VisualizerFade.openSeconds)
+        fade(to: 1, seconds: VisualizerFade.openSeconds)
         onOpen?()
 
-        if dismissEnabled {
-            NSCursor.hide()
-            cursorHidden = true
-            // Read at each open: settings can't change while the visualizer is up, since any input closes it.
-            let watcher = DismissWatcher(
-                keys: VisualizerKeys(defaults: .standard),
-                onAction: { [weak self] action in self?.onAction?(action) },
-                onDismiss: { [weak self] in self?.close(.input) }
-            )
-            watcher.start()
-            dismissWatcher = watcher
-        }
+        if closesOnInput { watchForInput() }
+        logOpened(source: source, window: window, takesFocus: plan.closeOnInput)
+    }
 
+    private func watchForInput() {
+        NSCursor.hide()
+        cursorHidden = true
+        // Read at each open: settings can't change while the visualizer is up, since any input closes it.
+        let watcher = DismissWatcher(
+            keys: VisualizerKeys(defaults: .standard),
+            onAction: { [weak self] action in self?.onAction?(action) },
+            onDismiss: { [weak self] in self?.close(.input) }
+        )
+        watcher.start()
+        dismissWatcher = watcher
+    }
+
+    private func logOpened(source: TriggerSource, window: VisualizerWindow, takesFocus: Bool) {
+        let windows = openWindows.count
+        guard takesFocus else {
+            log.notice("Opened via \(source.rawValue, privacy: .public) on \(windows, privacy: .public) window(s): input is ignored")
+            return
+        }
         // Activation is cooperative and may be refused; give it a moment, then record the outcome.
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
@@ -107,30 +170,34 @@ final class WindowController {
             self.stats.record(activated: activated)
             let outcome = activated ? "active" : "activation refused"
             self.log.notice(
-                "Opened via \(source.rawValue, privacy: .public): \(outcome, privacy: .public) (\(self.stats.summary, privacy: .public))"
+                """
+                Opened via \(source.rawValue, privacy: .public) on \(windows, privacy: .public) window(s): \
+                \(outcome, privacy: .public) (\(self.stats.summary, privacy: .public))
+                """
             )
         }
     }
 
-    /// Hands the Mac back at once (cursor, focus, clicks) and fades the window out on top of it.
+    /// Hands the Mac back at once (cursor, focus, clicks) and fades the windows out on top of it.
     func close(_ reason: CloseReason) {
         // A close that can't wait cuts a fade-out short.
         if state == .closing, reason.fadeSeconds == 0 { finishClosing() }
-        guard state == .open, let window else { return }
+        guard state == .open else { return }
         state = .closing
         log.notice("Closing: \(reason.rawValue, privacy: .public)")
         dismissWatcher?.stop()
         dismissWatcher = nil
-        window.ignoresMouseEvents = true
+        openWindows.forEach { $0.ignoresMouseEvents = true }
         if cursorHidden {
             NSCursor.unhide()
             cursorHidden = false
         }
-        previousApp?.activate()
+        // Only if focus is still here: with input ignored, someone may have switched apps while it was open.
+        if NSApp.isActive || closesOnInput { previousApp?.activate() }
         previousApp = nil
         onClosing?()
         if reason.fadeSeconds > 0 {
-            fade(window, to: 0, seconds: reason.fadeSeconds)
+            fade(to: 0, seconds: reason.fadeSeconds)
         } else {
             finishClosing()
         }
@@ -140,17 +207,19 @@ final class WindowController {
         guard state == .closing else { return }
         fadeID += 1
         window?.orderOut(nil)
+        otherWindows.forEach { $0.orderOut(nil) }
         state = .closed
         onClose?()
     }
 
-    private func fade(_ window: NSWindow, to alpha: CGFloat, seconds: TimeInterval) {
+    private func fade(to alpha: CGFloat, seconds: TimeInterval) {
         fadeID += 1
         let id = fadeID
+        let windows = openWindows
         NSAnimationContext.runAnimationGroup { context in
             context.duration = seconds
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            window.animator().alphaValue = alpha
+            windows.forEach { $0.animator().alphaValue = alpha }
         } completionHandler: { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, self.fadeID == id else { return }

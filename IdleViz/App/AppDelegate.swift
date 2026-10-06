@@ -75,7 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         closeWhenTheDisplayMayHaveChanged()
         startPermissions(spotify)
         // Before anything can open settings, which makes the app regular.
-        if let screen = NSScreen.screens.first { windowController.prepare(on: screen) }
+        windowController.prepare()
+        prepareWhenTheDisplaySettingsChange()
         startTriggers()
         runDebugLaunchArguments()
     }
@@ -147,6 +148,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// The windows of other displays are made ahead, so they follow the Displays settings as they change.
+    private func prepareWhenTheDisplaySettingsChange() {
+        var last = MultiDisplaySettings(defaults: .standard)
+        observers.append(NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                let settings = MultiDisplaySettings(defaults: .standard)
+                guard settings != last else { return }
+                last = settings
+                self?.windowController.prepare()
+            }
+        })
+    }
+
     /// After sleep or a change of displays the main display may be a different one, so close
     /// instead of staying on a screen that may be gone.
     private func closeWhenTheDisplayMayHaveChanged() {
@@ -167,6 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     return
                 }
                 self.windowController.close(.displayChanged)
+                self.windowController.prepare()
             }
         })
     }
@@ -176,9 +193,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func open(from source: TriggerSource) {
-        // With dismiss turned off (debug switch), a second manual trigger is the only way to close.
+        // While input is ignored ("Close on input" off, or the debug switch), a second manual trigger closes it.
         if windowController.isOpen {
-            if source.isManual && !windowController.dismissEnabled { windowController.close(.input) }
+            if source.isManual && !windowController.closesOnInput { windowController.close(.input) }
             return
         }
         // Manual triggers mean someone is at the Mac, so only the idle trigger checks these.
@@ -194,18 +211,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             // Another trigger may have opened it while Spotify was being asked.
-            guard !windowController.isOpen, let screen = NSScreen.screens.first else { return }
-            windowController.open(on: screen, source: source)
+            guard !windowController.isOpen else { return }
+            windowController.open(source: source)
         }
-    }
-}
-
-extension DisplayLayout {
-    /// The displays as they are right now.
-    @MainActor static var current: DisplayLayout {
-        DisplayLayout(displays: NSScreen.screens.map { screen in
-            let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
-            return Display(id: number?.uint32Value ?? 0, frame: screen.frame, scale: screen.backingScaleFactor)
-        })
     }
 }
