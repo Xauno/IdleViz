@@ -17,6 +17,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         audioDelay: audioDelay,
         openNow: { [weak self] in self?.open(from: .settings) }
     )
+
+    /// Shows one preset in the real visualizer, from the Favorites and Blocklist sheets. The page
+    /// is held on it until the visualizer starts to close, or at once if the open is refused.
+    private func preview(_ preset: String) {
+        presets.preview(preset)
+        // Already open (possible with "Close on input" off): only the preset changes.
+        guard !windowController.isOpen else { return }
+        open(from: .settings, onRefused: { [weak self] in self?.presets.endPreview() })
+    }
     private var triggers: Triggers?
     private let power = PowerSource()
     private lazy var keepAwake = KeepAwake(
@@ -65,7 +74,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.permissions.refresh()
         }
         // The Mac may sleep again as soon as the fade-out starts.
-        windowController.onClosing = { [weak self] in self?.keepAwake.stop() }
+        // A preview ends here too, not when the window is gone: an open during the fade-out finishes
+        // that close first, which would otherwise end the new preview.
+        windowController.onClosing = { [weak self] in
+            self?.keepAwake.stop()
+            self?.presets.endPreview()
+        }
+        presets.onPreview = { [weak self] preset in self?.preview(preset) }
         windowController.onClose = { [weak self] in
             spotify.stopResync()
             self?.audio.stop()
@@ -123,6 +138,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { [weak self] in
                 try? await Task.sleep(for: .seconds(4))
                 self?.audioDelay.detect()
+            }
+        }
+        // `-IdleVizPreview "bundled:Geiss - Swirlie 5"` previews that preset a moment after launch, as a Preview button would.
+        if let preset = UserDefaults.standard.string(forKey: "IdleVizPreview") {
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(3))
+                self?.preview(preset)
             }
         }
         // `-IdleVizOpenAtLaunch YES` opens the visualizer a moment after launch. Unlike `open idleviz://open`,
@@ -192,7 +214,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.show()
     }
 
-    private func open(from source: TriggerSource) {
+    private func open(from source: TriggerSource, onRefused: (() -> Void)? = nil) {
         // While input is ignored ("Close on input" off, or the debug switch), a second manual trigger closes it.
         if windowController.isOpen {
             if source.isManual && !windowController.closesOnInput { windowController.close(.input) }
@@ -208,6 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let refusal = await spotify.openRefusal() {
                 log.notice("Not opening via \(source.rawValue, privacy: .public): \(refusal.rawValue, privacy: .public)")
                 if source.isManual { menuBarIcon.flash() }
+                onRefused?()
                 return
             }
             // Another trigger may have opened it while Spotify was being asked.

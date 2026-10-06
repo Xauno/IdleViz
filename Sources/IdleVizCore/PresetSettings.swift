@@ -151,6 +151,23 @@ public struct PresetSettings: Sendable, Equatable, Encodable {
         return script(for: held)
     }
 
+    /// The call for a preview from the Favorites or Blocklist sheet: held on that one preset, and
+    /// with no blend, so the visualizer opens on it instead of fading to it from the last one.
+    public func previewScript(preset: String) -> String {
+        var held = self
+        held.mode = .single
+        held.single = preset
+        held.blendSeconds = 0
+        return script(for: held)
+    }
+
+    /// The presets whose name contains the search text, whatever the case. An empty search matches all.
+    public static func matching(_ presets: [PresetInfo], search: String) -> [PresetInfo] {
+        let query = search.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return presets }
+        return presets.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+
     private func script(for settings: PresetSettings) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]

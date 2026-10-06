@@ -106,8 +106,7 @@ struct SettingsView: View {
     let openNow: () -> Void
     @AppStorage(OverlaySetting.key) private var showOverlay = true
     @AppStorage(BrightnessSetting.key) private var brightness = BrightnessSetting.defaultValue
-    @AppStorage(VisualizerKeys.likeKey) private var likeKey = VisualizerKeys.defaultLike
-    @AppStorage(VisualizerKeys.skipKey) private var skipKey = VisualizerKeys.defaultSkip
+    @AppStorage(PresetTitleSetting.key) private var showTitle = false
     @State private var overlayOpen = FoldedRows.startOpen
 
     var body: some View {
@@ -144,19 +143,16 @@ struct SettingsView: View {
                             if enabled { overlayOpen = true }
                         }
                 }
+                Toggle(isOn: $showTitle) {
+                    Text("Show visualizer title")
+                    Text("Small, in the top left corner")
+                }
             }
             Section("Presets") {
                 PresetControls(presets: presets)
             }
             Section("Keys") {
-                keyPicker($likeKey, taken: skipKey) {
-                    Text("Like key")
-                    Text("Favorites what's on screen")
-                }
-                keyPicker($skipKey, taken: likeKey) {
-                    Text("Skip key")
-                    Text("Next visualizer, in Shuffle")
-                }
+                KeyControls()
             }
             Section("Audio sync") {
                 AudioDelayControls(audioDelay: audioDelay)
@@ -166,18 +162,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-    }
-
-    /// A key for use while the visualizer is open. The other action's key isn't offered, so one key never does both.
-    private func keyPicker(_ code: Binding<Int>, taken: Int, @ViewBuilder label: () -> some View) -> some View {
-        Picker(selection: code) {
-            Text("Off").tag(VisualizerKeys.off)
-            ForEach(VisualizerKey.choices.filter { Int($0.code) != taken }) { key in
-                Text(key.label).tag(Int(key.code))
-            }
-        } label: {
-            label()
-        }
     }
 }
 

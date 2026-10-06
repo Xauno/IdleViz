@@ -6,6 +6,8 @@ final class VisualizerKeysTests: XCTestCase {
     private let suite = "VisualizerKeysTests"
     private let keyL: UInt16 = 37
     private let keyN: UInt16 = 45
+    private let keyB: UInt16 = 11
+    private let keyF5: UInt16 = 96
     private let keyF: UInt16 = 3
     private let space: UInt16 = 49
 
@@ -18,11 +20,12 @@ final class VisualizerKeysTests: XCTestCase {
         defaults.removePersistentDomain(forName: suite)
     }
 
-    func testDefaultsAreLAndN() {
+    func testDefaultsAreLNAndB() {
         let keys = VisualizerKeys(defaults: defaults)
         XCTAssertEqual(keys.like, keyL)
         XCTAssertEqual(keys.skip, keyN)
-        XCTAssertEqual(keys.codes, [keyL, keyN])
+        XCTAssertEqual(keys.block, keyB)
+        XCTAssertEqual(keys.codes, [keyL, keyN, keyB])
     }
 
     func testReadsTheStoredKeys() {
@@ -31,12 +34,16 @@ final class VisualizerKeysTests: XCTestCase {
         let keys = VisualizerKeys(defaults: defaults)
         XCTAssertEqual(keys.action(for: keyF), .like)
         XCTAssertEqual(keys.action(for: space), .skip)
+        XCTAssertEqual(keys.action(for: keyB), .block)
         XCTAssertNil(keys.action(for: keyL))
+        defaults.set(Int(keyF5), forKey: VisualizerKeys.blockKey)
+        XCTAssertEqual(VisualizerKeys(defaults: defaults).action(for: keyF5), .block)
     }
 
     func testOffMeansNoKey() {
         defaults.set(VisualizerKeys.off, forKey: VisualizerKeys.likeKey)
         defaults.set(VisualizerKeys.off, forKey: VisualizerKeys.skipKey)
+        defaults.set(VisualizerKeys.off, forKey: VisualizerKeys.blockKey)
         let keys = VisualizerKeys(defaults: defaults)
         XCTAssertNil(keys.like)
         XCTAssertNil(keys.skip)
@@ -44,7 +51,7 @@ final class VisualizerKeysTests: XCTestCase {
         XCTAssertNil(keys.action(for: keyL))
     }
 
-    func testAKeyThatIsNotOfferedIsTheDefault() {
+    func testAStoredValueThatCannotBeAKeyIsTheDefault() {
         // 53 is Escape, 100000 isn't a key code at all.
         defaults.set(53, forKey: VisualizerKeys.likeKey)
         defaults.set(100_000, forKey: VisualizerKeys.skipKey)
@@ -61,15 +68,35 @@ final class VisualizerKeysTests: XCTestCase {
         XCTAssertNil(keys.skip)
     }
 
-    func testChoicesAreLettersDigitsArrowsAndSpace() {
-        let choices = VisualizerKey.choices
-        XCTAssertEqual(choices.count, 26 + 10 + 4 + 1)
-        XCTAssertEqual(Set(choices.map(\.code)).count, choices.count)
-        XCTAssertEqual(Set(choices.map(\.label)).count, choices.count)
-        XCTAssertEqual(choices.first { $0.code == keyL }?.label, "L")
-        XCTAssertEqual(choices.first { $0.code == 124 }?.label, "→")
-        XCTAssertTrue(choices.contains { $0.code == UInt16(VisualizerKeys.defaultLike) })
-        XCTAssertTrue(choices.contains { $0.code == UInt16(VisualizerKeys.defaultSkip) })
+    func testAnOlderChoiceOfBForLikeOrSkipKeepsItAndLeavesBlockUnset() {
+        defaults.set(Int(keyB), forKey: VisualizerKeys.skipKey)
+        let keys = VisualizerKeys(defaults: defaults)
+        XCTAssertEqual(keys.action(for: keyB), .skip)
+        XCTAssertNil(keys.block)
+        XCTAssertEqual(VisualizerKeys(like: keyF, skip: keyL, block: keyF).block, nil)
+    }
+
+    func testAlmostAnyKeyCanBeRecorded() {
+        for code in [0, 11, 36, 49, 96, 123, 127] { XCTAssertTrue(VisualizerKeys.canBe(code), "\(code)") }
+        // Esc cancels the recorder; Command, Shift, Caps Lock, Option, Control and fn are keys of their own.
+        for code in [53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, -1, 128, 100_000] {
+            XCTAssertFalse(VisualizerKeys.canBe(code), "\(code)")
+        }
+    }
+
+    func testKeysAreNamedAsOnAUSKeyboard() {
+        XCTAssertEqual(VisualizerKeys.label(keyL), "L")
+        XCTAssertEqual(VisualizerKeys.label(space), "Space")
+        XCTAssertEqual(VisualizerKeys.label(keyF5), "F5")
+        XCTAssertEqual(VisualizerKeys.label(29), "0")
+        XCTAssertEqual(VisualizerKeys.label(92), "Num 9")
+        XCTAssertEqual(VisualizerKeys.label(124), "→")
+        XCTAssertEqual(VisualizerKeys.label(42), "\\")
+        XCTAssertEqual(VisualizerKeys.label(110), "Key 110")
+        XCTAssertEqual(VisualizerKeys.label(nil), "Not set")
+        // No two keys share a name.
+        let named = (0..<128).map { VisualizerKeys.label(UInt16($0)) }.filter { !$0.hasPrefix("Key ") }
+        XCTAssertEqual(Set(named).count, named.count)
     }
 
     func testScripts() {

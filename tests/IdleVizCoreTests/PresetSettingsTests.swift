@@ -131,4 +131,26 @@ final class PresetInfoTests: XCTestCase {
         XCTAssertEqual(PresetSettings.secondsChoices.map(PresetSettings.secondsLabel), ["15 s", "30 s", "45 s", "1 min", "2 min", "5 min"])
         XCTAssertEqual(PresetSettings.secondsLabel(90), "90 s")
     }
+
+    func testAPreviewIsHeldOnOnePresetWithNoBlend() {
+        var settings = PresetSettings()
+        settings.blendSeconds = 5
+        let script = settings.previewScript(preset: "bundled:Tunnel")
+        XCTAssertTrue(script.contains("\"mode\":\"single\""))
+        XCTAssertTrue(script.contains("\"single\":\"bundled:Tunnel\""))
+        XCTAssertTrue(script.contains("\"blendSeconds\":0"))
+        // The stored controls are untouched.
+        XCTAssertEqual(settings.mode, .shuffle)
+        XCTAssertEqual(settings.blendSeconds, 5)
+    }
+
+    func testSearchMatchesNamesWhateverTheCase() {
+        let presets = [
+            PresetInfo(id: "bundled:Geiss - Swirlie", name: "Geiss - Swirlie", source: "bundled"),
+            PresetInfo(id: "bundled:martin - tunnel", name: "martin - tunnel", source: "bundled"),
+        ]
+        XCTAssertEqual(PresetSettings.matching(presets, search: " geiss ").map(\.name), ["Geiss - Swirlie"])
+        XCTAssertEqual(PresetSettings.matching(presets, search: "").count, 2)
+        XCTAssertTrue(PresetSettings.matching(presets, search: "swirl x").isEmpty)
+    }
 }

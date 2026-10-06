@@ -800,7 +800,7 @@ Not a step of the brief: the owner found the window clunky after W9. It had abou
 
 ### Keys, preset search and preview, close on input, visualizer title
 
-Not a step of the brief: the owner asked for these after using the 0.1.1 build. They replace parts of W7b, W8c, W9 and the regrouped settings window above, which are left as they were written. The Mac app has none of it yet; [mac-todo.md](mac-todo.md) lists what to bring over.
+Not a step of the brief: the owner asked for these after using the 0.1.1 build. They replace parts of W7b, W8c, W9 and the regrouped settings window above, which are left as they were written. The Mac app got all of it later; what differs there is in [project.md](../project.md) under "Brought over from the Windows app".
 
 | File | What changed |
 | ---- | ------------ |

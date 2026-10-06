@@ -541,6 +541,10 @@
                   <div>Show it on<span class="d">Multi-display only</span></div>
                   <span class="ctl">Main display ▾</span>
                 </div>
+                <div class="r">
+                  <div>Show visualizer title<span class="d">Small, in the top left corner</span></div>
+                  <div class="sw"></div>
+                </div>
               </div>
               <div class="h">Presets</div>
               <div class="card">
@@ -606,11 +610,15 @@
               <div class="card">
                 <div class="r">
                   <div>Like key<span class="d">Favorites what's on screen</span></div>
-                  <span class="ctl">L ▾</span>
+                  <span class="kbd">L ✕</span>
                 </div>
                 <div class="r">
                   <div>Skip key<span class="d">Next visualizer, in Shuffle</span></div>
-                  <span class="ctl">N ▾</span>
+                  <span class="kbd">N ✕</span>
+                </div>
+                <div class="r">
+                  <div>Block key<span class="d">Blocks what's on screen, then skips</span></div>
+                  <span class="kbd">B ✕</span>
                 </div>
               </div>
               <div class="h">Audio sync</div>
@@ -689,7 +697,7 @@
             </tr>
             <tr>
               <td>Look</td>
-              <td>Brightness (50 to 100%), Show Spotify overlay (folded into it: Show it on)</td>
+              <td>Brightness (50 to 100%), Show Spotify overlay (folded into it: Show it on), Show visualizer title</td>
             </tr>
             <tr>
               <td>Presets</td>
@@ -701,7 +709,7 @@
             </tr>
             <tr>
               <td>Keys</td>
-              <td>Like key and Skip key (A to Z, 0 to 9, arrow keys, Space, Off)</td>
+              <td>Like key, Skip key and Block key, each recorded by pressing a key, with a ✕ button for no key</td>
             </tr>
             <tr>
               <td>Audio sync</td>
@@ -753,9 +761,22 @@
               Time per preset offers 15 s, 30 s, 45 s, 1 min, 2 min and 5 min. Blend time offers 0, 1, 2.7, 5 and 8 s.
             </li>
             <li>
-              Like key and Skip key work while the visualizer is open, where every other key closes it. Like adds the
-              preset on screen to the favorites, or takes it off again. Skip shows the next one in Shuffle mode. Each
-              picker leaves out the key the other one uses. Each has a short hint under its label.
+              Like key, Skip key and Block key work while the visualizer is open, where every other key closes it. Like
+              adds the preset on screen to the favorites, or takes it off again. Skip shows the next one in Shuffle
+              mode. Block puts the preset on the blocklist and, in Shuffle, skips on. Click a row's button, which then
+              says "Press a key", and press one: any key but Esc and the modifiers. Esc, or a click elsewhere, keeps the
+              old key; a key another row uses is refused ("In use, press another"); ✕ means no key ("Not set"). While
+              Close on input is off the three rows are greyed out and say "Needs Close on input".
+            </li>
+            <li>
+              In Single mode the Visualizer row is a button with the preset's name and a magnifier. It opens a sheet
+              with a search box and every preset as a list, scrolled to the current one; picking a row applies at once.
+              The Favorites and Blocklist sheets have the same search box on both tabs and a Preview button (▷) on every
+              row, which opens the visualizer held on that preset without changing the stored controls.
+            </li>
+            <li>
+              Show visualizer title puts the name of the preset on screen in the top left corner, in small type. Off by
+              default.
             </li>
             <li>
               Last shown names the preset that was last on screen, with a Favorite button and a Block button. Any input

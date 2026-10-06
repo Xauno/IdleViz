@@ -1,12 +1,13 @@
 import Foundation
 import IdleVizCore
 
-/// Sends the brightness and the overlay switch to the page, at launch and whenever settings change them.
+/// Sends the brightness, the overlay switch and the title switch to the page, at launch and whenever settings change them.
 @MainActor
 final class DisplayOptions {
     private let page: PageView
     private var brightness: Double
     private var overlay: Bool
+    private var title: Bool
     private var observer: NSObjectProtocol?
 
     init(page: PageView) {
@@ -14,7 +15,9 @@ final class DisplayOptions {
         brightness = BrightnessSetting.value(in: .standard)
         overlay = OverlaySetting.value(in: .standard)
         page.send(brightness: brightness)
+        title = PresetTitleSetting.value(in: .standard)
         page.send(overlayEnabled: overlay)
+        page.send(presetTitleEnabled: title)
         observer = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -32,6 +35,11 @@ final class DisplayOptions {
         if overlay != self.overlay {
             self.overlay = overlay
             page.send(overlayEnabled: overlay)
+        }
+        let title = PresetTitleSetting.value(in: .standard)
+        if title != self.title {
+            self.title = title
+            page.send(presetTitleEnabled: title)
         }
     }
 }

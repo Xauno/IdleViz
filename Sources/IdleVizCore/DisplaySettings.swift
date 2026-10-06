@@ -40,3 +40,17 @@ public enum OverlaySetting {
         "window.setOverlayEnabled?.(\(enabled))"
     }
 }
+
+/// The "Show visualizer title" switch: the name of the preset on screen, small, in the top left corner.
+public enum PresetTitleSetting {
+    public static let key = "showPresetTitle"
+
+    /// Off unless it was switched on.
+    public static func value(in defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: key) as? Bool ?? false
+    }
+
+    public static func script(for enabled: Bool) -> String {
+        "window.setPresetTitleEnabled?.(\(enabled))"
+    }
+}
