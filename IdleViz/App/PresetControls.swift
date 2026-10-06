@@ -1,52 +1,58 @@
 import IdleVizCore
 import SwiftUI
 
-/// The audio delay rows of the Visualizer section in settings: the slider for the current
-/// speakers or headphones, Detect delay and the manual delay test.
+/// The Audio sync section in settings: the delay for the current speakers or headphones, with
+/// the slider, Detect and the manual delay test folded into its row.
 struct AudioDelayControls: View {
     @Bindable var audioDelay: AudioDelayController
     @State private var showTest = false
+    @State private var isOpen = FoldedRows.startOpen
 
     var body: some View {
-        LabeledContent {
-            HStack(spacing: 6) {
+        FoldedRow(isOpen: $isOpen) {
+            // Under its label, so the slider runs the width of the row: 250 steps need the room.
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Set by hand")
                 Slider(value: $audioDelay.delay, in: AudioDelaySetting.range)
-                    .frame(width: 96)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity)
                     .accessibilityLabel("Audio delay")
-                Text(AudioDelaySetting.label(audioDelay.delay))
-                    .font(.callout)
-                    .monospacedDigit()
-                    .frame(width: 58, alignment: .trailing)
+            }
+            LabeledContent {
+                Button(audioDelay.detecting ? "Listening…" : "Detect") { audioDelay.detect() }
+                    .disabled(audioDelay.detecting)
+                    .accessibilityLabel("Detect delay")
+            } label: {
+                Text("Detect with the microphone")
+                switch audioDelay.hint {
+                case let .text(text):
+                    Text(text)
+                case .microphoneDenied:
+                    // The microphone is optional, so a missing permission only shows here.
+                    Link("Microphone access is off. Open System Settings…", destination: AudioDelayController.microphoneSettingsURL)
+                        .font(.caption)
+                case nil:
+                    Text("Listens for a few seconds")
+                }
+            }
+            LabeledContent {
+                Button("Start") { showTest = true }
+                    .disabled(audioDelay.detecting)
+                    .accessibilityLabel("Start the manual delay test")
+            } label: {
+                Text("Manual delay test")
+                Text("Match a flash to a beep, no mic")
+            }
+            .sheet(isPresented: $showTest) {
+                ManualDelaySheet(audioDelay: audioDelay)
             }
         } label: {
-            Text("Audio delay")
-            Text("For \(audioDelay.deviceName)").lineLimit(1)
-        }
-        LabeledContent {
-            Button(audioDelay.detecting ? "Listening…" : "Detect") { audioDelay.detect() }
-                .disabled(audioDelay.detecting)
-        } label: {
-            Text("Detect delay")
-            switch audioDelay.hint {
-            case let .text(text):
-                Text(text)
-            case .microphoneDenied:
-                // The microphone is optional, so a missing permission only shows here.
-                Link("Microphone access is off. Open System Settings…", destination: AudioDelayController.microphoneSettingsURL)
-                    .font(.caption)
-            case nil:
-                Text("Listens with the mic for a few seconds")
+            LabeledContent {
+                Text(AudioDelaySetting.label(audioDelay.delay)).monospacedDigit()
+            } label: {
+                Text("Audio delay")
+                Text("For \(audioDelay.deviceName)").lineLimit(1)
             }
-        }
-        LabeledContent {
-            Button("Start") { showTest = true }
-                .disabled(audioDelay.detecting)
-        } label: {
-            Text("Manual delay test")
-            Text("Match a flash to a beep, no mic")
-        }
-        .sheet(isPresented: $showTest) {
-            ManualDelaySheet(audioDelay: audioDelay)
         }
     }
 }
@@ -105,34 +111,44 @@ struct ManualDelaySheet: View {
     }
 }
 
-/// The preset rows of the Visualizer section in settings: mode, the rows for that mode,
-/// the last-shown preset, and the favorites and blocklist sheets.
+/// The Presets section in settings: mode with the rows for that mode folded into it, the
+/// last-shown preset, the favorites and blocklist sheets, and the library.
 struct PresetControls: View {
     @Bindable var presets: PresetController
     @State private var sheet: PresetList?
+    /// Which rows are open isn't stored: Mode starts open, the others closed.
+    @State private var modeOpen = true
 
     private var settings: PresetSettings { presets.settings }
 
     var body: some View {
-        Picker("Mode", selection: $presets.settings.mode) {
-            Text("Shuffle").tag(PresetSettings.Mode.shuffle)
-            Text("Single").tag(PresetSettings.Mode.single)
-        }
-        if settings.mode == .shuffle {
-            shuffleRows
-        } else {
-            singleRow
+        FoldedRow(isOpen: $modeOpen) {
+            // The two modes are alternatives, so their rows swap instead of greying out.
+            if settings.mode == .shuffle {
+                shuffleRows
+            } else {
+                singleRow
+            }
+        } label: {
+            Picker("Mode", selection: $presets.settings.mode) {
+                Text("Shuffle").tag(PresetSettings.Mode.shuffle)
+                Text("Single").tag(PresetSettings.Mode.single)
+            }
         }
         lastShownRow
         LabeledContent("Favorites") {
             Button("Manage (\(settings.favorites.count))") { sheet = .favorites }
         }
-        LabeledContent("Blocklist") {
+        LabeledContent {
             Button("Manage (\(settings.blocked.count))") { sheet = .blocklist }
                 .sheet(item: $sheet) { list in
                     PresetListSheet(list: list, presets: presets)
                 }
+        } label: {
+            Text("Blocklist")
+            Text("Never shown in Shuffle")
         }
+        PresetLibraryControls(presets: presets)
     }
 
     @ViewBuilder private var shuffleRows: some View {
@@ -145,11 +161,14 @@ struct PresetControls: View {
             Text("Shuffle from")
             if let hint = emptySourceHint { Text(hint) }
         }
-        Picker("Seconds per preset", selection: $presets.settings.secondsPerPreset) {
-            ForEach(PresetSettings.secondsChoices, id: \.self) { Text("\($0)").tag($0) }
+        Picker("Time per preset", selection: $presets.settings.secondsPerPreset) {
+            ForEach(PresetSettings.secondsChoices, id: \.self) { Text(PresetSettings.secondsLabel($0)).tag($0) }
         }
-        Picker("Blend time", selection: $presets.settings.blendSeconds) {
+        Picker(selection: $presets.settings.blendSeconds) {
             ForEach(PresetSettings.blendChoices, id: \.self) { Text(Self.blendLabel($0)).tag($0) }
+        } label: {
+            Text("Blend time")
+            Text("The fade between presets")
         }
     }
 
@@ -176,21 +195,12 @@ struct PresetControls: View {
         if let id = presets.lastShown {
             LabeledContent {
                 HStack(spacing: 4) {
-                    Button {
-                        presets.settings.setFavorite(id, !settings.isFavorite(id))
-                    } label: {
-                        Image(systemName: settings.isFavorite(id) ? "heart.fill" : "heart")
-                    }
-                    .help(settings.isFavorite(id) ? "Remove from favorites" : "Add to favorites")
-                    .accessibilityLabel(settings.isFavorite(id) ? "Remove from favorites" : "Add to favorites")
-                    Button {
-                        presets.settings.setBlocked(id, !settings.isBlocked(id))
-                    } label: {
-                        Image(systemName: settings.isBlocked(id) ? "nosign.app.fill" : "nosign")
-                    }
-                    .help(settings.isBlocked(id) ? "Remove from the blocklist" : "Add to the blocklist")
-                    .accessibilityLabel(settings.isBlocked(id) ? "Remove from the blocklist" : "Add to the blocklist")
+                    Toggle("Favorite", isOn: Binding { settings.isFavorite(id) } set: { presets.settings.setFavorite(id, $0) })
+                        .help(settings.isFavorite(id) ? "Remove from favorites" : "Add to favorites")
+                    Toggle("Block", isOn: Binding { settings.isBlocked(id) } set: { presets.settings.setBlocked(id, $0) })
+                        .help(settings.isBlocked(id) ? "Remove from the blocklist" : "Add to the blocklist")
                 }
+                .toggleStyle(.button)
             } label: {
                 Text("Last shown")
                 Text(presets.name(for: id)).lineLimit(2)
@@ -296,50 +306,56 @@ struct PresetListSheet: View {
     }
 }
 
-/// The Presets section in settings: the trust warning, Import, the folder, Reload, and what failed to load.
-struct PresetFolderControls: View {
+/// The Library row of the Presets section, with the trust warning, Import, the folder, Reload and
+/// what failed to load folded into it.
+struct PresetLibraryControls: View {
     @Bindable var presets: PresetController
+    @State private var isOpen = FoldedRows.startOpen
 
     var body: some View {
-        Section {
+        FoldedRow(isOpen: $isOpen) {
+            // Presets carry equations that run as code, so the warning covers them as well as plugins.
+            WarningRow(text: "Custom plugins and presets are code. Only import ones you trust.")
             LabeledContent {
-                Button("Import") { presets.library.importPresets() }
+                Button("Import…") { presets.library.importPresets() }
+                    .accessibilityLabel("Import presets")
             } label: {
-                Text("Import…")
+                Text("Import presets")
                 Text(".json, .js, .milk")
             }
             LabeledContent {
-                Button("Open") { presets.library.openFolder() }
+                Button("Show in Finder") { presets.library.openFolder() }
             } label: {
-                Text("Folder")
-                Text("\(presets.bundledCount) bundled, \(presets.library.customCount) custom")
+                Text("Presets folder")
+                Text("Your own presets")
             }
-            LabeledContent("Rescan") {
+            LabeledContent {
                 Button("Reload") { presets.library.reload() }
+                    .accessibilityLabel("Reload presets")
+            } label: {
+                Text("Reload presets")
+                Text("After changing files in the folder")
             }
-        } header: {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Presets")
-                // Presets carry equations that run as code, so the warning covers them as well as plugins.
-                Text("Custom plugins and presets are code. Only import ones you trust.")
-                    .font(.caption)
-                    .fontWeight(.regular)
-                    .foregroundStyle(.orange)
-            }
-        }
-        if !presets.failures.isEmpty {
-            Section("Failed to load (\(presets.failures.count))") {
-                ForEach(presets.failures) { failure in
-                    LabeledContent {
-                        if presets.library.file(for: failure.id) != nil {
-                            Button("Reveal") { presets.library.reveal(failure.id) }
-                        }
-                    } label: {
-                        Text(presets.name(for: failure.id)).lineLimit(1)
-                        Text(failure.error).lineLimit(2)
+            ForEach(presets.failures) { failure in
+                LabeledContent {
+                    if presets.library.file(for: failure.id) != nil {
+                        Button("Reveal") { presets.library.reveal(failure.id) }
                     }
+                } label: {
+                    Text("Failed to load: \(presets.name(for: failure.id))").lineLimit(1)
+                    Text(failure.error).lineLimit(2)
                 }
             }
+        } label: {
+            LabeledContent("Library") {
+                Text(summary).font(.callout).multilineTextAlignment(.trailing)
+            }
         }
+    }
+
+    /// "396 bundled, 0 custom, 2 failed to load". The count is here since the list is folded away.
+    private var summary: String {
+        let counts = "\(presets.bundledCount) bundled, \(presets.library.customCount) custom"
+        return presets.failures.isEmpty ? counts : "\(counts), \(presets.failures.count) failed to load"
     }
 }

@@ -67,6 +67,11 @@ public struct PresetSettings: Sendable, Equatable, Encodable {
 
     public init() {}
 
+    /// "30 s", "2 min". Whole minutes are shown as minutes.
+    public static func secondsLabel(_ seconds: Int) -> String {
+        seconds >= 60 && seconds % 60 == 0 ? "\(seconds / 60) min" : "\(seconds) s"
+    }
+
     // MARK: Lists
 
     public func isFavorite(_ id: String) -> Bool { favorites.contains(id) }

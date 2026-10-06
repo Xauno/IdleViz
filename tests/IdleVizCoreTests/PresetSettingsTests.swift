@@ -126,4 +126,9 @@ final class PresetInfoTests: XCTestCase {
         XCTAssertEqual(PresetInfo.fallbackName(for: "custom:My: Preset"), "My: Preset")
         XCTAssertEqual(PresetInfo.fallbackName(for: "plain"), "plain")
     }
+
+    func testSecondsAreLabelledWithTheirUnit() {
+        XCTAssertEqual(PresetSettings.secondsChoices.map(PresetSettings.secondsLabel), ["15 s", "30 s", "45 s", "1 min", "2 min", "5 min"])
+        XCTAssertEqual(PresetSettings.secondsLabel(90), "90 s")
+    }
 }

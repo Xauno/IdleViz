@@ -276,6 +276,17 @@
       .r:last-child {
         border-bottom: none;
       }
+      .r.sub {
+        padding-left: 26px;
+      }
+      .r.off {
+        opacity: 0.45;
+      }
+      .ctl.go {
+        background: #0a84ff;
+        border-color: #0a84ff;
+        color: #fff;
+      }
       .r .d {
         display: block;
         font-size: 11px;
@@ -454,7 +465,10 @@
       </div>
 
       <h2>2. Settings window</h2>
-      <p class="lead">A small, fixed-size, portrait window. One page that scrolls. No sidebar and no tabs.</p>
+      <p class="lead">
+        A small portrait window with a fixed width and a height that can be dragged. One page that scrolls, in six
+        sections. A row that depends on another row is folded into it. No sidebar and no tabs.
+      </p>
       <div class="theme" role="group" aria-label="Preview appearance">
         <button type="button" data-t="system" aria-pressed="true">System</button>
         <button type="button" data-t="light" aria-pressed="false">Light</button>
@@ -469,7 +483,13 @@
               ><span style="flex: 1; text-align: center; margin-right: 40px">Settings</span>
             </div>
             <div class="body">
-              <div class="h" style="margin-top: 10px">General</div>
+              <div class="card" style="margin-top: 10px">
+                <div class="r">
+                  <div>Open the visualizer<span class="d">Needs a Spotify track</span></div>
+                  <span class="ctl go">Open now</span>
+                </div>
+              </div>
+              <div class="h">Opening</div>
               <div class="card">
                 <div class="r">
                   <div>Start after idle<span class="d">Needs a Spotify track</span></div>
@@ -480,15 +500,15 @@
                   <span class="ctl">1 hour ▾</span>
                 </div>
                 <div class="r">
-                  <div>Different times on battery</div>
+                  <div>⌄ Different times on battery</div>
                   <div class="sw on"></div>
                 </div>
-                <div class="r">
-                  <div>On battery: start after idle</div>
+                <div class="r sub">
+                  <div>Start after idle</div>
                   <span class="ctl">5 min ▾</span>
                 </div>
-                <div class="r">
-                  <div>On battery: keep screen awake</div>
+                <div class="r sub">
+                  <div>Keep screen awake</div>
                   <span class="ctl">30 min ▾</span>
                 </div>
                 <div class="r">
@@ -496,29 +516,16 @@
                   <span class="kbd">⌃⌥V ✕</span>
                 </div>
                 <div class="r">
-                  <div>Like key</div>
-                  <span class="ctl">L ▾</span>
-                </div>
-                <div class="r">
-                  <div>Skip key</div>
-                  <span class="ctl">N ▾</span>
-                </div>
-                <div class="r">
-                  <div>Open now</div>
-                  <span class="ctl">Open</span>
+                  <div>Close on input<span class="d">Off: the hotkey or Open now closes it</span></div>
+                  <div class="sw on"></div>
                 </div>
                 <div class="r">
                   <div>Launch at login</div>
                   <div class="sw on"></div>
                 </div>
               </div>
-
-              <div class="h">Visualizer</div>
+              <div class="h">Look</div>
               <div class="card">
-                <div class="r">
-                  <div>Show Spotify overlay</div>
-                  <div class="sw on"></div>
-                </div>
                 <div class="r">
                   <div>Brightness</div>
                   <div style="display: flex; gap: 8px; align-items: center">
@@ -527,79 +534,113 @@
                   </div>
                 </div>
                 <div class="r">
-                  <div>Audio delay<span class="d">For AirPods Pro</span></div>
-                  <div style="display: flex; gap: 8px; align-items: center">
-                    <div class="track"></div>
-                    <span style="font-size: 12px">180 ms</span>
-                  </div>
+                  <div>⌄ Show Spotify overlay</div>
+                  <div class="sw on"></div>
                 </div>
-                <div class="r">
-                  <div>Detect delay<span class="d">Listens with the mic for a few seconds</span></div>
-                  <span class="ctl">Detect</span>
+                <div class="r sub off">
+                  <div>Show it on<span class="d">Multi-display only</span></div>
+                  <span class="ctl">Main display ▾</span>
                 </div>
+              </div>
+              <div class="h">Presets</div>
+              <div class="card">
                 <div class="r">
-                  <div>Manual delay test<span class="d">Match a flash to a beep, no mic</span></div>
-                  <span class="ctl">Start</span>
-                </div>
-                <div class="r">
-                  <div>Mode</div>
+                  <div>⌄ Mode</div>
                   <span class="ctl">Shuffle ▾</span>
                 </div>
-                <div class="r">
+                <div class="r sub">
                   <div>Shuffle from</div>
                   <span class="ctl">All ▾</span>
                 </div>
-                <div class="r">
-                  <div>Seconds per preset</div>
-                  <span class="ctl">30 ▾</span>
+                <div class="r sub">
+                  <div>Time per preset</div>
+                  <span class="ctl">30 s ▾</span>
                 </div>
-                <div class="r">
-                  <div>Blend time</div>
+                <div class="r sub">
+                  <div>Blend time<span class="d">The fade between presets</span></div>
                   <span class="ctl">2.7 s ▾</span>
                 </div>
                 <div class="r">
                   <div>Last shown<span class="d">Geiss - Swirlie 5</span></div>
-                  <div style="display: flex; gap: 4px"><span class="ctl">♡</span><span class="ctl">⊘</span></div>
+                  <div style="display: flex; gap: 4px">
+                    <span class="ctl">Favorite</span><span class="ctl">Block</span>
+                  </div>
                 </div>
                 <div class="r">
                   <div>Favorites</div>
                   <span class="ctl">Manage (12)</span>
                 </div>
                 <div class="r">
-                  <div>Blocklist</div>
+                  <div>Blocklist<span class="d">Never shown in Shuffle</span></div>
                   <span class="ctl">Manage (4)</span>
                 </div>
-              </div>
-
-              <div class="h">Presets</div>
-              <div class="warn">Custom plugins and presets are code. Only import ones you trust.</div>
-              <div class="card">
                 <div class="r">
-                  <div>Import…<span class="d">.json, .js, .milk</span></div>
-                  <span class="ctl">Import</span>
+                  <div>⌄ Library</div>
+                  <span style="font-size: 11px; color: var(--muted)">312 bundled, 18 custom, 2 failed to load</span>
                 </div>
-                <div class="r">
-                  <div>Folder<span class="d">312 bundled, 18 custom</span></div>
-                  <span class="ctl">Open</span>
+                <div class="warn" style="margin: 4px 10px 4px 26px">
+                  Custom plugins and presets are code. Only import ones you trust.
                 </div>
-                <div class="r">
-                  <div>Rescan</div>
+                <div class="r sub">
+                  <div>Import presets<span class="d">.json, .js, .milk</span></div>
+                  <span class="ctl">Import…</span>
+                </div>
+                <div class="r sub">
+                  <div>Presets folder<span class="d">Your own presets</span></div>
+                  <span class="ctl">Show in Finder</span>
+                </div>
+                <div class="r sub">
+                  <div>Reload presets<span class="d">After changing files in the folder</span></div>
                   <span class="ctl">Reload</span>
                 </div>
+                <div class="r sub">
+                  <div>Failed to load: broken-tunnel.milk<span class="d">Shader compile error</span></div>
+                  <span class="ctl">Reveal</span>
+                </div>
+                <div class="r sub">
+                  <div>Failed to load: slow.js<span class="d">Frame over 50 ms</span></div>
+                  <span class="ctl">Reveal</span>
+                </div>
               </div>
-              <p class="grp">Failed to load (3)</p>
+              <div class="h">Keys</div>
               <div class="card">
                 <div class="r">
-                  <div>broken-tunnel.milk<span class="d">Shader compile error</span></div>
-                  <span class="ctl">Reveal</span>
+                  <div>Like key<span class="d">Favorites what's on screen</span></div>
+                  <span class="ctl">L ▾</span>
                 </div>
                 <div class="r">
-                  <div>my-plugin.js<span class="d">No WebGL2</span></div>
-                  <span class="ctl">Reveal</span>
+                  <div>Skip key<span class="d">Next visualizer, in Shuffle</span></div>
+                  <span class="ctl">N ▾</span>
+                </div>
+              </div>
+              <div class="h">Audio sync</div>
+              <div class="card">
+                <div class="r">
+                  <div>⌄ Audio delay<span class="d">For AirPods Pro</span></div>
+                  <span style="font-size: 12px">180 ms</span>
+                </div>
+                <div class="r sub" style="display: block">
+                  <div>Set by hand</div>
+                  <div class="track" style="width: auto; margin: 8px 0 4px"></div>
+                </div>
+                <div class="r sub">
+                  <div>Detect with the microphone<span class="d">Listens for a few seconds</span></div>
+                  <span class="ctl">Detect</span>
+                </div>
+                <div class="r sub">
+                  <div>Manual delay test<span class="d">Match a flash to a beep, no mic</span></div>
+                  <span class="ctl">Start</span>
+                </div>
+              </div>
+              <div class="h">Displays</div>
+              <div class="card">
+                <div class="r">
+                  <div>Main display</div>
+                  <span class="ctl">macOS main display ▾</span>
                 </div>
                 <div class="r">
-                  <div>slow.js<span class="d">Frame over 50 ms</span></div>
-                  <span class="ctl">Reveal</span>
+                  <div>› Use more than one display<span class="d">Covers other displays too</span></div>
+                  <div class="sw"></div>
                 </div>
               </div>
             </div>
@@ -610,13 +651,12 @@
           <h3>Window</h3>
           <ul>
             <li>
-              A normal <code>NSWindow</code> with SwiftUI content. Fixed width of about 340 pt and a fixed height of
-              about 560 pt. The content scrolls inside (<code>ScrollView</code>).
+              A normal <code>NSWindow</code> with SwiftUI content. Fixed width of about 340 pt; it opens about 640 pt
+              tall and the height can be dragged. The content scrolls inside.
             </li>
             <li>
-              Not resizable and cannot go fullscreen: leave <code>.resizable</code> out of the style mask, set
-              <code>collectionBehavior = [.fullScreenNone]</code>, and disable the zoom (green) button. That also stops
-              the ⌃⌘F shortcut.
+              Cannot go fullscreen: set <code>collectionBehavior = [.fullScreenNone]</code> and disable the zoom (green)
+              button. That also stops the ⌃⌘F shortcut.
             </li>
             <li>
               Keep close (the red button) and minimize. There is no Quit row: the red button closes the window and ⌘Q
@@ -635,28 +675,45 @@
               <th>Rows</th>
             </tr>
             <tr>
-              <td>General</td>
+              <td>(above the sections)</td>
+              <td>Open the visualizer, with the Open now button. It is not a setting.</td>
+            </tr>
+            <tr>
+              <td>Opening</td>
               <td>
-                Idle timeout (5, 10, 15, 30 min, Off), keep screen awake for (30 min, 1 hour, 2 hours, 4 hours; default
-                1 hour), Different times on battery (only on Macs with a battery; off by default; when on, two more
-                rows: idle timeout and keep screen awake on battery), hotkey recorder
-                (<code>KeyboardShortcuts.Recorder</code>), Like key and Skip key (A to Z, 0 to 9, arrow keys, Space,
-                Off), Open now, Launch at login
+                Start after idle (5, 10, 15, 30 min, Off), Keep screen awake (30 min, 1 hour, 2 hours, 4 hours; default
+                1 hour), Different times on battery (only on Macs with a battery; off by default; folded into it: Start
+                after idle and Keep screen awake on battery), Open hotkey (<code>KeyboardShortcuts.Recorder</code>),
+                Close on input, Launch at login
               </td>
             </tr>
             <tr>
-              <td>Visualizer</td>
-              <td>
-                Show Spotify overlay, Brightness (50 to 100%), Audio delay (0 to 2.5 s, for the current speakers or
-                headphones), Detect delay, Manual delay test, Mode (Single or Shuffle), then the rows for that mode (see
-                below), Favorites, Blocklist
-              </td>
+              <td>Look</td>
+              <td>Brightness (50 to 100%), Show Spotify overlay (folded into it: Show it on)</td>
             </tr>
             <tr>
               <td>Presets</td>
               <td>
-                Plugin trust warning, Import…, Open folder, Reload, list of presets and plugins that failed to load
-                (each with its error and a Reveal button)
+                Mode (Single or Shuffle; folded into it: the rows for that mode, see below), Last shown, Favorites,
+                Blocklist, Library (folded into it: the trust warning, Import presets, Presets folder, Reload presets,
+                and each preset or plugin that failed to load with its error and a Reveal button)
+              </td>
+            </tr>
+            <tr>
+              <td>Keys</td>
+              <td>Like key and Skip key (A to Z, 0 to 9, arrow keys, Space, Off)</td>
+            </tr>
+            <tr>
+              <td>Audio sync</td>
+              <td>
+                Audio delay, which shows the value for the current speakers or headphones (folded into it: Set by hand,
+                a slider from 0 to 2.5 s; Detect with the microphone; Manual delay test)
+              </td>
+            </tr>
+            <tr>
+              <td>Displays</td>
+              <td>
+                Main display, Use more than one display (folded into it: the GPU warning, Other displays, Placement)
               </td>
             </tr>
           </table>
@@ -669,6 +726,12 @@
               heading.
             </li>
             <li>
+              A folded row is a <code>DisclosureGroup</code> with its rows inset under it. A row that depends on a
+              switch is greyed out while the switch is off, not hidden, and turning the switch on opens the row. Which
+              rows are open is not stored: Mode starts open, the others closed. Mode swaps its rows between Shuffle and
+              Single instead of greying them out.
+            </li>
+            <li>
               Keep it compact: small text, tight rows, and a short hint under a label only when the label alone is
               unclear.
             </li>
@@ -678,24 +741,26 @@
             </li>
             <li>
               Mode is Single or Shuffle. The mockup shows Shuffle, which has three rows: Shuffle from (All, Bundled,
-              Custom, Favorites), Seconds per preset and Blend time. In Single, those three rows are replaced by one
-              row, Visualizer, a picker listing every preset and plugin (bundled and custom), and the current preset
-              stays on screen until changed.
+              Custom, Favorites), Time per preset and Blend time. In Single, those three rows are replaced by one row,
+              Visualizer, a picker listing every preset and plugin (bundled and custom), and the current preset stays on
+              screen until changed.
             </li>
             <li>
               Show Spotify overlay off means the page shows only the visualizer and dim layer: no now-playing layout in
               any state, not even the paused progress bar. Brightness, mode and the rest behave the same.
             </li>
-            <li>Seconds per preset offers 15, 30, 45, 60, 120 and 300. Blend time offers 0, 1, 2.7, 5 and 8 s.</li>
+            <li>
+              Time per preset offers 15 s, 30 s, 45 s, 1 min, 2 min and 5 min. Blend time offers 0, 1, 2.7, 5 and 8 s.
+            </li>
             <li>
               Like key and Skip key work while the visualizer is open, where every other key closes it. Like adds the
               preset on screen to the favorites, or takes it off again. Skip shows the next one in Shuffle mode. Each
               picker leaves out the key the other one uses. Each has a short hint under its label.
             </li>
             <li>
-              Last shown names the preset that was last on screen, with a heart button (favorite) and a block button.
-              Any input but the like and skip keys closes the visualizer, so this is how a preset you just watched gets
-              blocked, or liked after the fact. The row is hidden until a preset has been shown.
+              Last shown names the preset that was last on screen, with a Favorite button and a Block button. Any input
+              but the like and skip keys closes the visualizer, so this is how a preset you just watched gets blocked,
+              or liked after the fact. The row is hidden until a preset has been shown.
             </li>
             <li>
               Favorites and Blocklist open a sheet with two tabs: the presets on that list, where entries can be
@@ -713,10 +778,10 @@
               the delay macOS reports for it.
             </li>
             <li>
-              Detect delay: press it while Spotify plays out loud. The button shows "Listening…" for about 5 s, then the
-              slider jumps to the result. If it can't hear the music clearly (too quiet, or headphones), the hint says
-              so and the value doesn't change. If microphone access is denied, the hint says so and links to System
-              Settings.
+              Detect with the microphone: press Detect while Spotify plays out loud. The button shows "Listening…" for
+              about 5 s, then the slider jumps to the result. If it can't hear the music clearly (too quiet, or
+              headphones), the hint says so and the value doesn't change. If microphone access is denied, the hint says
+              so and links to System Settings.
             </li>
             <li>
               Manual delay test: Start opens a sheet with a panel that lights up, the delay slider with −10 ms and +10

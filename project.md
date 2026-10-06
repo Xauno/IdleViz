@@ -511,6 +511,14 @@ Not steps of the build order: the Windows port got these first, and the Mac foll
   - A stuck page ends only its own web content process, so the other pages are left alone. The preset a following page hung on is kept out of the library the same way as the main page's.
   - Debug builds take `-IdleVizSplitDisplay YES`, which treats the two halves of the main display as two displays. Mirror, extend, the overlay's display and **Close on input** off were checked that way; nothing has run on a real second display. The checks still to do are in [docs/mac-todo.md](docs/mac-todo.md).
 
+- **The settings window, regrouped.** The same six sections and folded rows as on Windows, with **Open now** above them. `SettingsWindow.swift` holds the page and the Opening section; `PresetControls.swift` the Presets and Audio sync sections; `DisplayControls.swift` the Displays section.
+  - A folded row is `FoldedRow`, a `DisclosureGroup` in the grouped `Form` with its rows inset. The arrow is at the row's left, where macOS puts it. A switch or picker in the row's label stays clickable without folding it.
+  - The window is 340 pt wide, opens 640 pt tall, and its height can be dragged (`contentMinSize` and `contentMaxSize` with the same width).
+  - Mac wording: "Launch at login", "Then the Mac sleeps as usual", **Show in Finder** for the presets folder. The Mac has no **Microphone** row, since Detect picks the built-in microphone itself.
+  - **Favorite** and **Block** next to **Last shown** are toggle buttons that stay pressed while the preset is on that list.
+  - Failed files are rows at the foot of **Library**, each starting "Failed to load:", and the count is on the Library row.
+  - Debug builds take `-IdleVizSettingsHeight 2050` (a window taller than the screen, for capturing all of it) and `-IdleVizSettingsUnfolded YES` (every folded row open).
+
 ## Requirements
 
 - macOS 26 or later. The app is only built for the macOS it runs on (personal use), which avoids fallbacks for older versions.
