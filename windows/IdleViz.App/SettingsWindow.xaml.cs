@@ -30,13 +30,6 @@ public sealed partial class SettingsWindow : Window
     // It starts set: a slider reports a change as soon as its range is, while the window is still being built.
     private bool _showing = true;
 
-    // What the Visualizer picker was last filled with: the page's list and a stored preset missing from it.
-    private IReadOnlyList<PresetInfo>? _singleChoices;
-    private string? _singleExtra;
-
-    // The ids behind the Visualizer picker's names, in the same order.
-    private List<string> _singleIds = [];
-
     // What the Failed to load list shows, so it is only rebuilt when that changes.
     private IReadOnlyList<PresetFailure> _shownFailures = [];
 
@@ -68,6 +61,9 @@ public sealed partial class SettingsWindow : Window
         Recorder.HotkeyChanged += ShowHotkeyState;
         ShowHotkeyState();
 
+        LikeKeyRecorder.KeyChanged += key => ChangeKey(VisualizerKeys.LikeKey, key);
+        SkipKeyRecorder.KeyChanged += key => ChangeKey(VisualizerKeys.SkipKey, key);
+        BlockKeyRecorder.KeyChanged += key => ChangeKey(VisualizerKeys.BlockKey, key);
         ShowKeys();
         ShowDisplayOptions();
         MultiDisplayWarning.Message = MultiDisplaySettings.GpuWarning;
@@ -266,54 +262,30 @@ public sealed partial class SettingsWindow : Window
         Unfold(BatteryExpander, BatterySwitch.IsOn);
     }
 
-    // Each picker leaves out the key the other one uses.
+    // Each recorder refuses the keys the other two use. With Close on input off no key is watched
+    // while the visualizer is open, so the rows are greyed out and say why.
     private void ShowKeys()
     {
         var keys = VisualizerKeys.Read(_app.Settings);
-        _showing = true;
-        try
-        {
-            FillKeys(LikeKeyPicker, keys.Like, taken: keys.Skip);
-            FillKeys(SkipKeyPicker, keys.Skip, taken: keys.Like);
-        }
-        finally
-        {
-            _showing = false;
-        }
+        var watched = MultiDisplaySettings.Read(_app.Settings).CloseOnInput;
+        ShowKey(LikeKeyCard, LikeKeyRecorder, keys.Like, keys, watched, "Favorites what's on screen");
+        ShowKey(SkipKeyCard, SkipKeyRecorder, keys.Skip, keys, watched, "Next visualizer, in Shuffle");
+        ShowKey(BlockKeyCard, BlockKeyRecorder, keys.Block, keys, watched, "Blocks what's on screen and skips to the next");
     }
 
-    private static void FillKeys(ComboBox picker, ushort? current, ushort? taken)
+    private static void ShowKey(
+        CommunityToolkit.WinUI.Controls.SettingsCard card, KeyRecorder recorder, ushort? key, VisualizerKeys keys, bool watched, string description)
     {
-        var choices = VisualizerKey.Choices.Where(key => key.Code != taken).ToList();
-        int[] codes = [VisualizerKeys.Off, .. choices.Select(key => (int)key.Code)];
-
-        // Only the other picker's list changes with a choice. The one being used keeps its items:
-        // emptying a picker from inside its own selection event takes the app down.
-        if (!codes.SequenceEqual(picker.Items.OfType<ComboBoxItem>().Select(item => (int)item.Tag)))
-        {
-            picker.Items.Clear();
-            picker.Items.Add(new ComboBoxItem { Content = "Off", Tag = VisualizerKeys.Off });
-            foreach (var key in choices)
-            {
-                picker.Items.Add(new ComboBoxItem { Content = key.Label, Tag = (int)key.Code });
-            }
-        }
-
-        Select(picker, current is { } code ? code : VisualizerKeys.Off);
+        recorder.Show(key, keys.Codes.Where(code => code != key));
+        card.IsEnabled = watched;
+        card.Description = watched ? description : "Needs Close on input";
     }
 
-    private void ChangeKey(ComboBox picker, string key)
+    private void ChangeKey(string setting, ushort? key)
     {
-        if (!_showing && picker.SelectedItem is ComboBoxItem { Tag: int code })
-        {
-            _app.Settings.SetInt(key, code);
-            ShowKeys();
-        }
+        _app.Settings.SetInt(setting, key ?? VisualizerKeys.Off);
+        ShowKeys();
     }
-
-    private void OnLikeKeyChanged(object sender, SelectionChangedEventArgs e) => ChangeKey(LikeKeyPicker, VisualizerKeys.LikeKey);
-
-    private void OnSkipKeyChanged(object sender, SelectionChangedEventArgs e) => ChangeKey(SkipKeyPicker, VisualizerKeys.SkipKey);
 
     private void ShowStartup()
     {
@@ -356,6 +328,7 @@ public sealed partial class SettingsWindow : Window
         try
         {
             OverlaySwitch.IsOn = OverlaySetting.Value(_app.Settings);
+            PresetTitleSwitch.IsOn = PresetTitleSetting.Value(_app.Settings);
             BrightnessSlider.Value = brightness;
         }
         finally
@@ -372,6 +345,14 @@ public sealed partial class SettingsWindow : Window
         {
             _app.Settings.SetBool(OverlaySetting.Key, OverlaySwitch.IsOn);
             ShowDisplays();
+        }
+    }
+
+    private void OnPresetTitleToggled(object sender, RoutedEventArgs e)
+    {
+        if (!_showing)
+        {
+            _app.Settings.SetBool(PresetTitleSetting.Key, PresetTitleSwitch.IsOn);
         }
     }
 
@@ -443,7 +424,7 @@ public sealed partial class SettingsWindow : Window
         OtherDisplaysButton.Content = others.Count == 0 ? "None connected" : chosen == others.Count ? "All" : chosen == 0 ? "None" : $"{chosen} of {others.Count} displays";
 
         MultiDisplayWarning.IsOpen = settings.Enabled;
-        PlacementCard.IsEnabled = CloseOnInputCard.IsEnabled = settings.Enabled;
+        PlacementCard.IsEnabled = settings.Enabled;
         OtherDisplaysCard.IsEnabled = settings.Enabled && others.Count > 0;
 
         // With one display covered the overlay has only one place to be.
@@ -533,6 +514,7 @@ public sealed partial class SettingsWindow : Window
         if (!_showing)
         {
             _app.Settings.SetBool(MultiDisplaySettings.CloseOnInputKey, CloseOnInputSwitch.IsOn);
+            ShowKeys();
         }
     }
 
@@ -561,12 +543,12 @@ public sealed partial class SettingsWindow : Window
         DelayLabel.Text = AudioDelaySetting.Label(delay.Delay);
         DelayExpander.Description = new TextBlock { Text = $"For {delay.DeviceName}", MaxLines = 1, TextTrimming = TextTrimming.CharacterEllipsis };
 
-        DetectButton.Content = delay.Detecting ? "Listening…" : "Detect";
+        DetectButton.Content = delay.Detecting ? "Listeningâ€¦" : "Detect";
         DetectButton.IsEnabled = !delay.Detecting && !delay.Testing;
         TestButton.IsEnabled = !delay.Detecting && !delay.Testing;
         if (delay.MicrophoneDenied)
         {
-            var link = new HyperlinkButton { Content = "Microphone access is off. Open Settings…", Padding = new Thickness(0) };
+            var link = new HyperlinkButton { Content = "Microphone access is off. Open Settingsâ€¦", Padding = new Thickness(0) };
             link.Click += async (_, _) => await Windows.System.Launcher.LaunchUriAsync(AudioDelayController.MicrophoneSettings);
             DetectCard.Description = link;
         }
@@ -682,7 +664,8 @@ public sealed partial class SettingsWindow : Window
 
             Select(SecondsPicker, settings.SecondsPerPreset);
             Select(BlendPicker, settings.BlendSeconds);
-            ShowSingleChoices(settings.SinglePreset);
+            SingleLabel.Text = Presets.Name(settings.SinglePreset);
+            ToolTipService.SetToolTip(SingleButton, SingleLabel.Text);
 
             if (Presets.LastShown is { } id)
             {
@@ -712,29 +695,6 @@ public sealed partial class SettingsWindow : Window
         finally
         {
             _showing = false;
-        }
-    }
-
-    // The page's list has a few hundred entries, so the picker is only refilled when it changed, and gets
-    // them as a plain list of names, which it can virtualize.
-    private void ShowSingleChoices(string selected)
-    {
-        var presets = Presets.Presets;
-        // Keeps the stored choice selectable while the list is still loading or the preset is gone.
-        var extra = presets.Any(preset => preset.Id == selected) ? null : selected;
-        if (!ReferenceEquals(presets, _singleChoices) || extra != _singleExtra)
-        {
-            _singleChoices = presets;
-            _singleExtra = extra;
-            var choices = (extra is null ? [] : new[] { new PresetInfo(extra, Presets.Name(extra), "bundled") }).Concat(presets).ToList();
-            _singleIds = [.. choices.Select(preset => preset.Id)];
-            SinglePicker.ItemsSource = choices.Select(preset => preset.Name).ToList();
-        }
-
-        var index = _singleIds.IndexOf(selected);
-        if (SinglePicker.SelectedIndex != index)
-        {
-            SinglePicker.SelectedIndex = index;
         }
     }
 
@@ -885,15 +845,7 @@ public sealed partial class SettingsWindow : Window
     private void OnBlendChanged(object sender, SelectionChangedEventArgs e) =>
         Change<double>(BlendPicker, (settings, blend) => settings.BlendSeconds = blend);
 
-    private void OnSingleChanged(object sender, SelectionChangedEventArgs e)
-    {
-        var index = SinglePicker.SelectedIndex;
-        if (!_showing && index >= 0 && index < _singleIds.Count)
-        {
-            var id = _singleIds[index];
-            Presets.Update(settings => settings.SinglePreset = id);
-        }
-    }
+    private async void OnSingleClick(object sender, RoutedEventArgs e) => await ShowDialog(new PresetPickerDialog(Presets), "Visualizer");
 
     // The toggle buttons flip themselves on click; ShowPresets then sets them from the settings.
     private void OnFavoriteClick(object sender, RoutedEventArgs e)
@@ -916,9 +868,11 @@ public sealed partial class SettingsWindow : Window
 
     private async void OnBlocklistClick(object sender, RoutedEventArgs e) => await ShowList(PresetList.Blocklist);
 
-    private async Task ShowList(PresetList list)
+    private Task ShowList(PresetList list) => ShowDialog(new PresetListDialog(list, Presets, _app.PreviewPreset), list.ToString());
+
+    private async Task ShowDialog(ContentDialog dialog, string name)
     {
-        var dialog = new PresetListDialog(list, Presets) { XamlRoot = Content.XamlRoot };
+        dialog.XamlRoot = Content.XamlRoot;
         try
         {
             await dialog.ShowAsync();
@@ -926,7 +880,7 @@ public sealed partial class SettingsWindow : Window
         catch (Exception error) when (error is InvalidOperationException or System.Runtime.InteropServices.COMException)
         {
             // Only one dialog can be open in a window at a time.
-            Log.Info("settings", $"Can't show the {list} dialog: {error.Message}");
+            Log.Info("settings", $"Can't show the {name} dialog: {error.Message}");
         }
     }
 }

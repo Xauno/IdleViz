@@ -8,6 +8,7 @@ import {
   overlayRegions,
   parseNowPlaying,
   positionAt,
+  presetTitle,
 } from "../IdleViz/web/overlay-state.js";
 
 const song = {
@@ -161,6 +162,19 @@ describe("parseNowPlaying", () => {
     expect(parseNowPlaying({ ...song, artwork: "data:image/png;base64,AA", artworkPending: true }).artworkPending).toBe(
       false,
     );
+  });
+});
+
+describe("presetTitle", () => {
+  it("trims a name and cuts a very long one", () => {
+    expect(presetTitle("  Geiss - Swirlie 5 ")).toBe("Geiss - Swirlie 5");
+    expect(presetTitle("x".repeat(500))).toHaveLength(200);
+  });
+
+  it("is empty for anything that isn't text", () => {
+    expect(presetTitle(null)).toBe("");
+    expect(presetTitle(undefined)).toBe("");
+    expect(presetTitle({ name: "x" })).toBe("");
   });
 });
 

@@ -68,6 +68,10 @@
           <local:HotkeyRecorder x:Name="Recorder" />
         </controls:SettingsCard>
 
+        <controls:SettingsCard Description="Off: the hotkey or the tray icon closes it" Header="Close on input">
+          <ToggleSwitch x:Name="CloseOnInputSwitch" MinWidth="0" AutomationProperties.Name="Close on input" Toggled="OnCloseOnInputToggled" />
+        </controls:SettingsCard>
+
         <controls:SettingsCard x:Name="StartupCard" Header="Run at startup">
           <ToggleSwitch x:Name="StartupSwitch" MinWidth="0" AutomationProperties.Name="Run at startup" Toggled="OnStartupToggled" />
         </controls:SettingsCard>
@@ -105,6 +109,10 @@
           </controls:SettingsExpander.Items>
         </controls:SettingsExpander>
 
+        <controls:SettingsCard Description="Small, in the top left corner" Header="Show visualizer title">
+          <ToggleSwitch x:Name="PresetTitleSwitch" MinWidth="0" AutomationProperties.Name="Show visualizer title" Toggled="OnPresetTitleToggled" />
+        </controls:SettingsCard>
+
         <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Presets" />
 
         <!-- Shuffle shows its three rows inside, Single its one. -->
@@ -121,8 +129,23 @@
               <ComboBox x:Name="BlendPicker" MinWidth="110" AutomationProperties.Name="Blend time" SelectionChanged="OnBlendChanged" />
             </controls:SettingsCard>
             <controls:SettingsCard x:Name="SingleCard" Header="Visualizer">
-              <!-- Preset names are long; a fixed width keeps the row from wrapping, and the box trims them. -->
-              <ComboBox x:Name="SinglePicker" Width="200" AutomationProperties.Name="Visualizer" SelectionChanged="OnSingleChanged" />
+              <!-- Opens the list with its search box. Preset names are long; a fixed width keeps the row
+                   from wrapping, and the label trims them. -->
+              <Button
+                x:Name="SingleButton"
+                Width="200"
+                HorizontalContentAlignment="Stretch"
+                AutomationProperties.Name="Visualizer"
+                Click="OnSingleClick">
+                <Grid ColumnSpacing="8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock x:Name="SingleLabel" TextTrimming="CharacterEllipsis" />
+                  <FontIcon Grid.Column="1" FontSize="12" Glyph="&#xE721;" />
+                </Grid>
+              </Button>
             </controls:SettingsCard>
           </controls:SettingsExpander.Items>
         </controls:SettingsExpander>
@@ -189,12 +212,17 @@
 
         <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Keys" />
 
-        <controls:SettingsCard Description="Favorites what's on screen" Header="Like key">
-          <ComboBox x:Name="LikeKeyPicker" MinWidth="110" SelectionChanged="OnLikeKeyChanged" />
+        <!-- The three rows only count while Close on input is on: without it no key is watched. -->
+        <controls:SettingsCard x:Name="LikeKeyCard" Header="Like key">
+          <local:KeyRecorder x:Name="LikeKeyRecorder" ActionName="Like key" />
         </controls:SettingsCard>
 
-        <controls:SettingsCard Description="Next visualizer, in Shuffle" Header="Skip key">
-          <ComboBox x:Name="SkipKeyPicker" MinWidth="110" SelectionChanged="OnSkipKeyChanged" />
+        <controls:SettingsCard x:Name="SkipKeyCard" Header="Skip key">
+          <local:KeyRecorder x:Name="SkipKeyRecorder" ActionName="Skip key" />
+        </controls:SettingsCard>
+
+        <controls:SettingsCard x:Name="BlockKeyCard" Header="Block key">
+          <local:KeyRecorder x:Name="BlockKeyRecorder" ActionName="Block key" />
         </controls:SettingsCard>
 
         <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Audio sync" />
@@ -240,7 +268,7 @@
           <ComboBox x:Name="MainDisplayPicker" Width="200" AutomationProperties.Name="Main display" SelectionChanged="OnMainDisplayChanged" />
         </controls:SettingsCard>
 
-        <!-- The three rows inside only count while the switch is on. -->
+        <!-- The two rows inside only count while the switch is on. -->
         <controls:SettingsExpander x:Name="MultiDisplayExpander" Description="Shows the visualizer on other displays too" Header="Use more than one display">
           <ToggleSwitch x:Name="MultiDisplaySwitch" MinWidth="0" AutomationProperties.Name="Use more than one display" Toggled="OnMultiDisplayToggled" />
           <controls:SettingsExpander.ItemsHeader>
@@ -263,9 +291,6 @@
             </controls:SettingsCard>
             <controls:SettingsCard x:Name="PlacementCard" Header="Placement">
               <ComboBox x:Name="PlacementPicker" Width="200" AutomationProperties.Name="Placement" SelectionChanged="OnPlacementChanged" />
-            </controls:SettingsCard>
-            <controls:SettingsCard x:Name="CloseOnInputCard" Description="Off: the hotkey or the tray icon closes it" Header="Close on input">
-              <ToggleSwitch x:Name="CloseOnInputSwitch" MinWidth="0" AutomationProperties.Name="Close on input" Toggled="OnCloseOnInputToggled" />
             </controls:SettingsCard>
           </controls:SettingsExpander.Items>
         </controls:SettingsExpander>

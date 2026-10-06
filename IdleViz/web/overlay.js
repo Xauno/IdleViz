@@ -9,6 +9,7 @@ import {
   overlayRegions,
   parseNowPlaying,
   positionAt,
+  presetTitle,
 } from "./overlay-state.js";
 
 const NOTE_PATH = "M9 18V5.5l12-2.5v12.5a3 3 0 1 1-2-2.83V7.4l-8 1.66v9.44a3 3 0 1 1-2-2.83z";
@@ -23,6 +24,7 @@ const HEART_PATH = "M12 21C7 17 3 13 3 8.5a4.5 4.5 0 0 1 9 0 4.5 4.5 0 0 1 9 0C2
  * @property {HTMLElement} played
  * @property {HTMLElement} elapsed
  * @property {HTMLElement} duration
+ * @property {HTMLElement} presetTitle  The name of the preset on screen, in the top left corner.
  * @property {SVGElement} cornerHeart   For when the track block isn't showing. It sits outside the stage, which may be hidden.
  * @property {HTMLElement | null} currentTrack
  * @property {boolean} overlay          Whether the overlay shows on this display.
@@ -43,6 +45,8 @@ let hideTimer;
 let audioDelay = 0;
 /** The "Show Spotify overlay" setting, from Swift. */
 let overlayEnabled = true;
+/** The "Show visualizer title" setting, from the app. */
+let titleEnabled = false;
 
 /**
  * @param {HTMLElement} root
@@ -60,6 +64,7 @@ function makeView(root) {
     played: find(".played"),
     elapsed: find(".elapsed"),
     duration: find(".duration"),
+    presetTitle: find(".preset-title"),
     cornerHeart,
     currentTrack: null,
     overlay: true,
@@ -187,6 +192,16 @@ function renderProgress() {
   }
 }
 
+/** Shows the name of the preset on screen in every region's corner. visualizer.js knows which one it is. */
+function renderTitle() {
+  const name = titleEnabled ? presetTitle(/** @type {any} */ (window).idlevizPresetTitle?.()) : "";
+  for (const view of views) {
+    // The last name stays in place while it fades out.
+    if (name && view.presetTitle.textContent !== name) view.presetTitle.textContent = name;
+    view.presetTitle.classList.toggle("shown", name !== "");
+  }
+}
+
 /** @param {RegionView} view */
 function layoutOn(view) {
   return layoutFor(current, overlayEnabled && view.overlay);
@@ -240,7 +255,10 @@ function safeParse(text) {
 window.addEventListener("resize", fitRegions);
 fitRegions();
 // Only the time labels and bar move between readings; a few updates a second is plenty.
-setInterval(renderProgress, 250);
+setInterval(() => {
+  renderProgress();
+  if (titleEnabled) renderTitle();
+}, 250);
 
 /**
  * Called by Swift with the audio delay of the current speakers or headphones.
@@ -258,6 +276,15 @@ function setAudioDelay(seconds) {
 function setOverlayEnabled(enabled) {
   overlayEnabled = enabled !== false;
   render();
+}
+
+/**
+ * Called by the app with the "Show visualizer title" setting.
+ * @param {unknown} enabled
+ */
+function setPresetTitleEnabled(enabled) {
+  titleEnabled = enabled === true;
+  renderTitle();
 }
 
 /**
@@ -293,6 +320,15 @@ function setOverlayRegions(layout) {
   regionLayout = layout;
   fitRegions();
   render();
+  renderTitle();
 }
 
-Object.assign(window, { nowPlaying, setAudioDelay, setOverlayEnabled, setOverlayRegions, setBrightness, showLike });
+Object.assign(window, {
+  nowPlaying,
+  setAudioDelay,
+  setOverlayEnabled,
+  setOverlayRegions,
+  setPresetTitleEnabled,
+  setBrightness,
+  showLike,
+});

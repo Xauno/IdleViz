@@ -140,6 +140,9 @@ public partial class App : Application
         _visualizer.MirrorHung += presets.Library.MarkHung;
         page.SendBrightness(BrightnessSetting.Value(_settings));
         page.SendOverlayEnabled(OverlaySetting.Value(_settings));
+        page.SendPresetTitleEnabled(PresetTitleSetting.Value(_settings));
+        // When the fade-out starts, not when it ends: an open during the fade-out finishes that close first.
+        _visualizer.Closing += _ => presets.EndPreview();
         _visualizer.Opened += _audio.Start;
         _visualizer.Opened += page.StartStatusChecks;
         _visualizer.Closed += _audio.Stop;
@@ -177,6 +180,10 @@ public partial class App : Application
             else if (e.Key == OverlaySetting.Key)
             {
                 page.SendOverlayEnabled(OverlaySetting.Value(_settings));
+            }
+            else if (e.Key == PresetTitleSetting.Key)
+            {
+                page.SendPresetTitleEnabled(PresetTitleSetting.Value(_settings));
             }
             else if (MultiDisplaySettings.IsKey(e.Key))
             {
@@ -300,6 +307,32 @@ public partial class App : Application
         _visualizer.Open(source);
     }
 
+    /// <summary>
+    /// Opens the visualizer held on one preset, for the Preview buttons in the Favorites and Blocklist
+    /// dialogs. The preset controls are back in charge when it closes. It opens under the same rules
+    /// as every trigger; an open visualizer just changes to the preset.
+    /// </summary>
+    internal void PreviewPreset(string id)
+    {
+        if (_visualizer is null || _presets is null)
+        {
+            return;
+        }
+
+        _presets.Preview(id);
+        if (_visualizer.IsOpen)
+        {
+            return;
+        }
+
+        OpenVisualizer(TriggerSource.Settings);
+        // Not opened and not waiting for Spotify's first reading: there is nothing to preview on.
+        if (!_visualizer.IsOpen && _waitingSource is null)
+        {
+            _presets.EndPreview();
+        }
+    }
+
     // The app has only just started and Windows hasn't said what Spotify is doing yet.
     private void WaitForFirstReading(TriggerSource source)
     {
@@ -361,6 +394,7 @@ public partial class App : Application
             _ => $"Windows hasn't said what Spotify is doing after {OpenRules.FirstReadingWaitSeconds} s",
         };
         Log.Info("open", $"Not opening via {source}: {reason}");
+        _presets?.EndPreview();
         // A refused idle trigger does nothing visible.
         if (source.IsManual())
         {

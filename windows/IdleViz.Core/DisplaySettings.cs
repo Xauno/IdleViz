@@ -53,3 +53,18 @@ public static class OverlaySetting
 
     public static string Script(bool enabled) => $"window.setOverlayEnabled?.({(enabled ? "true" : "false")})";
 }
+
+/// <summary>The "Show visualizer title" switch: the name of the preset on screen, small, in the top left corner.</summary>
+public static class PresetTitleSetting
+{
+    public const string Key = "showPresetTitle";
+
+    /// <summary>Off unless it was switched on.</summary>
+    public static bool Value(SettingsStore settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        return settings.GetBool(Key) ?? false;
+    }
+
+    public static string Script(bool enabled) => $"window.setPresetTitleEnabled?.({(enabled ? "true" : "false")})";
+}

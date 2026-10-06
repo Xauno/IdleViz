@@ -19,13 +19,13 @@
       <SelectorBarItem x:Name="AllTab" Text="All presets" />
     </SelectorBar>
 
-    <TextBox
+    <AutoSuggestBox
       x:Name="SearchBox"
       Grid.Row="1"
       AutomationProperties.Name="Search"
       PlaceholderText="Search"
-      TextChanged="OnSearchChanged"
-      Visibility="Collapsed" />
+      QueryIcon="Find"
+      TextChanged="OnSearchChanged" />
 
     <ListView
       x:Name="Rows"
@@ -38,6 +38,7 @@
           <Grid Padding="0,4" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center">
@@ -54,6 +55,14 @@
             </StackPanel>
             <Button
               Grid.Column="1"
+              Padding="8,5"
+              AutomationProperties.Name="{x:Bind PreviewLabel}"
+              Click="OnPreviewClick"
+              ToolTipService.ToolTip="Preview">
+              <FontIcon FontSize="12" Glyph="&#xE768;" />
+            </Button>
+            <Button
+              Grid.Column="2"
               MinWidth="76"
               AutomationProperties.Name="{x:Bind ButtonLabel, Mode=OneWay}"
               Click="OnRowClick"

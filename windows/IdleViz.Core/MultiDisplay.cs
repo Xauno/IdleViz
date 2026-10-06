@@ -15,13 +15,14 @@ public enum DisplayPlacement
 
 /// <summary>
 /// The "Displays" settings: which display is the main one, whether further displays are covered,
-/// which ones, how, whether input closes the visualizer, and where the Spotify overlay shows.
+/// which ones, how, and where the Spotify overlay shows. "Close on input" is kept here too, under
+/// the key it got when it only counted with more than one display.
 /// Displays are stored by the name Windows gives them, for example <c>\\.\DISPLAY1</c>.
 /// </summary>
 /// <param name="MainDisplay">The main display, or null for the one Windows calls primary.</param>
 /// <param name="Enabled">Whether more than one display is covered.</param>
 /// <param name="OtherDisplays">The further displays to cover, or null for all of them.</param>
-/// <param name="CloseOnInput">Whether input closes the visualizer. Only read while <paramref name="Enabled"/> is on.</param>
+/// <param name="CloseOnInput">Whether input closes the visualizer, on one display or several.</param>
 /// <param name="Placement">Mirror or extend.</param>
 /// <param name="OverlayDisplay"><see cref="OverlayOnMain"/>, <see cref="OverlayOnAll"/> or a display's name.</param>
 public sealed record MultiDisplaySettings(
@@ -181,7 +182,6 @@ public sealed record DisplayPlan(IReadOnlyList<PlannedWindow> Windows, bool Clos
         var overlayOn = covered.Any(display => display.Name == settings.OverlayDisplay) ? settings.OverlayDisplay : main.Name;
         bool Overlay(Display display) => overlayOnAll || display.Name == overlayOn;
 
-        var closeOnInput = !settings.Enabled || settings.CloseOnInput;
         if (covered.Count == 1 || settings.Placement == DisplayPlacement.Mirror)
         {
             return new DisplayPlan(
@@ -192,7 +192,7 @@ public sealed record DisplayPlan(IReadOnlyList<PlannedWindow> Windows, bool Clos
                     display.Height,
                     [new DisplayRegion(0, 0, display.Width, display.Height, Overlay(display))],
                     RenderWidthCap))],
-                closeOnInput);
+                settings.CloseOnInput);
         }
 
         // One window over the rectangle that encloses the displays. Parts of it that no display covers aren't seen.
@@ -203,6 +203,6 @@ public sealed record DisplayPlan(IReadOnlyList<PlannedWindow> Windows, bool Clos
         // The main display's part stays as sharp as when it is covered alone.
         var cap = (int)Math.Min(Math.Round((double)RenderWidthCap * width / main.Width), MaxRenderWidthCap);
         var regions = covered.Select(display => new DisplayRegion(display.Left - left, display.Top - top, display.Width, display.Height, Overlay(display)));
-        return new DisplayPlan([new PlannedWindow(left, top, width, height, [.. regions], cap)], closeOnInput);
+        return new DisplayPlan([new PlannedWindow(left, top, width, height, [.. regions], cap)], settings.CloseOnInput);
     }
 }

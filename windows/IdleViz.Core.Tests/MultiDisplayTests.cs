@@ -107,13 +107,15 @@ public sealed class MultiDisplayTests
         var window = Assert.Single(plan.Windows);
         Assert.Equal(3440, window.Width);
         Assert.True(window.Regions[0].Overlay);
-        // Input only stays ignored while more than one display is switched on.
-        Assert.True(plan.CloseOnInput);
+        // Close on input doesn't depend on the switch: it works with one display too.
+        Assert.False(plan.CloseOnInput);
     }
 
     [Fact]
-    public void InputCanBeIgnoredWhileTheSwitchIsOn()
+    public void InputCanBeIgnoredOnOneDisplayOrSeveral()
     {
+        Assert.False(DisplayPlan.For(new MultiDisplaySettings(CloseOnInput: false), s_two).CloseOnInput);
+        Assert.True(DisplayPlan.For(new MultiDisplaySettings(), s_two).CloseOnInput);
         Assert.False(DisplayPlan.For(new MultiDisplaySettings(Enabled: true, CloseOnInput: false), s_two).CloseOnInput);
         Assert.True(DisplayPlan.For(new MultiDisplaySettings(Enabled: true), s_two).CloseOnInput);
     }

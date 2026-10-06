@@ -216,6 +216,19 @@ public sealed class PresetListTests
     }
 
     [Fact]
+    public void APreviewIsHeldOnOnePresetWithNoBlend()
+    {
+        var settings = new PresetSettings { Mode = PresetMode.Shuffle, BlendSeconds = 5 };
+        var script = settings.PreviewScript("bundled:A");
+        Assert.Contains("\"mode\":\"single\"", script, StringComparison.Ordinal);
+        Assert.Contains("\"single\":\"bundled:A\"", script, StringComparison.Ordinal);
+        Assert.Contains("\"blendSeconds\":0,", script, StringComparison.Ordinal);
+        // The controls themselves are untouched.
+        Assert.Contains("\"mode\":\"shuffle\"", settings.Script, StringComparison.Ordinal);
+        Assert.Contains("\"blendSeconds\":5,", settings.Script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SearchMatchesPartOfTheNameIgnoringCase()
     {
         IReadOnlyList<PresetInfo> presets = [new("bundled:A", "Geiss - Swirlie 5", "bundled"), new("custom:B", "Aurora", "custom")];

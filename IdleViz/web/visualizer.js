@@ -368,12 +368,18 @@ function idlevizStatus() {
   return { preset: current?.id ?? null, frames, audioFrames, presets: presets.length, failed: failures.list() };
 }
 
+/** The name of the preset on screen, for the title overlay.js shows in the corner. */
+function idlevizPresetTitle() {
+  return current?.name ?? null;
+}
+
 /** Every preset and plugin the page can show, for the pickers in settings. */
 function idlevizPresets() {
   return presets.map(({ id, name, source }) => ({ id, name, source }));
 }
 Object.assign(window, {
   audioFrame,
+  idlevizPresetTitle,
   idlevizPresets,
   idlevizStatus,
   setCustomPresets,

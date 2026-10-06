@@ -64,7 +64,7 @@ Answers the owner gave to the open points in section 9 of the brief, on 2 Octobe
 | ----- | -------- |
 | J1 | Code lives in `windows/` in this repository and loads `IdleViz/web/` as it is. xUnit for tests. Lint is `dotnet format` plus the built-in analyzers, warnings as errors. |
 | Packages | A few well-known third-party packages are fine (H.NotifyIcon.WinUI, NAudio, CsWin32). Each new one is named in its pull request and in the table above. |
-| J2 | Settings window as suggested: about 440 × 680, title "IdleViz Settings", "PC" for "Mac", "Run at startup", the Mac's sheets as `ContentDialog`s, the trust warning as an `InfoBar`. The layout was later regrouped; see "Settings window regrouped". |
+| J2 | Settings window as suggested: about 440 × 680, title "IdleViz Settings", "PC" for "Mac", "Run at startup", the Mac's sheets as `ContentDialog`s, the trust warning as an `InfoBar`. The layout was later regrouped; see "Settings window regrouped". Rows added after that are in "Keys, preset search and preview, close on input, visualizer title". |
 | J3 | Low-level keyboard and mouse hooks while the visualizer is open. Like and skip work without focus. The key or click that closes the visualizer is swallowed, so it never reaches the app behind. |
 | J4 | Two warnings: "Spotify audio can't be captured" and "Can't read what Spotify is playing". Clicking one opens a small dialog with the error text and a button that opens the log folder. |
 | J5 | Inno Setup, per-user install in `%LOCALAPPDATA%\Programs\IdleViz`, built by `windows/build-installer.ps1`. Presets folder `%APPDATA%\IdleViz\Presets\`. A taken import name is numbered as in File Explorer: "Tunnel (2).milk". |
@@ -797,6 +797,58 @@ Not a step of the brief: the owner found the window clunky after W9. It had abou
 | Overlay on, multi-display off | **Show it on** greyed out with "Multi-display only" |
 
 **Not tried:** dragging the window's edge by hand, the Single mode rows, the **Failed to load** rows (no file failed on this PC), the dialogs opened from the new rows, a display with another scale, and the installed Release copy.
+
+### Keys, preset search and preview, close on input, visualizer title
+
+Not a step of the brief: the owner asked for these after using the 0.1.1 build. They replace parts of W7b, W8c, W9 and the regrouped settings window above, which are left as they were written. The Mac app has none of it yet; [mac-todo.md](mac-todo.md) lists what to bring over.
+
+| File | What changed |
+| ---- | ------------ |
+| `IdleViz.Core/VisualizerKeys.cs` | The list of keys the pickers offered is gone. `CanBe` says which keys can be recorded, `Label` names one. A third key, `Block` (`blockKey`, default B), and `VisualizerAction.Block`. |
+| `IdleViz.App/KeyRecorder.xaml` | The control of the three key rows: click, press a key. |
+| `IdleViz.App/PresetPickerDialog.xaml` | The list with a search box behind the **Visualizer** row of Single mode. |
+| `IdleViz.App/PresetListDialog.xaml` | The search box on both tabs, and a **Preview** button on every row. |
+| `IdleViz.Core/PresetSettings.cs` | `PreviewScript(preset)`: the controls held on one preset, with no blend. |
+| `IdleViz.App/PresetController.cs`, `App.xaml.cs` | `Preview`, `EndPreview` and `PreviewPreset`; `Perform` runs the block key. |
+| `IdleViz.Core/MultiDisplay.cs` | `DisplayPlan.CloseOnInput` is the stored setting, whether or not more than one display is on. |
+| `IdleViz.Core/DisplaySettings.cs`, `IdleViz.App/PageView.cs` | `PresetTitleSetting` (`showPresetTitle`, off by default) and its call to the page. |
+| `IdleViz/web/overlay.js`, `overlay-state.js`, `overlay.css`, `index.html`, `visualizer.js` | The title: a `.preset-title` in each region, `setPresetTitleEnabled`, and `idlevizPresetTitle()`, which says what is on screen. |
+| `SettingsWindow.xaml` | **Close on input** under Opening, **Show visualizer title** under Look, the **Visualizer** button, three recorders under Keys. |
+
+**The keys** (the owner chose "almost any key"). Click a row's button, which then says "Press a key", and press one. Any keyboard key can be recorded except Esc, the modifiers (Ctrl, Alt, Shift, the Windows keys) and the six media keys that leave the visualizer open. Esc, or clicking elsewhere, keeps the key the row had. The **✕** button turns the key off (stored as −1, as before), and the button then says "Not set". A modifier held while recording is ignored and the next other key is taken, since in the visualizer a modifier is a key of its own. A key one of the other two rows uses is refused: the button says "In use, press another" and keeps listening. A stored code that can't be one of these keys still falls back to the default. Keys are named as the open hotkey names them (`Hotkey.KeyName`), which gained Caps Lock, Menu, Num Lock and Scroll Lock; a key with no name there shows as "Key 123".
+
+**The block key** (the owner chose "block and move on", with the skip said in the row's description). It asks the page what is on screen, as the like key does, puts that preset on the blocklist, which takes it off the favorites, and logs "Blocked …". In Shuffle the page would leave a blocked preset by itself, but over the whole blend time, so the app calls `skipPreset()` first and the blocklist change second: the next preset blends in over half a second, as with the skip key. In Single mode, and in a preview, the preset stays on screen. There is no icon and no unblocking by key; that is done in settings. Someone who had already set the like or skip key to B keeps it there, and the block key starts as "Not set" for them.
+
+**Search.** The **Visualizer** row is now a button with the preset's name and a magnifier. It opens a dialog with a search box and every preset as a plain list of names, scrolled to the current one. Picking a row stores it and tells the page at once; **Done** closes the dialog. A stored preset that is gone from the library is still listed first. In the Favorites and Blocklist dialogs the search box now shows on **On the list** too, and filters that tab by name. A search with no match says "No presets match." in all three.
+
+**Preview** (the owner chose the real visualizer, fullscreen, over a picture in the dialog). The ▷ button on a row calls `App.PreviewPreset`: the page is sent the preset controls in Single mode on that preset with a blend of 0, so the visualizer opens on it instead of fading to it from the last one, and then the visualizer opens as from **Open now**, under the same open rules. The stored controls are not changed. They are sent again when the visualizer starts to close (`Closing`, not `Closed`: an open during a fade-out finishes that close first, which would otherwise end the new preview), and when the open is refused. While a preview runs, the like and block keys still store their change and the page stays on the previewed preset. With the visualizer already open (possible with **Close on input** off), the button only changes the preset. Pages on other displays follow the main page as always, with the usual blend.
+
+**Close on input** now sits under **Opening**, after **Open hotkey**, and no longer depends on **Use more than one display**. What off means is unchanged from W9: no hooks, no focus, the pointer stays, and a second manual trigger, the keep-awake limit, sleep or a display change closes it. Since no key is watched then, the three key rows are greyed out with "Needs Close on input". The stored key is still `multiDisplayCloseOnInput`, so nobody's choice is lost. For someone who had it off while the multi-display switch was also off, it now takes effect.
+
+**The visualizer title.** With **Show visualizer title** on, every region (so every display the visualizer covers) shows the name of the preset on screen in its top left corner, whatever the Spotify overlay does. `overlay.js` asks `idlevizPresetTitle()` four times a second while the switch is on, so the name changes within a quarter of a second of the preset; a page that follows the main page names its own preset, which is the same one. The type is 0.6 % of the display's width and at least 12 px: about 21 px on a 3440 px display. The owner asked for it to be small, and for smaller again after seeing 36 px. A long name is cut with "…" at 60 % of the width.
+
+**Chosen here without asking the owner:**
+
+- The **✕** button for "off", as on the hotkey row, in place of the pickers' **Off** entry.
+- A taken key is refused rather than swapped or taken away from the other row.
+- The search is a box that is always there, with a magnifier in it, not a button that reveals one.
+- Where **Close on input** went (the owner left that open), that the stored key keeps its name, and that the key rows grey out while it is off.
+- The title shows on every covered display and doesn't follow **Show it on**; its place, weight and shadow; the row's name and "Small, in the top left corner".
+- The block key skips before it blocks, and does nothing visible in Single mode.
+- A preview has no blend, and is ended when the fade-out starts.
+- The descriptions: "Blocks what's on screen and skips to the next", "Needs Close on input".
+
+**Seen when checking** (Debug build on the owner's PC, driven through UI Automation, the window and the screen captured; no keys or pointer were used):
+
+| Case | Result |
+| --- | --- |
+| The settings window | **Close on input** under Opening, **Show visualizer title** under Look, and Like, Skip and Block key rows showing L, N and B, each with its ✕ |
+| Mode set to Single, the **Visualizer** button | The dialog opened scrolled to the stored preset, which was marked; long names end in "…" |
+| Search "geiss" in it, third row picked | 45 rows listed; `singlePreset` stored at once; "swirl" gave "No presets match." |
+| Favorites, **All presets**, search "geiss" | The matching rows, each with ▷ and **Add** |
+| ▷ on the first row, with the title switched on | "Opened via Settings", then "Preset: …" naming that row's preset, with `visualizerMode` still what it was; the name showed in the top left corner |
+
+**Not tried:** recording a key, Esc and a taken key in the recorder, and the block key itself (they need real key presses; the rules behind them are unit-tested), **Close on input** off on one display, the key rows greyed out, the search on **On the list** (the lists were empty), a refused preview, the title at its final size (it was captured at the first, larger one), on a second display and in the installed Release copy.
 
 ### The setup file, trimmed
 

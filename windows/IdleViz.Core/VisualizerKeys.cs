@@ -8,42 +8,21 @@ public enum VisualizerAction
 
     /// <summary>Moves on to the next preset. Only shuffle mode has one.</summary>
     Skip,
+
+    /// <summary>Adds the preset on screen to the blocklist, and in shuffle mode moves on to the next one.</summary>
+    Block,
 }
 
 /// <summary>
-/// One key the "Like key" and "Skip key" pickers offer, by its Windows virtual-key code. For these
-/// keys the code names the letter or digit the key types, whatever the keyboard layout.
-/// </summary>
-public readonly record struct VisualizerKey(ushort Code, string Label)
-{
-    private const ushort Left = 0x25;
-    private const ushort Up = 0x26;
-    private const ushort Right = 0x27;
-    private const ushort Down = 0x28;
-    private const ushort Space = 0x20;
-
-    /// <summary>A to Z, 0 to 9, the arrow keys and Space, in the order the pickers list them.</summary>
-    public static IReadOnlyList<VisualizerKey> Choices { get; } =
-    [
-        .. Enumerable.Range('A', 26).Select(code => new VisualizerKey((ushort)code, ((char)code).ToString())),
-        .. Enumerable.Range('0', 10).Select(code => new VisualizerKey((ushort)code, ((char)code).ToString())),
-        new(Left, "←"),
-        new(Right, "→"),
-        new(Up, "↑"),
-        new(Down, "↓"),
-        new(Space, "Space"),
-    ];
-}
-
-/// <summary>
-/// The "Like key" and "Skip key" settings. Each is stored as a virtual-key code, or <see cref="Off"/>.
-/// The key names are the Mac's, the codes are not: the two systems number their keys differently.
-/// Ported from <c>VisualizerKeys.swift</c>.
+/// The "Like key", "Skip key" and "Block key" settings. Each is stored as a virtual-key code, or
+/// <see cref="Off"/>. The key names are the Mac's, the codes are not: the two systems number their
+/// keys differently. Ported from <c>VisualizerKeys.swift</c>; the block key is Windows only so far.
 /// </summary>
 public sealed record VisualizerKeys
 {
     public const string LikeKey = "likeKey";
     public const string SkipKey = "skipKey";
+    public const string BlockKey = "blockKey";
 
     /// <summary>The stored value for "Off".</summary>
     public const int Off = -1;
@@ -54,25 +33,48 @@ public sealed record VisualizerKeys
     /// <summary>N.</summary>
     public const int DefaultSkip = 0x4E;
 
-    public VisualizerKeys(ushort? like = DefaultLike, ushort? skip = DefaultSkip)
+    /// <summary>B.</summary>
+    public const int DefaultBlock = 0x42;
+
+    private const ushort Escape = 0x1B;
+
+    public VisualizerKeys(ushort? like = DefaultLike, ushort? skip = DefaultSkip, ushort? block = DefaultBlock)
     {
         Like = like;
-        // One key can't do both. Settings never offers that, so this only happens with hand-edited values.
+        // One key can't do two things. Settings never records that, so this only happens with hand-edited
+        // values, or when an older choice for like or skip is the key a newer action defaults to.
         Skip = skip == like ? null : skip;
+        Block = block == Like || block == Skip ? null : block;
     }
 
     public ushort? Like { get; }
 
     public ushort? Skip { get; }
 
-    /// <summary>The key codes that do something other than close the visualizer.</summary>
-    public IReadOnlySet<ushort> Codes => new[] { Like, Skip }.OfType<ushort>().ToHashSet();
+    public ushort? Block { get; }
 
-    /// <summary>Reads the stored keys. A value that was never set, or isn't one of the choices, is the default.</summary>
+    /// <summary>The key codes that do something other than close the visualizer.</summary>
+    public IReadOnlySet<ushort> Codes => new[] { Like, Skip, Block }.OfType<ushort>().ToHashSet();
+
+    /// <summary>
+    /// Whether a key can be one of these keys: any keyboard key but Esc, which cancels the recorder,
+    /// the modifiers, which are keys of their own to the visualizer, and the media keys, which keep
+    /// their own job.
+    /// </summary>
+    public static bool CanBe(int code) =>
+        KeyboardInput.IsKeyboardKey(code) && code != Escape && !Hotkey.IsModifierKey((ushort)code) && !MediaKeys.Contains((ushort)code);
+
+    /// <summary>"L", "Space", "F5", or "Not set" for no key.</summary>
+    public static string Label(ushort? code) => code is { } key ? Hotkey.KeyName(key) : "Not set";
+
+    /// <summary>Reads the stored keys. A value that was never set, or can't be one of these keys, is the default.</summary>
     public static VisualizerKeys Read(SettingsStore settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        return new VisualizerKeys(Code(settings.GetInt(LikeKey), DefaultLike), Code(settings.GetInt(SkipKey), DefaultSkip));
+        return new VisualizerKeys(
+            Code(settings.GetInt(LikeKey), DefaultLike),
+            Code(settings.GetInt(SkipKey), DefaultSkip),
+            Code(settings.GetInt(BlockKey), DefaultBlock));
     }
 
     public VisualizerAction? Action(ushort code)
@@ -82,7 +84,12 @@ public sealed record VisualizerKeys
             return VisualizerAction.Like;
         }
 
-        return code == Skip ? VisualizerAction.Skip : null;
+        if (code == Skip)
+        {
+            return VisualizerAction.Skip;
+        }
+
+        return code == Block ? VisualizerAction.Block : null;
     }
 
     /// <summary>The call that asks the page for the next preset.</summary>
@@ -99,6 +106,6 @@ public sealed record VisualizerKeys
             return null;
         }
 
-        return VisualizerKey.Choices.Any(key => key.Code == value) ? (ushort)value : (ushort)fallback;
+        return CanBe(value) ? (ushort)value : (ushort)fallback;
     }
 }
