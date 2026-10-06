@@ -2,8 +2,8 @@ import AppKit
 import IdleVizCore
 import SwiftUI
 
-/// The Displays rows of the settings window: the main display, the switch for more than one
-/// display, and the rows that only count while it is on.
+/// The Displays section of the settings window: the main display, and the switch for more than
+/// one display with the rows that only count while it is on folded into it.
 struct DisplayControls: View {
     @AppStorage(MultiDisplaySettings.mainDisplayKey) private var mainDisplay = ""
     @AppStorage(MultiDisplaySettings.enabledKey) private var enabled = false
@@ -11,6 +11,7 @@ struct DisplayControls: View {
     /// The connected displays, macOS's main one first.
     @State private var displays = DisplayLayout.current.displays
     @State private var canSpan = Displays.canSpan
+    @State private var isOpen = FoldedRows.startOpen
     /// The chosen other displays, or nil for all of them. `@AppStorage` can't hold a list.
     @State private var chosenOthers = UserDefaults.standard.stringArray(forKey: MultiDisplaySettings.otherDisplaysKey)
 
@@ -19,32 +20,38 @@ struct DisplayControls: View {
             Text("macOS main display").tag("")
             DisplayChoices(displays: displays, stored: mainDisplay)
         }
-        Toggle(isOn: $enabled) {
-            Text("Use more than one display")
-            Text("Shows the visualizer on other displays too")
-        }
-        if enabled {
-            WarningRow(text: MultiDisplaySettings.gpuWarning)
-        }
-        Group {
-            LabeledContent("Other displays") {
-                Menu(othersSummary) {
-                    ForEach(labelled.filter { others.contains($0.display) }, id: \.display.uuid) { item in
-                        Toggle(item.label, isOn: covered(item.display))
+        FoldedRow(isOpen: $isOpen) {
+            if enabled {
+                WarningRow(text: MultiDisplaySettings.gpuWarning)
+            }
+            Group {
+                LabeledContent("Other displays") {
+                    Menu(othersSummary) {
+                        ForEach(labelled.filter { others.contains($0.display) }, id: \.display.uuid) { item in
+                            Toggle(item.label, isOn: covered(item.display))
+                        }
                     }
+                    .fixedSize()
+                    .disabled(others.isEmpty)
                 }
-                .fixedSize()
-                .disabled(others.isEmpty)
+                Picker("Placement", selection: $placement) {
+                    Text("Same on each display").tag(DisplayPlacement.mirror.rawValue)
+                    Text("Extend across displays").tag(DisplayPlacement.extend.rawValue)
+                }
+                if enabled, placement == DisplayPlacement.extend.rawValue, !canSpan {
+                    WarningRow(text: MultiDisplaySettings.separateSpacesWarning)
+                }
             }
-            Picker("Placement", selection: $placement) {
-                Text("Same on each display").tag(DisplayPlacement.mirror.rawValue)
-                Text("Extend across displays").tag(DisplayPlacement.extend.rawValue)
+            .disabled(!enabled)
+        } label: {
+            Toggle(isOn: $enabled) {
+                Text("Use more than one display")
+                Text("Covers other displays too")
             }
-            if enabled, placement == DisplayPlacement.extend.rawValue, !canSpan {
-                WarningRow(text: MultiDisplaySettings.separateSpacesWarning)
+            .onChange(of: enabled) { _, enabled in
+                if enabled { isOpen = true }
             }
         }
-        .disabled(!enabled)
         // A display may be plugged in or pulled out, or the Spaces setting changed, while the window is open.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refresh() }

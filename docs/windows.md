@@ -731,7 +731,7 @@ A stored display that isn't connected falls back: the main display to the primar
 
 ### Settings window regrouped
 
-Not a step of the brief: the owner found the window clunky after W9. It had about 30 rows in one flat scroll under four headings, with rows that depend on another row drawn as its equals. The settings themselves, their keys and their defaults did not change; only where the rows sit and what they are called. The Mac window still has the old layout; [mac-todo.md](mac-todo.md) lists what to bring over.
+Not a step of the brief: the owner found the window clunky after W9. It had about 30 rows in one flat scroll under four headings, with rows that depend on another row drawn as its equals. The settings themselves, their keys and their defaults did not change; only where the rows sit and what they are called. The Mac window was regrouped the same way later; what differs there is in [project.md](../project.md) under "Brought over from the Windows app".
 
 **Chosen by the owner:** one page with expanders, not a section list on the left; portrait, 440 wide; the height can be dragged; the six sections and their order; dependent rows greyed out, not hidden; **Open now** out of the list.
 
