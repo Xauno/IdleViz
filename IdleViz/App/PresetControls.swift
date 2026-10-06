@@ -1,116 +1,6 @@
 import IdleVizCore
 import SwiftUI
 
-/// The Audio sync section in settings: the delay for the current speakers or headphones, with
-/// the slider, Detect and the manual delay test folded into its row.
-struct AudioDelayControls: View {
-    @Bindable var audioDelay: AudioDelayController
-    @State private var showTest = false
-    @State private var isOpen = FoldedRows.startOpen
-
-    var body: some View {
-        FoldedRow(isOpen: $isOpen) {
-            // Under its label, so the slider runs the width of the row: 250 steps need the room.
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Set by hand")
-                Slider(value: $audioDelay.delay, in: AudioDelaySetting.range)
-                    .labelsHidden()
-                    .frame(maxWidth: .infinity)
-                    .accessibilityLabel("Audio delay")
-            }
-            LabeledContent {
-                Button(audioDelay.detecting ? "Listening…" : "Detect") { audioDelay.detect() }
-                    .disabled(audioDelay.detecting)
-                    .accessibilityLabel("Detect delay")
-            } label: {
-                Text("Detect with the microphone")
-                switch audioDelay.hint {
-                case let .text(text):
-                    Text(text)
-                case .microphoneDenied:
-                    // The microphone is optional, so a missing permission only shows here.
-                    Link("Microphone access is off. Open System Settings…", destination: AudioDelayController.microphoneSettingsURL)
-                        .font(.caption)
-                case nil:
-                    Text("Listens for a few seconds")
-                }
-            }
-            LabeledContent {
-                Button("Start") { showTest = true }
-                    .disabled(audioDelay.detecting)
-                    .accessibilityLabel("Start the manual delay test")
-            } label: {
-                Text("Manual delay test")
-                Text("Match a flash to a beep, no mic")
-            }
-            .sheet(isPresented: $showTest) {
-                ManualDelaySheet(audioDelay: audioDelay)
-            }
-        } label: {
-            LabeledContent {
-                Text(AudioDelaySetting.label(audioDelay.delay)).monospacedDigit()
-            } label: {
-                Text("Audio delay")
-                Text("For \(audioDelay.deviceName)").lineLimit(1)
-            }
-        }
-    }
-}
-
-/// The manual delay test: beeps play through the speakers, the panel lights up one audio delay
-/// after each, and the slider is dragged until the two land together.
-struct ManualDelaySheet: View {
-    @Bindable var audioDelay: AudioDelayController
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Text("Manual delay test").font(.headline)
-                Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
-            }
-            // Redrawn every frame; the flash is worked out from the clock the beeps are scheduled on.
-            TimelineView(.animation) { _ in
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(color(for: audioDelay.testFlash))
-                    .frame(height: 120)
-            }
-            .accessibilityHidden(true)
-            if let problem = audioDelay.testProblem {
-                Text(problem).font(.callout).foregroundStyle(.red)
-            }
-            Text("Drag until the panel lights up exactly when you hear the beep. Every fourth beep is higher, and its flash is orange.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 6) {
-                Button("−10 ms") { audioDelay.delay -= AudioDelaySetting.step }
-                Slider(value: $audioDelay.delay, in: AudioDelaySetting.range)
-                    .accessibilityLabel("Audio delay")
-                Button("+10 ms") { audioDelay.delay += AudioDelaySetting.step }
-            }
-            HStack {
-                Text("For \(audioDelay.deviceName)").lineLimit(1).foregroundStyle(.secondary)
-                Spacer()
-                Text(AudioDelaySetting.label(audioDelay.delay)).monospacedDigit()
-            }
-            .font(.callout)
-        }
-        .padding(14)
-        .frame(width: 320)
-        .onAppear { audioDelay.startTest() }
-        .onDisappear { audioDelay.stopTest() }
-    }
-
-    /// Dark between flashes, white for a beep and orange for the marked one. Fixed colours, so the
-    /// flash reads the same in light and dark mode.
-    private func color(for flash: BeepTest.Flash?) -> Color {
-        guard let flash else { return .black }
-        return flash.accent ? .orange : .white
-    }
-}
-
 /// The Presets section in settings: mode with the rows for that mode folded into it, the
 /// last-shown preset, the favorites and blocklist sheets, and the library.
 struct PresetControls: View {
@@ -118,6 +8,7 @@ struct PresetControls: View {
     @State private var sheet: PresetList?
     /// Which rows are open isn't stored: Mode starts open, the others closed.
     @State private var modeOpen = true
+    @State private var showPicker = false
 
     private var settings: PresetSettings { presets.settings }
 
@@ -182,12 +73,19 @@ struct PresetControls: View {
     }
 
     private var singleRow: some View {
-        Picker("Visualizer", selection: $presets.settings.single) {
-            // Keeps the stored choice selectable while the list is still loading or the preset is gone.
-            if !presets.presets.contains(where: { $0.id == settings.single }) {
-                Text(presets.name(for: settings.single)).tag(settings.single)
+        LabeledContent("Visualizer") {
+            Button {
+                showPicker = true
+            } label: {
+                Label(presets.name(for: settings.single), systemImage: "magnifyingglass")
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: 150)
             }
-            ForEach(presets.presets) { Text($0.name).tag($0.id) }
+            .accessibilityLabel("Visualizer: \(presets.name(for: settings.single))")
+            .sheet(isPresented: $showPicker) {
+                PresetPickerSheet(presets: presets)
+            }
         }
     }
 
@@ -226,8 +124,84 @@ enum PresetList: String, Identifiable {
     }
 }
 
+/// A search box that is always there, with a magnifier in it.
+private struct SearchField: View {
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("Search", text: $text).textFieldStyle(.plain)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+/// What a list shows when the search matches nothing.
+private struct NoMatches: View {
+    var body: some View {
+        Text("No presets match.")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// The preset of Single mode: every preset as a list of names with a search box, scrolled to the
+/// current one. Picking a row stores it and tells the page at once.
+struct PresetPickerSheet: View {
+    @Bindable var presets: PresetController
+    @Environment(\.dismiss) private var dismiss
+    @State private var search = ""
+
+    /// Every preset, with a stored one that is gone from the library still listed first.
+    private var all: [PresetInfo] {
+        let single = presets.settings.single
+        guard !presets.presets.contains(where: { $0.id == single }) else { return presets.presets }
+        return [PresetInfo(id: single, name: presets.name(for: single), source: "bundled")] + presets.presets
+    }
+
+    var body: some View {
+        let matches = PresetSettings.matching(all, search: search)
+        VStack(spacing: 10) {
+            HStack {
+                Text("Visualizer").font(.headline)
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+            }
+            SearchField(text: $search)
+            if matches.isEmpty {
+                NoMatches()
+            } else {
+                ScrollViewReader { proxy in
+                    List(matches) { preset in
+                        Button {
+                            presets.settings.single = preset.id
+                        } label: {
+                            HStack {
+                                Text(preset.name).lineLimit(1)
+                                Spacer()
+                                if preset.id == presets.settings.single { Image(systemName: "checkmark") }
+                            }
+                            .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                        .font(.callout)
+                        .id(preset.id)
+                    }
+                    .onAppear { proxy.scrollTo(presets.settings.single, anchor: .center) }
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 320, height: 440)
+    }
+}
+
 /// Lists the presets on the favorites or the blocklist, where they can be removed, and every
-/// preset with a search field, where they can be added.
+/// preset, where they can be added. Both lists have a search box, and every row a Preview button.
 struct PresetListSheet: View {
     let list: PresetList
     @Bindable var presets: PresetController
@@ -245,10 +219,12 @@ struct PresetListSheet: View {
         }
     }
 
+    /// The presets of the tab that is showing, filtered by the search.
     private var matches: [PresetInfo] {
-        let query = search.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return presets.presets }
-        return presets.presets.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        let shown = showAll
+            ? presets.presets
+            : ids.map { PresetInfo(id: $0, name: presets.name(for: $0), source: $0.hasPrefix("custom:") ? "custom" : "bundled") }
+        return PresetSettings.matching(shown, search: search)
     }
 
     var body: some View {
@@ -264,20 +240,18 @@ struct PresetListSheet: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            if showAll {
-                TextField("Search", text: $search).textFieldStyle(.roundedBorder)
-                List(matches) { preset in
-                    row(id: preset.id, name: preset.name, custom: preset.source == "custom")
-                }
-            } else if ids.isEmpty {
+            SearchField(text: $search)
+            if !showAll, ids.isEmpty {
                 Text(list.emptyText)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if matches.isEmpty {
+                NoMatches()
             } else {
-                List(ids, id: \.self) { id in
-                    row(id: id, name: presets.name(for: id), custom: id.hasPrefix("custom:"))
+                List(matches) { preset in
+                    row(id: preset.id, name: preset.name, custom: preset.source == "custom")
                 }
             }
         }
@@ -293,6 +267,14 @@ struct PresetListSheet: View {
                 if custom { Text("custom").font(.caption).foregroundStyle(.secondary) }
             }
             Spacer()
+            Button {
+                presets.onPreview?(id)
+            } label: {
+                Image(systemName: "play")
+            }
+            .buttonStyle(.borderless)
+            .help("Preview in the visualizer")
+            .accessibilityLabel("Preview \(name)")
             Button {
                 set(id, !listed)
             } label: {

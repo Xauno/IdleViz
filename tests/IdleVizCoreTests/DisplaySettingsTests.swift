@@ -53,4 +53,16 @@ final class DisplaySettingsTests: XCTestCase {
         XCTAssertEqual(OverlaySetting.script(for: true), "window.setOverlayEnabled?.(true)")
         XCTAssertEqual(OverlaySetting.script(for: false), "window.setOverlayEnabled?.(false)")
     }
+
+    func testThePresetTitleIsOffUnlessSwitchedOn() {
+        let suite = "PresetTitleSettingTests"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        XCTAssertFalse(PresetTitleSetting.value(in: defaults))
+        defaults.set(true, forKey: PresetTitleSetting.key)
+        XCTAssertTrue(PresetTitleSetting.value(in: defaults))
+        XCTAssertEqual(PresetTitleSetting.script(for: true), "window.setPresetTitleEnabled?.(true)")
+        XCTAssertEqual(PresetTitleSetting.script(for: false), "window.setPresetTitleEnabled?.(false)")
+    }
 }

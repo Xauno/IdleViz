@@ -519,6 +519,13 @@ Not steps of the build order: the Windows port got these first, and the Mac foll
   - Failed files are rows at the foot of **Library**, each starting "Failed to load:", and the count is on the Library row.
   - Debug builds take `-IdleVizSettingsHeight 2050` (a window taller than the screen, for capturing all of it) and `-IdleVizSettingsUnfolded YES` (every folded row open).
 
+- **Recorded keys, the block key, preset search and preview, the visualizer title.** `KeyRecorder.swift` is the Keys section; `PresetPickerSheet` and `PresetListSheet` in `PresetControls.swift` have the search; `PresetController.preview` and `endPreview` hold the page on one preset.
+  - Any key code from 0 to 127 can be recorded except Esc and codes 54 to 63: Command, Shift, Caps Lock, Option, Control, their right-hand twins and fn. The media keys have no key code on a Mac (they are system-defined events), so they can't be recorded and nothing has to leave them out. Keys are named as on a US layout (`VisualizerKeys.label`), since they are matched by position.
+  - The recorder is a local event monitor that runs while a row says "Press a key". A click anywhere ends it and keeps the old key, and still does what it would have done.
+  - The preview opens the visualizer as **Open now** does, from the sheet. It ends when the fade-out starts or the open is refused, as on Windows.
+  - The rows of the Single mode picker and of both sheets are filtered by `PresetSettings.matching`.
+  - Debug builds take `-IdleVizPreview "bundled:…"`, which previews that preset a moment after launch.
+
 ## Requirements
 
 - macOS 26 or later. The app is only built for the macOS it runs on (personal use), which avoids fallbacks for older versions.

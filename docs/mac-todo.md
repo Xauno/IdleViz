@@ -1,12 +1,10 @@
 # To do on the Mac
 
-The Windows app has one thing the Mac app doesn't have yet (part 3), and one the Mac has but that was never run on a real second display (part 1). All were built and checked on Windows only. This file is the brief for the session on a Mac that brings them over. Delete each part once its PR is merged, and the file when it is empty.
+Everything the Windows app has is in the Mac app now. One thing is left: more than one display was built with only one display connected, so it has never run on a real second one. Delete this file once the checks below are done.
 
-Before any of them: [project.md](../project.md) is the Mac plan, [mockups.html](../mockups.html) the Mac UI reference, and [AGENTS.md](../AGENTS.md) the rules (ask before any judgement call; one PR per step, with tests; update the README).
+Also never tried by hand, since the checks used no keys or pointer: recording a key under **Keys** (Esc, the ✕ button, a key another row uses), the block key in the open visualizer, the **Preview** buttons and the search boxes in the preset sheets, and the folded rows of the settings window (that a switch in a row's label toggles without folding the row, and that turning it on opens the row).
 
-Where the Windows version made a choice "without asking the owner", it is listed in [windows.md](windows.md) under that heading. Don't carry those over silently: ask the owner whether the Mac should do the same.
-
-## 1. More than one display: test it with a second display
+## More than one display: test it with a second display
 
 Built and merged, but only ever run with one display connected, using the Debug switch `-IdleVizSplitDisplay YES` (the two halves of the main display stand in for two displays). What it is and how it differs from Windows is in [project.md](../project.md) under "Brought over from the Windows app". Delete this part once these have been seen on a real second display:
 
@@ -22,17 +20,3 @@ Built and merged, but only ever run with one display connected, using the Debug 
 - **Close on input off** with the visualizer on one display: keep typing in an app on the other display, then click on the visualizer. The hotkey closes it.
 - **Unplug the second display** while the visualizer is open, and put the Mac to sleep: every window closes.
 - **Frame rate** with two displays covered, in `log stream --level debug --predicate 'subsystem == "com.xauno.IdleViz" AND category == "page"'`.
-
-## 3. Recorded keys, the block key, preset search and preview, the visualizer title
-
-**What it is:** [windows.md, "Keys, preset search and preview, close on input, visualizer title"](windows.md#keys-preset-search-and-preview-close-on-input-visualizer-title). The owner asked for these on Windows; ask which of them the Mac should get before building any.
-
-| Windows | What the Mac needs |
-| ------- | ------------------ |
-| `KeyRecorder.xaml`, `VisualizerKeys.CanBe` and `Label` | **Like key** and **Skip key** recorded by pressing a key instead of picked from a list: Esc keeps the old key, a button turns the key off, a key another row uses is refused. The Mac matches keys by position (key codes), so decide with the owner which keys can be recorded and how they are named. |
-| `VisualizerAction.Block`, `blockKey`, `PresetController.Perform` | A **Block key**, default B: blocks the preset on screen, and in Shuffle skips to the next one first, so it leaves as fast as with the skip key. No page change is needed. |
-| `PresetPickerDialog.xaml` | The **Visualizer** picker of Single mode as a list with a search box. |
-| `PresetListDialog.xaml` | The search box on both tabs of the Favorites and Blocklist sheets, and a **Preview** button on every row. |
-| `PresetSettings.PreviewScript`, `PresetController.Preview` and `EndPreview`, `App.PreviewPreset` | A preview opens the visualizer under the usual open rules, with the page held on one preset (Single mode, no blend) while the stored controls stay as they are; they are sent again when the visualizer starts to close or the open is refused. |
-| `PresetTitleSetting`, `PageView.SendPresetTitleEnabled` | The **Show visualizer title** switch (key `showPresetTitle`, off by default). The page does the rest and is already shared: `setPresetTitleEnabled` in `overlay.js`, `idlevizPresetTitle` in `visualizer.js`, `.preset-title` in `overlay.css`. |
-| **Close on input** under Opening | The Mac has the switch, under **Opening**. The like and skip rows don't grey out yet while it is off. |

@@ -32,6 +32,7 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
     /// The latest brightness and overlay switch, replayed the same way.
     private var brightnessScript = BrightnessSetting.script(for: BrightnessSetting.defaultValue)
     private var overlayEnabledScript = OverlaySetting.script(for: true)
+    private var presetTitleScript = PresetTitleSetting.script(for: false)
     /// The latest layout: which displays the window covers. Empty until the window first opens.
     private var layoutScript = ""
     /// The pages of other displays. They are sent what this page is sent and follow its preset.
@@ -123,9 +124,18 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         webView.evaluateJavaScript(overlayEnabledScript)
     }
 
-    func send(presetSettings: PresetSettings) {
+    func send(presetTitleEnabled: Bool) {
+        presetTitleScript = PresetTitleSetting.script(for: presetTitleEnabled)
+        mirrors.forEach { $0.send(presetTitleEnabled: presetTitleEnabled) }
+        guard loaded else { return }
+        webView.evaluateJavaScript(presetTitleScript)
+    }
+
+    /// Hands the preset controls to the page, which applies them at once.
+    /// - Parameter script: The call to send in place of the controls' own, for a preview held on one preset.
+    func send(presetSettings: PresetSettings, script: String? = nil) {
         self.presetSettings = presetSettings
-        presetSettingsScript = presetSettings.script
+        presetSettingsScript = script ?? presetSettings.script
         sendMirrorPreset()
         guard loaded else { return }
         webView.evaluateJavaScript(presetSettingsScript)
@@ -290,6 +300,7 @@ final class PageView: NSObject, WKNavigationDelegate, WKUIDelegate {
         webView.evaluateJavaScript(audioDelayScript)
         webView.evaluateJavaScript(brightnessScript)
         webView.evaluateJavaScript(overlayEnabledScript)
+        webView.evaluateJavaScript(presetTitleScript)
         if !layoutScript.isEmpty { webView.evaluateJavaScript(layoutScript) }
         webView.evaluateJavaScript(nowPlayingScript)
         fetchPresetList()
@@ -308,6 +319,7 @@ extension PageView {
         mirror.audioDelayScript = audioDelayScript
         mirror.brightnessScript = brightnessScript
         mirror.overlayEnabledScript = overlayEnabledScript
+        mirror.presetTitleScript = presetTitleScript
         mirrors.append(mirror)
     }
 
