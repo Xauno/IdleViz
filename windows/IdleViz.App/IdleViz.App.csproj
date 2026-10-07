@@ -44,7 +44,7 @@
   <ItemGroup>
     <Content Include="Assets\IdleViz.ico" CopyToOutputDirectory="PreserveNewest" />
     <!-- The page, shared with the Mac app. It is served from the "web" folder next to the exe. -->
-    <Content Include="..\..\IdleViz\web\**\*" Link="web\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\web\**\*" Link="web\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- WinUI brings its own texts (the names screen readers say for controls, the text box menu) in

@@ -2,7 +2,7 @@ import IdleVizCore
 import KeyboardShortcuts
 import SwiftUI
 
-/// The small glass popup under the menu-bar icon. See mockups.html, section 1.
+/// The small glass popup under the menu-bar icon.
 struct MenuBarView: View {
     var permissions: Permissions
     let openSettings: () -> Void

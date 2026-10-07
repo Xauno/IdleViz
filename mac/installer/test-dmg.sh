@@ -1,6 +1,6 @@
 #!/bin/zsh
-# Checks artifacts/IdleViz.dmg: mounts it and looks at what a person who downloads it would get.
-# Usage: installer/test-dmg.sh [version]     With a version, the app must say the same.
+# Checks mac/artifacts/IdleViz.dmg: mounts it and looks at what a person who downloads it would get.
+# Usage: mac/installer/test-dmg.sh [version]     With a version, the app must say the same.
 set -euo pipefail
 cd "${0:A:h}/.."
 
@@ -18,7 +18,7 @@ check() {
   fi
 }
 
-[[ -f "$DMG" ]] || { echo "$DMG isn't there. Run installer/build-dmg.sh first." >&2; exit 1; }
+[[ -f "$DMG" ]] || { echo "$DMG isn't there. Run mac/installer/build-dmg.sh first." >&2; exit 1; }
 hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MOUNT" >/dev/null
 trap 'hdiutil detach "$MOUNT" -quiet || true; rmdir "$MOUNT" 2>/dev/null || true' EXIT
 

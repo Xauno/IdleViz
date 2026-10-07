@@ -118,10 +118,10 @@ After that it opens like any app, and you carry on at step 4 below. To update, d
 1. Clone the repo and create your local signing config:
 
    ```bash
-   cp Config/Local.example.xcconfig Config/Local.xcconfig
+   cp mac/Config/Local.example.xcconfig mac/Config/Local.xcconfig
    ```
 
-   Set `DEVELOPMENT_TEAM` in `Config/Local.xcconfig` to your team ID. It's the `OU=` value printed by:
+   Set `DEVELOPMENT_TEAM` in `mac/Config/Local.xcconfig` to your team ID. It's the `OU=` value printed by:
 
    ```bash
    security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject
@@ -129,15 +129,15 @@ After that it opens like any app, and you carry on at step 4 below. To update, d
 
    Always sign with the same certificate. macOS ties the app's permissions to its signature, so a changing signature makes permission prompts come back.
 
-2. Double-click `IdleViz.command` in Finder (or run `./IdleViz.command`). It builds the Release app, replaces `/Applications/IdleViz.app` with it, quitting a running copy first, and opens it. Run it again after pulling changes to update. Then skip to step 4.
+2. Double-click `IdleViz.command` in the `mac` folder in Finder (or run `mac/IdleViz.command`). It builds the Release app, replaces `/Applications/IdleViz.app` with it, quitting a running copy first, and opens it. Run it again after pulling changes to update. Then skip to step 4.
 
-   To do it by hand instead, open `IdleViz.xcodeproj` in Xcode and run the **IdleViz** scheme, or build from Terminal:
+   To do it by hand instead, open `mac/IdleViz.xcodeproj` in Xcode and run the **IdleViz** scheme, or build from Terminal in `mac/`:
 
    ```bash
    xcodebuild build -project IdleViz.xcodeproj -scheme IdleViz -configuration Release -derivedDataPath .build/xcode
    ```
 
-3. Copy `.build/xcode/Build/Products/Release/IdleViz.app` to `/Applications` and open it. The app has no Dock icon; it lives in the menu bar.
+3. Copy `mac/.build/xcode/Build/Products/Release/IdleViz.app` to `/Applications` and open it. The app has no Dock icon; it lives in the menu bar.
 
 4. A welcome window opens. With Spotify running, click **Continue**. If Spotify isn't running, open it and the window carries on by itself. macOS then asks two things in turn:
    - Whether IdleViz may control Spotify. Click **OK**; the app uses this only to read what's playing.
@@ -224,21 +224,19 @@ This builds the app and `windows\artifacts\IdleViz-Setup.exe`, runs it without q
 
 ## Custom visualizers
 
-You can add your own visuals without touching either app. The easiest way is a single `.js` file that draws into a canvas and receives Spotify's audio levels every frame. [`aurora.js`](IdleViz/web/visuals/aurora.js) is a complete working example, and the full guide is [docs/custom-visualizer.md](docs/custom-visualizer.md).
+You can add your own visuals without touching either app. The easiest way is a single `.js` file that draws into a canvas and receives Spotify's audio levels every frame. [`aurora.js`](web/visuals/aurora.js) is a complete working example, and the full guide is [docs/custom-visualizer.md](docs/custom-visualizer.md).
 
 ## How it works
 
 One borderless window holds one web page. The page stacks the Butterchurn canvas, a dim layer and the Spotify-style overlay, and it is the same page in both apps: in a WKWebView on the Mac and in WebView2 on Windows. A native helper around it watches for idle time and hotkeys, reads now-playing info, captures Spotify's audio and sends the analysis to the page about 60 times a second. The helper is Swift on the Mac and C# with WinUI 3 on Windows.
 
-The full design, including the decisions behind it, is in [project.md](project.md). The brief for the Windows version is [windows-port.html](windows-port.html), and what was built and decided there is in [docs/windows.md](docs/windows.md).
+The full design, including the decisions behind it, is in [project.md](project.md). How the Windows version is built and what was decided there is in [docs/windows.md](docs/windows.md).
 
 ## Roadmap
 
-Each step becomes one pull request, and these tables are updated as it merges.
+Each step was one pull request.
 
 ### macOS
-
-The steps are from [project.md](project.md).
 
 | Step | What                                                                              | Status |
 | ---- | --------------------------------------------------------------------------------- | ------ |
@@ -259,8 +257,6 @@ The steps are from [project.md](project.md).
 | 8c   | Polish: brightness, overlay switch, launch at login                               | Done   |
 
 ### Windows
-
-The steps are from [windows-port.html](windows-port.html) and [docs/windows.md](docs/windows.md).
 
 | Step | What                                                                                                    | Status |
 | ---- | ------------------------------------------------------------------------------------------------------- | ------ |
@@ -299,7 +295,7 @@ npm run check
 
 ### macOS
 
-The Swift side is split in two. `IdleVizCore` (`Package.swift`, `Sources/`, `tests/IdleVizCoreTests/`) holds logic that runs without a screen, such as the dismiss rules and parsing Spotify's replies. The app target in `IdleViz.xcodeproj` (`IdleViz/App/`) is a thin AppKit and SwiftUI layer on top.
+The Swift side is split in two. `IdleVizCore` (`Package.swift`, `Sources/`, `Tests/`) holds logic that runs without a screen, such as the dismiss rules and parsing Spotify's replies. The app target in `IdleViz.xcodeproj` (`IdleViz/`) is a thin AppKit and SwiftUI layer on top. In `mac/`:
 
 ```bash
 swift build && swift test
@@ -330,30 +326,30 @@ The build treats warnings as errors. Details are in [docs/windows.md](docs/windo
 
 CI runs all of this on every pull request, and on a `macos-26` runner builds the Mac app unsigned with `xcodebuild` and then the disk image, which it mounts and checks. Pushing a version tag such as `v0.1.2` builds and tests the Windows setup file and the Mac disk image and publishes a GitHub release with both; nothing is published unless both pass. The tag has to match the version in `windows/Directory.Build.props` and `MARKETING_VERSION` in the Xcode project.
 
-To build the disk image yourself, run `installer/build-dmg.sh` (the result is `artifacts/IdleViz.dmg`) and check it with `installer/test-dmg.sh`. The app icon and the image's background are drawn by `swift installer/make-assets.swift` and committed.
+To build the disk image yourself, run `mac/installer/build-dmg.sh` (the result is `mac/artifacts/IdleViz.dmg`) and check it with `mac/installer/test-dmg.sh`. The app icon and the image's background are drawn by `swift installer/make-assets.swift`, run in `mac/`, and committed.
 
 ## Project layout
 
 ```
 .
-├─ project.md              Design and build order
-├─ LICENSE                 MIT license
-├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
-├─ IdleViz/web/            The page both apps show: visualizer and overlay HTML, CSS and JS, the plugin frame and its runner, the converter page, Figtree font
-├─ IdleViz/web/vendor/     Butterchurn, its preset packs and the Milkdrop converter, copied unchanged from npm
-├─ IdleViz/web/visuals/    Bundled visualizer plugins (aurora.js, the example plugin)
-├─ IdleViz.command         Builds the Mac app, installs it in /Applications and opens it
-├─ Package.swift           IdleVizCore Swift package (testable logic)
-├─ Sources/IdleVizCore/    Dismiss rules, the like and skip keys, open rules, idle timing and skip rules, keep-awake and battery times, fade times, permission states, brightness and overlay settings, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks), the audio delay (per-device setting, delay line, delay detection, the manual delay test's timing and beeps)
-├─ IdleViz.xcodeproj       Mac app target: bundle, Info.plist, entitlements, signing
-├─ IdleViz/App/            The Mac app: menu-bar app, settings window, welcome window and permission checks, triggers, fullscreen window, dismiss, keep awake, power source, Spotify info, Spotify audio tap, web view, presets folder and Milkdrop converter
-├─ Config/                 Mac build settings; your signing team goes in Local.xcconfig
+├─ web/                    The page both apps show: visualizer and overlay HTML, CSS and JS, the plugin frame and its runner, the converter page, Figtree font
+│  ├─ vendor/              Butterchurn, its preset packs and the Milkdrop converter, copied unchanged from npm
+│  └─ visuals/             Bundled visualizer plugins (aurora.js, the example plugin)
+├─ tests/                  Vitest suite for the page, with fake WebGL helpers
+├─ mac/                    The Mac app
+│  ├─ IdleViz.xcodeproj    App target: bundle, signing
+│  ├─ IdleViz/             The app: menu-bar app, settings window, welcome window and permission checks, triggers, fullscreen window, dismiss, keep awake, power source, Spotify info, Spotify audio tap, web view, presets folder and Milkdrop converter, Info.plist, entitlements
+│  ├─ Package.swift        IdleVizCore Swift package (testable logic)
+│  ├─ Sources/IdleVizCore/ Dismiss rules, the like and skip keys, open rules, idle timing and skip rules, keep-awake and battery times, fade times, permission states, brightness and overlay settings, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks), the audio delay (per-device setting, delay line, delay detection, the manual delay test's timing and beeps)
+│  ├─ Tests/               The Swift tests (IdleVizCoreTests)
+│  ├─ Config/              Build settings; your signing team goes in Local.xcconfig
+│  ├─ installer/           Builds and checks the disk image, draws the app icon and the image's background
+│  └─ IdleViz.command      Builds the app, installs it in /Applications and opens it
 ├─ windows/                The Windows app: IdleViz.Core (logic) and its tests, IdleViz.App (WinUI 3), the installer script
-├─ aurora-demo.html        Test page that feeds a plugin audio from a file or microphone
-├─ mockups.html            UI mockups for the Mac menu-bar popup and settings window
-├─ windows-port.html       Brief for the Windows version: what to reuse, the Windows UI, every decision so far
-├─ docs/                   Guides: the custom visualizer guide, the Windows notes, what the Mac app still needs
-├─ tests/                  Vitest suite, fake WebGL helpers, and the Swift tests (IdleVizCoreTests)
+├─ docs/                   The custom visualizer guide and its test page (aurora-demo.html), the Windows notes, what the Mac app still needs
+├─ project.md              Design of the Mac app and the decisions behind it
+├─ AGENTS.md               Instructions for AI coding agents (CLAUDE.md points to it)
+├─ LICENSE                 MIT license
 └─ .github/                CI and release workflows, PR template, Dependabot
 ```
 
@@ -363,7 +359,7 @@ To build the disk image yourself, run `installer/build-dmg.sh` (the result is `a
 
 ## License
 
-[MIT](LICENSE). Butterchurn, the bundled preset packs and the Milkdrop converter are MIT licensed too; their license files are in [IdleViz/web/vendor/](IdleViz/web/vendor/). Milkdrop presets and plugins that you import yourself keep their own licenses.
+[MIT](LICENSE). Butterchurn, the bundled preset packs and the Milkdrop converter are MIT licensed too; their license files are in [web/vendor/](web/vendor/). Milkdrop presets and plugins that you import yourself keep their own licenses.
 
 ## Acknowledgments
 

@@ -9,7 +9,7 @@ import {
   parseNowPlaying,
   positionAt,
   presetTitle,
-} from "../IdleViz/web/overlay-state.js";
+} from "../web/overlay-state.js";
 
 const song = {
   id: "spotify:track:a",

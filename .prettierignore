@@ -1,11 +1,12 @@
 node_modules/
 coverage/
 package-lock.json
-aurora-demo.html
+docs/aurora-demo.html
 .build/
 *.md
-IdleViz/web/vendor/*.min.js
+web/vendor/*.min.js
 .claude/
 **/bin/
 **/obj/
 windows/artifacts/
+mac/artifacts/

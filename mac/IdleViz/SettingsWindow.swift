@@ -3,7 +3,7 @@ import IdleVizCore
 import KeyboardShortcuts
 import SwiftUI
 
-/// Separate settings window, per mockups.html section 2: one scrolling page with six sections,
+/// Separate settings window: one scrolling page with six sections,
 /// in which a row that depends on another row is folded into it.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {

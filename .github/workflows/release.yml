@@ -57,6 +57,9 @@ jobs:
     name: Mac disk image
     runs-on: macos-26
     timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mac
     steps:
       - uses: actions/checkout@v7
 
@@ -79,7 +82,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: mac-disk-image
-          path: artifacts/IdleViz.dmg
+          path: mac/artifacts/IdleViz.dmg
           if-no-files-found: error
 
   publish:

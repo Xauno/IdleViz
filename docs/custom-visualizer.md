@@ -1,6 +1,6 @@
 # Writing a custom visualizer
 
-A custom visualizer is a single `.js` file. Drop it in the presets folder (`~/Library/Application Support/IdleViz/Presets/` on a Mac, `%APPDATA%\IdleViz\Presets\` on Windows, subfolders allowed) and it shows up in the preset list, tagged "custom". `IdleViz/web/visuals/aurora.js` in the repo is a complete working example, and `aurora-demo.html` is a test page you can load it into.
+A custom visualizer is a single `.js` file. Drop it in the presets folder (`~/Library/Application Support/IdleViz/Presets/` on a Mac, `%APPDATA%\IdleViz\Presets\` on Windows, subfolders allowed) and it shows up in the preset list, tagged "custom". [`web/visuals/aurora.js`](../web/visuals/aurora.js) in the repo is a complete working example, and `aurora-demo.html` is a test page you can load it into.
 
 ## The contract
 
@@ -127,7 +127,7 @@ export function dispose() {
 
 ## Testing
 
-1. Open `aurora-demo.html` in a browser. It is a test harness that can feed your plugin audio from a file or the microphone (in the real app, visuals never get microphone audio) and shows the same `audio` object the app provides. Swap in your file to try it.
+1. Open [aurora-demo.html](aurora-demo.html) in a browser. It is a test harness that can feed your plugin audio from a file or the microphone (in the real app, visuals never get microphone audio) and shows the same `audio` object the app provides. Swap in your file to try it.
 2. Test with **silence** (all zeros), a quiet track and a loud one.
 3. Test at both a small window and a large one (resize the window, and try a 4K display if you have one).
 4. Switch away and back, or reload the page, several times and watch the memory and GPU usage to make sure `dispose` really frees things.

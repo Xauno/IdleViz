@@ -19,7 +19,7 @@ import {
   shouldRender,
   shufflePool,
   skipBlendSeconds,
-} from "../IdleViz/web/visualizer-state.js";
+} from "../web/visualizer-state.js";
 
 /** A repeatable stand-in for Math.random. */
 function seeded(seed) {
@@ -205,7 +205,7 @@ describe("FailureLog", () => {
 });
 
 describe("the bundled packs", () => {
-  const vendor = resolve(import.meta.dirname, "..", "IdleViz", "web", "vendor");
+  const vendor = resolve(import.meta.dirname, "..", "web", "vendor");
   const load = (file, name) => {
     const sandbox = { self: {} };
     runInNewContext(readFileSync(resolve(vendor, file), "utf8"), sandbox);
@@ -317,7 +317,7 @@ describe("parsePresetSettings", () => {
     expect(parsePresetSettings({ secondsPerPreset: NaN, blendSeconds: Infinity })).toEqual(DEFAULT_SETTINGS);
   });
 
-  it("matches the defaults in mockups.html", () => {
+  it("has the documented defaults", () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       mode: "shuffle",
       shuffleFrom: "all",

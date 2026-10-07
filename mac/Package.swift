@@ -9,7 +9,6 @@ let package = Package(
     ],
     targets: [
         .target(name: "IdleVizCore"),
-        // `tests/` also holds the JavaScript suite; macOS folders are case-insensitive, so name it exactly.
-        .testTarget(name: "IdleVizCoreTests", dependencies: ["IdleVizCore"], path: "tests/IdleVizCoreTests")
+        .testTarget(name: "IdleVizCoreTests", dependencies: ["IdleVizCore"])
     ]
 )

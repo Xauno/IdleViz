@@ -20,7 +20,7 @@ bundle_id() {
 }
 
 command -v xcodebuild >/dev/null || fail "xcodebuild not found. Install Xcode (the full app, not just the Command Line Tools)."
-[[ -f Config/Local.xcconfig ]] || fail "Config/Local.xcconfig is missing. Copy Config/Local.example.xcconfig and set DEVELOPMENT_TEAM (see the README, Installation)."
+[[ -f Config/Local.xcconfig ]] || fail "mac/Config/Local.xcconfig is missing. Copy mac/Config/Local.example.xcconfig and set DEVELOPMENT_TEAM (see the README, Installation)."
 
 echo "Building IdleViz (Release)…"
 xcodebuild build -project IdleViz.xcodeproj -scheme IdleViz -configuration Release \

@@ -3,8 +3,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// The vendored libraries must stay byte-for-byte what npm published (see IdleViz/web/vendor/README.md).
-const vendorDir = resolve(import.meta.dirname, "..", "IdleViz", "web", "vendor");
+// The vendored libraries must stay byte-for-byte what npm published (see web/vendor/README.md).
+const vendorDir = resolve(import.meta.dirname, "..", "web", "vendor");
 const checksums = JSON.parse(readFileSync(join(vendorDir, "checksums.json"), "utf8"));
 
 describe("vendored libraries", () => {

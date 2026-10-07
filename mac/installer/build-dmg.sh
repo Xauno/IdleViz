@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Builds IdleViz.dmg: the disk image people download, with the app and a shortcut to Applications.
-# Usage: installer/build-dmg.sh        The result is artifacts/IdleViz.dmg.
+# Usage: mac/installer/build-dmg.sh        The result is mac/artifacts/IdleViz.dmg.
 #
 # The app in it runs on Apple silicon and Intel and is signed ad hoc, meaning with no certificate:
 # the project has no Developer ID and the image isn't notarized. So on another Mac, macOS blocks

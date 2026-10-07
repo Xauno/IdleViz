@@ -1,6 +1,6 @@
 included:
   - Sources
-  - tests/IdleVizCoreTests
+  - Tests
   - IdleViz
 line_length:
   warning: 140

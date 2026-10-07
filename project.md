@@ -33,13 +33,13 @@ A menu-bar app that opens a fullscreen music visualizer with a Spotify now-playi
 ## Build and signing
 
 - **Minimum macOS 26**, for both the app and the package (`platforms: [.macOS(.v26)]`).
-- **Xcode project + Swift package.** `IdleViz.xcodeproj` holds the app target: the `.app` bundle, `Info.plist`, entitlements, the `idleviz://` URL scheme and signing. All logic that can be tested without a screen lives in a local Swift package, `IdleVizCore` (`Package.swift` at the repo root), which the app target depends on. The app target stays a thin AppKit/SwiftUI layer. Building needs full Xcode, not just the Command Line Tools.
+- **Xcode project + Swift package.** `mac/IdleViz.xcodeproj` holds the app target: the `.app` bundle, `Info.plist`, entitlements, the `idleviz://` URL scheme and signing. All logic that can be tested without a screen lives in a local Swift package, `IdleVizCore` (`mac/Package.swift`), which the app target depends on. The app target stays a thin AppKit/SwiftUI layer. Building needs full Xcode, not just the Command Line Tools.
 - **Testability.** Put anything that touches the system behind a small protocol (AppleScript runner, idle-time source, clock, power assertions, Spotify running state) so `IdleVizCore` logic runs against fakes in `swift test`. CI can't test permissions, Spotify or audio, so those are checked by hand and written up in each PR's Verification section.
 - **CI.** `swift test` for the package, `xcodebuild build` for the app with `CODE_SIGNING_ALLOWED=NO`, and SwiftLint. It runs on the `macos-26` runner.
 - **Signing.** Sign every local build with the same free Apple Development certificate (Xcode's personal team). macOS ties the Automation and System Audio Recording permissions to the signature, so ad-hoc or changing signatures make the prompts come back or silently return all-zero audio.
 - **Hardened Runtime** on, with the `com.apple.security.automation.apple-events` entitlement, and `com.apple.security.device.audio-input` for the delay detector's microphone use.
 - **Not sandboxed.** The sandbox would need a temporary-exception entitlement for Apple Events to Spotify and would move the presets folder into a container.
-- **Install** by copying the built app to `/Applications`. Launch at login (`SMAppService`) works best from there. The `.app` bundle is the whole app, so there is no installer. `IdleViz.command` at the repo root does the build, the copy and the launch in one step.
+- **Install** by copying the built app to `/Applications`. Launch at login (`SMAppService`) works best from there. The `.app` bundle is the whole app, so there is no installer. `mac/IdleViz.command` does the build, the copy and the launch in one step.
 
 ---
 
@@ -87,8 +87,6 @@ Page layers (bottom → top): Butterchurn canvas or plugin frame → dim layer �
 ```
 
 ### Menu-bar helper
-**UI reference:** build the menu-bar popup and the settings window to match [mockups.html](mockups.html) (layout, grouping, row order, sizes, and build notes). Open it in a browser.
-
 - `LSUIElement = YES`, launch at login (`SMAppService.mainApp.register()`). The settings switch reads its state from `SMAppService.mainApp.status` instead of storing a setting, since it can also be changed under Login Items in System Settings.
 - The menu-bar popup is a small glass-style popover (SwiftUI `MenuBarExtra` with `.window` style, or `NSPopover`), not a plain `NSMenu`. The background is real Liquid Glass (`glassEffect`). The app requires macOS 26, so there's no fallback look. It is deliberately tiny, with two rows:
   1. **Settings…** opens the separate settings window.
@@ -329,31 +327,6 @@ The tap hears Spotify's audio before it reaches the speakers. With built-in spea
   - The microphone is the Mac's built-in one when it has one, whatever the default input is: recording from a Bluetooth headset's own microphone would switch the headset to call mode and change the delay being measured.
   - A measured value is saved even when it equals the reported latency. A device that was never measured or adjusted keeps following what macOS reports.
 
-### Audio spike findings (step 2)
-Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024 × 1964 built-in display, built-in speakers) with macOS 26 and the Spotify desktop app. The spike used a Spotify process tap, a vDSP analysis in Swift, one packed frame per display frame sent with `evaluateJavaScript`, and Butterchurn 2.6.7 in a `WKWebView` loaded with `loadFileURL` (no custom scheme or CSP yet).
-
-**What worked**
-- **Permission.** macOS showed the System Audio Recording prompt when the tap first started, and after Allow the audio was real (not all-zero). The build was signed with the Apple Development team.
-- **Tap.** The tap delivers 48 kHz, 2-channel, interleaved Float32. Setting up the tap and the aggregate device (default output as the main sub-device, the tap with drift compensation, `TapAutoStart`) took 20–25 ms.
-- **Process list.** Spotify had exactly one audio process object with a `com.spotify.client` bundle ID, and its helpers never showed up. The list listener fired when Spotify launched and when it quit, and the tap rebuilt and tore down cleanly each time.
-- **Spotify only.** With Spotify paused, system sounds (`afplay`) left the tap at exact zero.
-- **Swift analysis.** Building a frame (a 1024-point vDSP FFT, 64 log bands, RMS and packing) took 50–75 µs in an optimized build (about 1 ms unoptimized).
-- **Transport.** One frame is 7,448 bytes: a 24-byte header, 64 bands as `f32`, a 1024-sample `f32` waveform, and 3 × 1024 bytes for Butterchurn. Sent base64-encoded with `evaluateJavaScript` 60 times a second, the round trip averaged about 0.5 ms and the page decoded a frame in 0.02–0.1 ms. No frames were dropped.
-- **Butterchurn.** `render({ audioLevels })` works (see "Feeding Butterchurn"). Its `bass` value ranged about 0–2.4 each second, a normal Milkdrop range, and the visuals clearly followed the beat. Rendering held 60 fps at 2560 × 1663, with `render()` taking 1.5–2 ms of JS per frame. `requestAnimationFrame` ran at 60 Hz on the 120 Hz display.
-- **Cost while playing** (`top`, percent of one core): IdleViz about 5.5%, WebKit WebContent 13–15%, WebKit GPU process 5–7%, `coreaudiod` 7–9%, WindowServer about 19% (including compositing the fullscreen window). The GPU's "Device Utilization" was about 22% at 2560 px wide and 0–12% at 1512 px and below. That counter is noisy at low load, so tune the resolution cap by power use in step 7b.
-
-**What had to change** (already written into the sections above)
-- Spotify's process object appears when Spotify launches, not when it first plays. Before the first play the I/O block gets no buffers at all; once paused, it gets exact-zero buffers. This changes the permission check under "Permissions and first launch".
-- The I/O block has to be created outside the main actor, or Swift 6 crashes on the first buffer.
-- The sample buffer has to be cleared on teardown.
-- The 60 fps cap needs a tolerant threshold.
-- Frames sent before the page has loaded throw a JavaScript exception. Swift should only start sending after the page finishes loading, or call `window.audioFrame?.(…)`.
-- Presets differ a lot in how reactive they look. The first one tried ("Flexi + Martin - cascading decay swing") looked disconnected from the music, while beat-driven ones ("Flexi, martin + geiss - dedicated to the sherwin maxawow", "Zylot - Paint Spill (Music Reactive Paint Mix)") clearly followed it. Keep this in mind when picking the default preset and the shuffle list in 7a/7c.
-
-**Development notes**
-- LaunchServices sends `idleviz://open` to whichever registered copy of `com.xauno.IdleViz` it picks, so several builds on disk (Debug, Release, other derived-data folders) can make the URL open a stale copy. Keep one build around, or unregister the others with `lsregister -u`.
-- `loadFileURL` drops query strings. This won't matter once the page is served from `idleviz-app://`.
-
 ### Performance
 - Cap rendering at 60 fps, including on 120 Hz ProMotion displays (skip every other `requestAnimationFrame`). Skip a frame only when it comes less than ~12 ms after the last one. A strict 16.7 ms threshold drops about a third of the frames on a 60 Hz display because of timestamp jitter (step 2 spike).
 - Render Butterchurn below full device resolution on large displays (at most 2560 px wide for now) and let the GPU scale it up. Tune by eye and by power use.
@@ -419,79 +392,67 @@ Tested on the throwaway `spike/audio-tap` branch, on a MacBook Pro (M5 Pro, 3024
 ## File layout
 
 ```
-IdleViz.xcodeproj                # app target (bundle ID com.xauno.IdleViz), synchronized with IdleViz/; web/ is an explicit folder so it's copied with its subfolders
-Config/                          # IdleViz.xcconfig; Local.xcconfig (gitignored) holds DEVELOPMENT_TEAM
-IdleViz.command                  # build Release, install to /Applications, open
-Package.swift                    # IdleVizCore package (testable logic)
-Sources/IdleVizCore/             # open rules, idle/skip rules, dismiss rules, like and skip keys, keep-awake + battery timing, fade times, permission states, brightness and overlay settings, Spotify parsing, content type, FFT/bands, delay detection
-tests/IdleVizCoreTests/          # XCTest, runs in CI with swift test (shares tests/ with the JS suite; Package.swift names the path)
-IdleViz/
-├─ App/
-│  ├─ AppDelegate.swift          # wires everything together at launch, open rules
-│  ├─ MenuBarView.swift          # the popup: Settings…, hotkey row, error rows
-│  ├─ MenuBarIcon.swift          # icon flash, yellow icon
-│  ├─ Permissions.swift          # check Automation and audio, run the welcome window's prompts, open System Settings pages
-│  ├─ SettingsWindow.swift       # separate settings UI (one scrolling page, per mockups.html)
-│  ├─ LaunchAtLogin.swift        # the launch at login switch (SMAppService)
-│  ├─ DisplayOptions.swift       # brightness and overlay switch → page
-│  ├─ PresetControls.swift       # the preset rows in settings, and the favorites and blocklist sheets
-│  ├─ PresetController.swift     # preset settings in UserDefaults → page; preset list and last-shown preset from the page
-│  ├─ WelcomeWindow.swift        # explains and triggers the two permission prompts
-│  ├─ Triggers.swift             # idle, hotkey, URL scheme, open rules
-│  ├─ DismissWatcher.swift       # closes on input; hands the like and skip keys to the app instead
-│  ├─ KeepAwake.swift            # display-sleep assertion + time limit
-│  ├─ PowerSource.swift          # plugged in / battery, change notifications
-│  ├─ WindowController.swift     # key-capable borderless window, fades in and out
-│  ├─ PageView.swift             # WKWebView, nowPlaying and audio frames, status check and recovery, media capture denied
-│  ├─ AppSchemeHandler.swift     # serves idleviz-app://app/ with the CSP header
-│  ├─ SpotifyInfo.swift          # launch/quit tracking, notifications, AppleScript, artwork
-│  ├─ SpotifyAudioTap.swift      # process tap on Spotify only, rebuilt when its processes or the output device change
-│  ├─ AudioPump.swift            # while open: tap → IdleVizCore analysis → page, 60×/s; tap health check
-│  ├─ AudioDelay.swift           # per-device delay, device lookups, Detect delay (mic, ~5 s), manual delay test
-│  ├─ BeepTest.swift             # plays the manual delay test's beeps at exact host times
-│  ├─ PresetLibrary.swift        # scan/watch custom preset folder, import, send list to page
-│  ├─ FolderWatcher.swift        # FSEvents wrapper
-│  ├─ MilkConverter.swift        # hidden page that converts .milk files
-│  ├─ Info.plist                 # LSUIElement, NSAppleEventsUsageDescription, NSAudioCaptureUsageDescription, NSMicrophoneUsageDescription
-│  └─ IdleViz.entitlements       # hardened runtime + apple-events + audio-input, no sandbox
-├─ web/
-│  ├─ index.html
-│  ├─ plugin-host.html           # sandboxed frame that runs one custom JS plugin
-│  ├─ plugin-runner.js           # inside the frame: loads the plugin, runs it on posted frames
-│  ├─ plugin-runner-core.js      # DOM-free part of the runner (tested with Vitest)
-│  ├─ plugin-frame.js            # host side: creates the frame, posts audio, handles failures
-│  ├─ converter.html / converter.js  # hidden page for .milk conversion
-│  ├─ overlay.css / overlay.js   # nowPlaying(), progress interpolation, states
-│  ├─ overlay-state.js           # DOM-free overlay logic (tested with Vitest)
-│  ├─ fonts/                     # Figtree + OFL license
-│  ├─ visualizer.js              # Butterchurn wrapper: canvas, render loop, preset changes, context-loss rebuild
-│  ├─ visualizer-state.js        # DOM-free visualizer logic (preset list, shuffle, timing, render size; tested with Vitest)
-│  ├─ audio-frame.js             # DOM-free decoder for the packed audio frame from Swift (tested with Vitest)
-│  ├─ vendor/                    # butterchurn.min.js + preset packs from npm, unchanged, with licenses and checksums
-│  └─ visuals/                   # bundled plugin modules only (aurora.js); the plugin contract test loads every file here
-└─ design/reference/             # Spotify TV app reference photo (gitignored, local only)
+web/                             # the page both apps show
+├─ index.html
+├─ plugin-host.html              # sandboxed frame that runs one custom JS plugin
+├─ plugin-runner.js              # inside the frame: loads the plugin, runs it on posted frames
+├─ plugin-runner-core.js         # DOM-free part of the runner (tested with Vitest)
+├─ plugin-frame.js               # host side: creates the frame, posts audio, handles failures
+├─ converter.html / converter.js # hidden page for .milk conversion
+├─ overlay.css / overlay.js      # nowPlaying(), progress interpolation, states
+├─ overlay-state.js              # DOM-free overlay logic (tested with Vitest)
+├─ fonts/                        # Figtree + OFL license
+├─ visualizer.js                 # Butterchurn wrapper: canvas, render loop, preset changes, context-loss rebuild
+├─ visualizer-state.js           # DOM-free visualizer logic (preset list, shuffle, timing, render size; tested with Vitest)
+├─ audio-frame.js                # DOM-free decoder for the packed audio frame from Swift (tested with Vitest)
+├─ vendor/                       # butterchurn.min.js + preset packs from npm, unchanged, with licenses and checksums
+└─ visuals/                      # bundled plugin modules only (aurora.js); the plugin contract test loads every file here
+tests/                           # Vitest suite for the page
+mac/
+├─ IdleViz.xcodeproj             # app target (bundle ID com.xauno.IdleViz), synchronized with IdleViz/; ../web is a folder reference so it's copied with its subfolders
+├─ Config/                       # IdleViz.xcconfig; Local.xcconfig (gitignored) holds DEVELOPMENT_TEAM
+├─ IdleViz.command               # build Release, install to /Applications, open
+├─ installer/                    # build-dmg.sh, test-dmg.sh, dmg-settings.py, make-assets.swift
+├─ Package.swift                 # IdleVizCore package (testable logic)
+├─ Sources/IdleVizCore/          # open rules, idle/skip rules, dismiss rules, like and skip keys, keep-awake + battery timing, fade times, permission states, brightness and overlay settings, Spotify parsing, content type, FFT/bands, delay detection
+├─ Tests/IdleVizCoreTests/       # XCTest, runs in CI with swift test
+└─ IdleViz/
+   ├─ AppDelegate.swift          # wires everything together at launch, open rules
+   ├─ MenuBarView.swift          # the popup: Settings…, hotkey row, error rows
+   ├─ MenuBarIcon.swift          # icon flash, yellow icon
+   ├─ Permissions.swift          # check Automation and audio, run the welcome window's prompts, open System Settings pages
+   ├─ SettingsWindow.swift       # separate settings UI (one scrolling page)
+   ├─ LaunchAtLogin.swift        # the launch at login switch (SMAppService)
+   ├─ DisplayOptions.swift       # brightness and overlay switch → page
+   ├─ PresetControls.swift       # the preset rows in settings, and the favorites and blocklist sheets
+   ├─ PresetController.swift     # preset settings in UserDefaults → page; preset list and last-shown preset from the page
+   ├─ WelcomeWindow.swift        # explains and triggers the two permission prompts
+   ├─ Triggers.swift             # idle, hotkey, URL scheme, open rules
+   ├─ DismissWatcher.swift       # closes on input; hands the like and skip keys to the app instead
+   ├─ KeepAwake.swift            # display-sleep assertion + time limit
+   ├─ PowerSource.swift          # plugged in / battery, change notifications
+   ├─ WindowController.swift     # key-capable borderless window, fades in and out
+   ├─ PageView.swift             # WKWebView, nowPlaying and audio frames, status check and recovery, media capture denied
+   ├─ AppSchemeHandler.swift     # serves idleviz-app://app/ with the CSP header
+   ├─ SpotifyInfo.swift          # launch/quit tracking, notifications, AppleScript, artwork
+   ├─ SpotifyAudioTap.swift      # process tap on Spotify only, rebuilt when its processes or the output device change
+   ├─ AudioPump.swift            # while open: tap → IdleVizCore analysis → page, 60×/s; tap health check
+   ├─ AudioDelay.swift           # per-device delay, device lookups, Detect delay (mic, ~5 s), manual delay test
+   ├─ BeepTest.swift             # plays the manual delay test's beeps at exact host times
+   ├─ PresetLibrary.swift        # scan/watch custom preset folder, import, send list to page
+   ├─ FolderWatcher.swift        # FSEvents wrapper
+   ├─ MilkConverter.swift        # hidden page that converts .milk files
+   ├─ IdleVizApp.swift           # the app's entry point
+   ├─ IdleWatcher.swift          # fires the idle trigger, scheduled by IdleScheduler
+   ├─ Displays.swift             # the connected displays as they are right now
+   ├─ DisplayControls.swift      # the Displays section in settings
+   ├─ AudioDelayControls.swift   # the Audio sync section in settings
+   ├─ KeyRecorder.swift          # the Keys section in settings: keys recorded by pressing them
+   ├─ AppIcon.icns               # the app icon, drawn by installer/make-assets.swift
+   ├─ Info.plist                 # LSUIElement, NSAppleEventsUsageDescription, NSAudioCaptureUsageDescription, NSMicrophoneUsageDescription
+   └─ IdleViz.entitlements       # hardened runtime + apple-events + audio-input, no sandbox
+design/reference/                # Spotify TV app reference photo (gitignored, local only)
 ```
-
-## Build order
-
-Each step is one pull request. At the end of each step, update the README (Roadmap table, Features, Installation, Usage) and add tests for the step, as described in `CONTRIBUTING.md`.
-
-1. **Open/close shell:** Xcode project + `IdleVizCore` package, signing, CI building the app with `xcodebuild`. Menu-bar app (Settings… + hotkey row, settings window stubbed), hotkey, fullscreen black window on the main display, dismiss on any input, focus returned to the previous app, the debug no-dismiss switch. Compare the feel side by side with a real macOS screensaver, and note how often activation is refused.
-2. **Audio spike (throwaway):** prove the riskiest part before building on it. A process tap on Spotify gets real audio, Swift turns it into levels, and they reach the page ~60×/s and drive Butterchurn with one preset. Check `render({ audioLevels })`, the permission prompt, and CPU/GPU use. The spike code stays on a branch and isn't merged; this step's PR only writes the findings (what worked, what had to change) into `project.md`. Done: see "Audio spike findings (step 2)" and the `spike/audio-tap` branch.
-3. **SpotifyInfo:** launch/quit tracking, notification + AppleScript (on its own thread, with a timeout), artwork download, content type and ad context, printed to the console. Confirm it never launches Spotify. Test songs, paused, podcasts, music ads, podcast ads, local files and Spotify Connect.
-4. **Open rules + icon flash** wired to the hotkey.
-5. **Overlay page** matched to the reference screenshots, served from `idleviz-app://` with the CSP, over a placeholder animated gradient (no audio needed yet), covering every state in the table plus the missing-artwork placeholder.
-6. **Idle trigger**, with the skip rules (locked screen, another app keeping the display awake).
-7. **Visualizer**, split into five PRs:
-   - **7a.** Butterchurn in the page with bundled presets and fake audio. Move `aurora.js` to `web/visuals/`. Done.
-   - **7b.** Real audio: process tap (with process-list changes), analysis in Swift, automatic gain, silence rules, web view recovery. Done.
-   - **7c.** Preset controls (mode, shuffle, timing, blend, favorites, blocklist). Done.
-   - **7d.** Custom preset folder: `.json` loading, folder watching, `.js` plugins in sandboxed frames (with the audio, CSP and status-check rules), Import/Open/Reload controls in settings, then `.milk` conversion with caching and failure handling. Done.
-   - **7e.** Audio delay: per-device delay line, the settings slider, and **Detect delay** with the microphone. Test with built-in speakers, Bluetooth headphones and speakers, and AirPlay if available. Done. Tested with the built-in speakers, AirPlay and Bluetooth headphones; no Bluetooth speaker was available.
-8. **Polish**, split into three PRs:
-   - **8a.** Keep awake with its time limit setting (and the idle rule to wait for input after the limit), different times on battery, and the window fades. Done.
-   - **8b.** Permissions: welcome window, yellow icon and popup error rows for missing permissions. Done. The macOS prompts themselves weren't triggered, since both permissions were already granted on the test Mac.
-   - **8c.** Brightness slider, Show Spotify overlay switch and launch at login in settings. Done. The launch at login switch wasn't flipped during testing.
 
 ## Later
 
@@ -499,7 +460,7 @@ Each step is one pull request. At the end of each step, update the README (Roadm
 
 ## Brought over from the Windows app
 
-Not steps of the build order: the Windows port got these first, and the Mac followed. What each one is, and what the owner chose, is in [docs/windows.md](docs/windows.md); only what differs on the Mac is here.
+The Windows port got these first, and the Mac followed. What each one does is in the [README](README.md#usage); only what differs on the Mac is here.
 
 - **The delay line, measured.** `DelayLine.pop` used to drop about a quarter of the frames at delays that are a whole number of frames. The fix was written on a Windows PC, so it was measured here afterwards: a Debug build with the visualizer open, counting the audio frames the page reports each second, gave 60 a second at delays of 0, 0.1, 1.0 and 2.5 s. The Debug copy had no audio permission, so the frames were silent ones; they take the same path through the delay line.
 - **More than one display** (W9 on Windows). `MultiDisplay.swift` holds the settings and `DisplayPlan`; `WindowController` keeps a window for every connected display and a page for each covered one; the main `PageView` forwards what it is sent to the others and keeps them on its preset.
@@ -526,10 +487,10 @@ Not steps of the build order: the Windows port got these first, and the Mac foll
   - The rows of the Single mode picker and of both sheets are filtered by `PresetSettings.matching`.
   - Debug builds take `-IdleVizPreview "bundled:…"`, which previews that preset a moment after launch.
 
-- **The disk image.** The Windows app has a setup wizard; the owner chose a disk image for the Mac, published unsigned on version tags. `installer/build-dmg.sh` builds the Release app for Apple silicon and Intel, signs it ad hoc, and has `dmgbuild` (a Python package, installed into `.build/dmg-venv`) make `artifacts/IdleViz.dmg` with the app, a shortcut to Applications and the window layout in `installer/dmg-settings.py`. `installer/test-dmg.sh` mounts it and checks the contents, the signature, both chip types and the version.
+- **The disk image.** The Windows app has a setup wizard; the owner chose a disk image for the Mac, published unsigned on version tags. `mac/installer/build-dmg.sh` builds the Release app for Apple silicon and Intel, signs it ad hoc, and has `dmgbuild` (a Python package, installed into `mac/.build/dmg-venv`) make `mac/artifacts/IdleViz.dmg` with the app, a shortcut to Applications and the window layout in `dmg-settings.py`. `test-dmg.sh` mounts it and checks the contents, the signature, both chip types and the version.
   - `dmgbuild` writes the window's layout file itself. The usual tools script Finder to arrange the window, which needs a logged-in desktop and doesn't work in CI.
   - Ad hoc means signed with no certificate. macOS blocks the first open until it is allowed under Privacy & Security, and it ties the permissions to the exact build, so they are asked again after every update. `IdleViz.command` still builds a copy signed with your own certificate.
-  - The app got an icon for this (`AppIcon.icns`, the Windows icon's design on Apple's icon grid); it had none. `installer/make-assets.swift` draws it and the window's background.
+  - The app got an icon for this (`AppIcon.icns`, the Windows icon's design on Apple's icon grid); it had none. `mac/installer/make-assets.swift` draws it and the window's background.
   - The background is one 600 × 400 picture in mid grey. Finder ignored a 2x version (a two-size TIFF and a 144 dpi PNG both came out double size on macOS 26), and it writes the icons' names in black or white by the system's appearance whatever is behind them.
   - `MARKETING_VERSION` went from 0.1.0 to 0.1.1 to match the Windows app. The release workflow fails unless the tag matches both.
 
