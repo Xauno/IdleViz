@@ -44,7 +44,7 @@ Every setting and what differs between the two apps is in [docs/usage.md](docs/u
 </p>
 
 <p align="center">
-  <img src="docs/images/settings.png" width="440" alt="The settings window"><br>
+  <img src="docs/images/settings.png" width="400" alt="The settings window"><br>
   <em>The settings window</em>
 </p>
 
