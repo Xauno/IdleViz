@@ -11,7 +11,7 @@ There are two apps, one for macOS and one for Windows 11. Both show the same pag
 
 It is not a real screensaver, just a fullscreen window on top of everything.
 
-> **Status: in development.** Every step in the [Roadmap](#roadmap) is built for both apps. The Windows app has a setup file on the [Releases page](https://github.com/Xauno/IdleViz/releases); the Mac app is built from source. Both can cover one display or several; on the Mac that was only checked with one display connected. The Windows app has only been used on one PC, a desktop with two displays and no battery, so its battery times are untested on real hardware.
+> **Status: in development.** Every step in the [Roadmap](#roadmap) is built for both apps. The Windows app has a setup file on the [Releases page](https://github.com/Xauno/IdleViz/releases). The Mac app gets a disk image there from the next release on; up to v0.1.1 it could only be built from source. Both can cover one display or several; on the Mac that was only checked with one display connected. The Windows app has only been used on one PC, a desktop with two displays and no battery, so its battery times are untested on real hardware.
 
 ## Contents
 
@@ -76,7 +76,7 @@ Both apps do all of this. Where they differ is in [macOS and Windows compared](#
 
 |                        | macOS                                                                                             | Windows                                                                                                    |
 | ---------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Getting it             | Built from source with Xcode                                                                      | `IdleViz-Setup.exe` from the [Releases page](https://github.com/Xauno/IdleViz/releases), or built yourself |
+| Getting it             | `IdleViz.dmg` from the Releases page (from the next release on), or built with Xcode              | `IdleViz-Setup.exe` from the [Releases page](https://github.com/Xauno/IdleViz/releases), or built yourself |
 | Where it lives         | Menu bar                                                                                          | Tray (notification area)                                                                                   |
 | Displays               | One or several, as on Windows; **Extend** needs "Displays have separate Spaces" turned off        | One or several: the same visualizer on each, or one picture extended across them                           |
 | Permissions            | A welcome window asks for Spotify control and Spotify audio; the microphone is asked at Detect    | No prompts; the microphone follows the Windows privacy setting                                             |
@@ -104,7 +104,16 @@ Both need the Spotify desktop app.
 
 ### macOS
 
-The Mac app is built from source for personal use. There is no download.
+Download `IdleViz.dmg` from the [Releases page](https://github.com/Xauno/IdleViz/releases), open it, and drag **IdleViz** onto **Applications** in the window that appears. Each version tag gets a release with the disk image; releases up to v0.1.1 only have the Windows setup file, so until the next one, build it yourself as described below. The app in the image runs on Apple silicon and Intel Macs.
+
+The app isn't signed with a Developer ID and isn't notarized, so macOS blocks it the first time:
+
+- Open **IdleViz** from Applications. macOS says it can't check the app for malicious software. Click **Done**.
+- Open System Settings → Privacy & Security, scroll down to the line about IdleViz, click **Open Anyway** and confirm.
+
+After that it opens like any app, and you carry on at step 4 below. To update, download the new disk image and drag the app across again, replacing the old one. macOS ties the app's permissions to the exact build, so it asks for Spotify control and Spotify audio again after an update, and **Launch at login** may need switching on again. To remove it, quit IdleViz and drag it from Applications to the Trash.
+
+**Or build it yourself**, which signs the app with your own certificate, so the permissions stay across updates:
 
 1. Clone the repo and create your local signing config:
 
@@ -319,7 +328,9 @@ The build treats warnings as errors. Details are in [docs/windows.md](docs/windo
 
 ### CI and releases
 
-CI runs all of this on every pull request, and builds the Mac app unsigned with `xcodebuild` on a `macos-26` runner. Pushing a version tag such as `v0.1.0` builds and tests the Windows setup file and publishes a GitHub release with it; the tag has to match the version in `windows/Directory.Build.props`.
+CI runs all of this on every pull request, and on a `macos-26` runner builds the Mac app unsigned with `xcodebuild` and then the disk image, which it mounts and checks. Pushing a version tag such as `v0.1.2` builds and tests the Windows setup file and the Mac disk image and publishes a GitHub release with both; nothing is published unless both pass. The tag has to match the version in `windows/Directory.Build.props` and `MARKETING_VERSION` in the Xcode project.
+
+To build the disk image yourself, run `installer/build-dmg.sh` (the result is `artifacts/IdleViz.dmg`) and check it with `installer/test-dmg.sh`. The app icon and the image's background are drawn by `swift installer/make-assets.swift` and committed.
 
 ## Project layout
 
