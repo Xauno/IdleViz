@@ -77,4 +77,5 @@ What the owner decided before and during the build, starting on 2 October 2026.
 | First reading | A trigger that comes before Windows has said anything about Spotify (the app has just started) waits up to 2 s for the first reading, then decides. |
 | App icon | The tray's five-bar waveform, white on a dark rounded square. |
 | Docs | The README has a Windows section with its own roadmap. This file holds how the app is built and what was decided. |
+| Updates | The app tells the user about a newer release in the flyout and installs nothing; see "Update notice" in [project.md](../project.md). The request is made with `HttpClient` and names the app as `IdleViz`, since GitHub refuses requests without a user agent. |
 | Shared page | One change to the shared page was approved: it also accepts `https://app.idleviz.invalid/visuals/…` and `https://presets.idleviz.invalid/…` for plugin and preset URLs, because WebView2 refuses every request from the sandboxed plugin frame to a custom scheme. The Windows app answers those two addresses itself; `.invalid` never resolves. |

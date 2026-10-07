@@ -47,6 +47,7 @@ Both apps do all of this. Where they differ is in [macOS and Windows compared](#
 - Optional separate idle and keep-awake times for when the computer runs on its battery. They apply the moment you unplug or plug in, even while the visualizer is open. Computers without a battery don't show the option.
 - Closes when the computer goes to sleep or the displays change (one is plugged in or removed, or its resolution changes).
 - Can start when you log in.
+- Tells you when a newer version is out: once a day it asks GitHub for the latest release, and the popup gets a row that opens the release page. It downloads and installs nothing, and a switch in settings turns the check off.
 
 **Now playing**
 
@@ -111,7 +112,7 @@ The app isn't signed with a Developer ID and isn't notarized, so macOS blocks it
 - Open **IdleViz** from Applications. macOS says it can't check the app for malicious software. Click **Done**.
 - Open System Settings → Privacy & Security, scroll down to the line about IdleViz, click **Open Anyway** and confirm.
 
-After that it opens like any app, and you carry on at step 4 below. To update, download the new disk image and drag the app across again, replacing the old one. macOS ties the app's permissions to the exact build, so it asks for Spotify control and Spotify audio again after an update, and **Launch at login** may need switching on again. To remove it, quit IdleViz and drag it from Applications to the Trash.
+After that it opens like any app, and you carry on at step 4 below. The app tells you in its popup when a newer version is out. To update, download the new disk image and drag the app across again, replacing the old one. macOS ties the app's permissions to the exact build, so it asks for Spotify control and Spotify audio again after an update, and **Launch at login** may need switching on again. To remove it, quit IdleViz and drag it from Applications to the Trash.
 
 **Or build it yourself**, which signs the app with your own certificate, so the permissions stay across updates:
 
@@ -175,6 +176,7 @@ This builds the app and `windows\artifacts\IdleViz-Setup.exe`, runs it without q
 - **Idle:** after the **Start after idle** time with no input (5 minutes by default; 10, 15 or 30 minutes, or off), it opens by itself, with the same Spotify check. A refused or skipped idle open isn't tried again until you've used the computer.
 - **Keep awake:** while the visualizer is showing, the display doesn't sleep and the computer doesn't lock by itself. After the **Keep screen awake** time (1 hour by default; 30 minutes, 2 hours or 4 hours also available), counted from when it opened, it fades out slowly and the system's own sleep and lock settings take over. It then stays closed until you use the computer again.
 - **On battery:** on a computer with a battery, turn on **Different times on battery** in settings to get a second **Start after idle** and **Keep screen awake** time that apply while it's unplugged.
+- **Updates:** with **Check for updates** on under **Opening** in settings (it is on unless you turn it off), the app asks GitHub once a day which release is the latest. If it is newer than yours, the popup shows **Version … is available**; click it for the release page in your browser, download the new disk image or setup file there and install it as before. The icon doesn't change. The row under the switch says which version you have and what the last check found, and **Check now** asks at once. The request names no one: it carries no account and no identifier. Turned off, the app never contacts GitHub.
 - **Brightness and overlay:** **Brightness** dims the visuals behind the overlay (50 to 100%), and **Show Spotify overlay** turns the now-playing layout off, leaving only the visualizer. Both apply at once, even while the visualizer is open.
 - **Visualizer:** it moves to whatever Spotify is playing on this computer, and a new preset blends in every 30 seconds. With Spotify paused, or playing on another device, the visuals get silence and drift slowly.
 - **Presets:** in settings, **Mode** is **Shuffle** or **Single**. Shuffle has **Shuffle from** (all, bundled, custom or favorites), the time per preset and **Blend time**. Single has one **Visualizer** row, which opens a list of every preset with a search box; picking one applies at once, and that preset stays on screen. Besides the like key, presets can be rated after the visualizer has closed: **Last shown** names the preset that was just on screen, with a button to add it to your favorites and one to leave it out of shuffle. **Favorites** and **Blocklist** open a list where you can remove entries or add more from all presets. Both tabs have a search box, and every row has a **Preview** button (▷) that opens the visualizer on that preset. Close the preview like any open visualizer; your **Mode** and other preset settings are untouched. Like every open, a preview needs a Spotify track.
@@ -234,7 +236,7 @@ The full design, including the decisions behind it, is in [project.md](project.m
 
 ## Roadmap
 
-Each step was one pull request.
+Each step was one pull request. Features added to both apps after these steps, such as the update notice, are not in the tables.
 
 ### macOS
 
@@ -302,7 +304,7 @@ swift build && swift test
 swiftlint lint --strict
 ```
 
-In Debug builds, the launch argument `-IdleVizNoDismiss YES` keeps the window open so it can be inspected; trigger it again to close. `-IdleVizShowSettings YES` opens the settings window at launch, `-IdleVizShowWelcome YES` the welcome window, `-IdleVizFakePermissions automation=notAsked,audio=denied` shows the yellow icon, error rows and welcome window in that state without touching the real permissions, `-IdleVizDetectDelay YES` runs Detect delay four seconds after launch, and `-IdleVizOpenAtLaunch YES` opens the visualizer three seconds after launch (unlike `open idleviz://open`, that can't end up in another copy of the app). The page is inspectable in Debug builds: with the window open, attach Safari's Web Inspector from **Develop → [your Mac] → IdleViz**. The scheme has this argument ready to tick. Each open logs whether macOS let the app activate, and each preset change is logged too:
+In Debug builds, the launch argument `-IdleVizNoDismiss YES` keeps the window open so it can be inspected; trigger it again to close. `-IdleVizShowSettings YES` opens the settings window at launch, `-IdleVizShowWelcome YES` the welcome window, `-IdleVizFakePermissions automation=notAsked,audio=denied` shows the yellow icon, error rows and welcome window in that state without touching the real permissions, `-IdleVizFakeUpdate 9.9.9` offers that version in the popup and in settings as if it were the latest release, `-IdleVizDetectDelay YES` runs Detect delay four seconds after launch, and `-IdleVizOpenAtLaunch YES` opens the visualizer three seconds after launch (unlike `open idleviz://open`, that can't end up in another copy of the app). The page is inspectable in Debug builds: with the window open, attach Safari's Web Inspector from **Develop → [your Mac] → IdleViz**. The scheme has this argument ready to tick. Each open logs whether macOS let the app activate, and each preset change is logged too:
 
 ```bash
 log stream --predicate 'subsystem == "com.xauno.IdleViz"'
@@ -319,6 +321,14 @@ dotnet format --verify-no-changes
 dotnet build
 dotnet test
 ```
+
+Debug builds take switches on the command line. `--pretend-update` offers version 99.0.0 without waiting for a real release, so the row in the flyout and the text under **Check for updates** can be tried; add `--show-flyout` or `--show-settings` to open them at launch:
+
+```powershell
+dotnet run --project IdleViz.App -- --pretend-update --show-flyout
+```
+
+In any build, **Check now** under **Check for updates** in settings asks GitHub at once and says what it found, and the answer is written to the log.
 
 The build treats warnings as errors. Details are in [docs/windows.md](docs/windows.md).
 
@@ -340,7 +350,7 @@ To build the disk image yourself, run `mac/installer/build-dmg.sh` (the result i
 │  ├─ IdleViz.xcodeproj    App target: bundle, signing
 │  ├─ IdleViz/             The app: menu-bar app, settings window, welcome window and permission checks, triggers, fullscreen window, dismiss, keep awake, power source, Spotify info, Spotify audio tap, web view, presets folder and Milkdrop converter, Info.plist, entitlements
 │  ├─ Package.swift        IdleVizCore Swift package (testable logic)
-│  ├─ Sources/IdleVizCore/ Dismiss rules, the like and skip keys, open rules, idle timing and skip rules, keep-awake and battery times, fade times, permission states, brightness and overlay settings, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks), the audio delay (per-device setting, delay line, delay detection, the manual delay test's timing and beeps)
+│  ├─ Sources/IdleVizCore/ The update check, dismiss rules, the like and skip keys, open rules, idle timing and skip rules, keep-awake and battery times, fade times, permission states, brightness and overlay settings, page scheme and CSP, overlay payload, URL commands, activation stats, Spotify query parsing and tracking, audio analysis (bands, automatic gain, frame packing), page status checks, preset settings, the custom presets folder (scanning, import names, Milkdrop conversion checks), the audio delay (per-device setting, delay line, delay detection, the manual delay test's timing and beeps)
 │  ├─ Tests/               The Swift tests (IdleVizCoreTests)
 │  ├─ Config/              Build settings; your signing team goes in Local.xcconfig
 │  ├─ installer/           Builds and checks the disk image, draws the app icon and the image's background

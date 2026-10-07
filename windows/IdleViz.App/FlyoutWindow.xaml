@@ -46,5 +46,8 @@
 
     <!-- One row per problem, only while something is wrong. -->
     <StackPanel x:Name="WarningRows" />
+
+    <!-- A newer release, if there is one. Not a problem, so the tray icon stays as it is. -->
+    <StackPanel x:Name="UpdateRows" />
   </StackPanel>
 </Window>

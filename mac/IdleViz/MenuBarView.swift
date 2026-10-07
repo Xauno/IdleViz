@@ -5,6 +5,7 @@ import SwiftUI
 /// The small glass popup under the menu-bar icon.
 struct MenuBarView: View {
     var permissions: Permissions
+    var updates: UpdateChecker
     let openSettings: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -48,6 +49,26 @@ struct MenuBarView: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(permission.errorTitle)
                             Text(permissions.status.action(for: permission) == .showWelcome ? "Allow access ›" : "Open System Settings ›")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                }
+                .buttonStyle(MenuRowButtonStyle())
+            }
+
+            // Not a problem, so the icon stays as it is: the row is all that tells.
+            if let version = updates.available {
+                Button {
+                    dismiss()
+                    updates.openReleasePage()
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: "arrow.down.circle.fill").foregroundStyle(.tint)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Version \(version.description) is available")
+                            Text("Get it on GitHub ›")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }

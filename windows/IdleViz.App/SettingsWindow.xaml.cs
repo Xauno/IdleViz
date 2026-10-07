@@ -79,6 +79,8 @@ public sealed partial class SettingsWindow : Window
             }
         };
         ShowStartup();
+        _app.Updates.Changed += ShowUpdates;
+        ShowUpdates();
 
         FillPresetChoices();
         Presets.Changed += ShowPresets;
@@ -91,6 +93,7 @@ public sealed partial class SettingsWindow : Window
         {
             Presets.Changed -= ShowPresets;
             AudioDelay.Changed -= ShowDelay;
+            _app.Updates.Changed -= ShowUpdates;
             // The window can be closed with the test's dialog still open.
             AudioDelay.StopTest();
         };
@@ -320,6 +323,46 @@ public sealed partial class SettingsWindow : Window
             ShowStartup();
         }
     }
+
+    // The switch, what the last check found, and a button that checks at once.
+    private void ShowUpdates()
+    {
+        var updates = _app.Updates;
+        var installed = updates.Installed is { } version ? UpdateCheck.Label(version) : "unknown";
+        _showing = true;
+        try
+        {
+            UpdatesSwitch.IsOn = updates.Enabled;
+        }
+        finally
+        {
+            _showing = false;
+        }
+
+        CheckNowButton.IsEnabled = updates.Enabled && updates.Result != UpdateResult.Checking;
+        UpdatesCard.Description = !updates.Enabled
+            ? $"This is version {installed}"
+            : updates.Result switch
+            {
+                UpdateResult.Checking => "Checking\u2026",
+                UpdateResult.Failed => "Couldn't reach GitHub",
+                UpdateResult.UpToDate => $"Version {installed} is the latest",
+                _ => updates.Available is { } available
+                    ? $"Version {UpdateCheck.Label(available)} is available"
+                    : $"Once a day. This is version {installed}",
+            };
+    }
+
+    private void OnUpdatesToggled(object sender, RoutedEventArgs e)
+    {
+        if (!_showing)
+        {
+            // The checker follows the setting and reports back, which shows the row again.
+            _app.Settings.SetBool(UpdateCheck.EnabledKey, UpdatesSwitch.IsOn);
+        }
+    }
+
+    private void OnCheckNowClick(object sender, RoutedEventArgs e) => _app.Updates.CheckNow();
 
     private void ShowDisplayOptions()
     {

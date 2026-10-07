@@ -36,6 +36,9 @@ public sealed record LaunchOptions
     /// <summary>Debug builds only: show both warnings, as if the capture and the media controls had failed.</summary>
     public bool PretendWarning { get; init; }
 
+    /// <summary>Debug builds only: offer a newer version in the flyout and settings without asking GitHub.</summary>
+    public bool PretendUpdate { get; init; }
+
     public static LaunchOptions Parse(IEnumerable<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -53,6 +56,7 @@ public sealed record LaunchOptions
                 "--detect-delay" => options with { DetectDelay = true },
                 "--pretend-battery" => options with { PretendBattery = true },
                 "--pretend-warning" => options with { PretendWarning = true },
+                "--pretend-update" => options with { PretendUpdate = true },
                 _ => UrlCommands.Parse(argument) is { } command ? options with { Command = command } : options,
             };
         }

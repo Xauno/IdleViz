@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let windowController = WindowController()
     let menuBarIcon = MenuBarIcon()
     let permissions = Permissions()
+    let updates = UpdateChecker()
     private lazy var welcome = WelcomeWindowController(permissions: permissions)
     private lazy var presets = PresetController(page: windowController.page, library: PresetLibrary())
     private lazy var audioDelay = AudioDelayController(pump: audio)
@@ -15,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var settings = SettingsWindowController(
         presets: presets,
         audioDelay: audioDelay,
+        updates: updates,
         openNow: { [weak self] in self?.open(from: .settings) }
     )
 
@@ -93,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowController.prepare()
         prepareWhenTheDisplaySettingsChange()
         startTriggers()
+        updates.start()
         runDebugLaunchArguments()
     }
 
