@@ -473,7 +473,7 @@ Both apps tell the user about a newer release; neither installs it. Built after 
 
 ## Brought over from the Windows app
 
-The Windows port got these first, and the Mac followed. What each one does is in the [README](README.md#usage); only what differs on the Mac is here.
+The Windows port got these first, and the Mac followed. What each one does is in [docs/usage.md](docs/usage.md); only what differs on the Mac is here.
 
 - **The delay line, measured.** `DelayLine.pop` used to drop about a quarter of the frames at delays that are a whole number of frames. The fix was written on a Windows PC, so it was measured here afterwards: a Debug build with the visualizer open, counting the audio frames the page reports each second, gave 60 a second at delays of 0, 0.1, 1.0 and 2.5 s. The Debug copy had no audio permission, so the frames were silent ones; they take the same path through the delay line.
 - **More than one display** (W9 on Windows). `MultiDisplay.swift` holds the settings and `DisplayPlan`; `WindowController` keeps a window for every connected display and a page for each covered one; the main `PageView` forwards what it is sent to the others and keeps them on its preset.
