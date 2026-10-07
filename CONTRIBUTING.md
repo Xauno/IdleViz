@@ -10,9 +10,9 @@
 
 ## Build steps
 
-The steps each app was built in are listed in the [README](README.md#roadmap). One step is one pull request, and the pull request also:
+The steps each app was built in are listed in [docs/roadmap.md](docs/roadmap.md). One step is one pull request, and the pull request also:
 
-- ticks the step off in the README roadmap and updates the README's features, installation and usage if they changed
+- ticks the step off in `docs/roadmap.md` and updates the README and `docs/usage.md` if features, installation or usage changed
 - updates `project.md` and `docs/` if the design changed
 - adds tests for the new behavior
 
@@ -20,7 +20,7 @@ The steps each app was built in are listed in the [README](README.md#roadmap). O
 
 - JavaScript: Vitest, in `tests/`. New visualizer plugins are picked up automatically by `tests/plugin-contract.test.js` when placed in `web/visuals/`.
 - Swift (the Mac app, in `mac/`): XCTest. Keep logic in a Swift package target so `swift test` can run it in CI. Linting is SwiftLint (`mac/.swiftlint.yml`).
-- C# (the Windows app, in `windows/`): xUnit. Keep logic in `IdleViz.Core` so `dotnet test` can run it in CI. Linting is `dotnet format` (`windows/.editorconfig`) and the .NET analyzers, with warnings as errors. The Windows build steps are listed in the README's Windows section and written up in `docs/windows.md`.
+- C# (the Windows app, in `windows/`): xUnit. Keep logic in `IdleViz.Core` so `dotnet test` can run it in CI. Linting is `dotnet format` (`windows/.editorconfig`) and the .NET analyzers, with warnings as errors. The Windows build steps are listed in `docs/roadmap.md` and written up in `docs/windows.md`.
 
 ## Code style
 

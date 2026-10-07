@@ -4,7 +4,7 @@ Write the title as a conventional commit with a scope, in lowercase:
 
 Open the description with a short paragraph: the problem or context, what this
 changes, and what it deliberately does not cover. Link related PRs by number.
-If this is a build step from the README's Roadmap, say which one.
+If this is a build step from docs/roadmap.md, say which one.
 -->
 
 ## What Changed
@@ -28,6 +28,6 @@ If this is a build step from the README's Roadmap, say which one.
 ## Checklist
 
 - [ ] `npm run check` passes locally (and `swift build && swift test` in `mac/` if Swift changed, `dotnet build` and `dotnet test` in `windows/` if C# changed)
-- [ ] README updated if a build step finished or behavior changed
+- [ ] README, `docs/usage.md` and `docs/roadmap.md` updated if a build step finished or behavior changed
 - [ ] `project.md` / `docs/` updated if the design changed
 - [ ] Before/after screenshots included for UI changes
