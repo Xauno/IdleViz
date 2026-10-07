@@ -43,10 +43,25 @@ Every setting and what differs between the two apps is in [docs/usage.md](docs/u
   <em>The visualizer with the now-playing overlay</em>
 </p>
 
+The visualizer is the same page in both apps. The windows around it are native, so they look different on each.
+
+### macOS
+
 <p align="center">
-  <img src="docs/images/settings.png" width="400" alt="The settings window"><br>
+  <img src="docs/images/settings-mac.png" width="400" alt="The settings window on macOS"><br>
   <em>The settings window</em>
 </p>
+
+### Windows
+
+Screenshots of the Windows app are still to come.
+
+<!-- Add when taken on a Windows PC:
+<p align="center">
+  <img src="docs/images/settings-windows.png" width="400" alt="The settings window on Windows"><br>
+  <em>The settings window</em>
+</p>
+-->
 
 ## Install
 

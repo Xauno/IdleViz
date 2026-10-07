@@ -14,6 +14,7 @@ The steps each app was built in are listed in [docs/roadmap.md](docs/roadmap.md)
 
 - ticks the step off in `docs/roadmap.md` and updates the README and `docs/usage.md` if features, installation or usage changed
 - updates `project.md` and `docs/` if the design changed
+- retakes the README's screenshots in `docs/images/` if the UI changed, so they show what the app looks like now
 - adds tests for the new behavior
 
 ## Tests

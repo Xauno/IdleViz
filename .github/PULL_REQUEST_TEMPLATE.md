@@ -31,3 +31,4 @@ If this is a build step from docs/roadmap.md, say which one.
 - [ ] README, `docs/usage.md` and `docs/roadmap.md` updated if a build step finished or behavior changed
 - [ ] `project.md` / `docs/` updated if the design changed
 - [ ] Before/after screenshots included for UI changes
+- [ ] README screenshots in `docs/images/` retaken if the UI changed
