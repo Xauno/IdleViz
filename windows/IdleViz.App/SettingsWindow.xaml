@@ -76,6 +76,13 @@
           <ToggleSwitch x:Name="StartupSwitch" MinWidth="0" AutomationProperties.Name="Run at startup" Toggled="OnStartupToggled" />
         </controls:SettingsCard>
 
+        <controls:SettingsCard x:Name="UpdatesCard" Header="Check for updates">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <Button x:Name="CheckNowButton" VerticalAlignment="Center" Click="OnCheckNowClick" Content="Check now" />
+            <ToggleSwitch x:Name="UpdatesSwitch" MinWidth="0" AutomationProperties.Name="Check for updates" Toggled="OnUpdatesToggled" />
+          </StackPanel>
+        </controls:SettingsCard>
+
         <TextBlock Margin="0,18,0,6" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Look" />
 
         <controls:SettingsCard Header="Brightness">

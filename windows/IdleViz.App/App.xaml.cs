@@ -23,6 +23,7 @@ public partial class App : Application
     private AudioPump? _audio;
     private PresetController? _presets;
     private AudioDelayController? _audioDelay;
+    private UpdateChecker? _updates;
 #if DEBUG
     private DispatcherQueueTimer? _hangTimer;
     private DispatcherQueueTimer? _detectTimer;
@@ -63,6 +64,9 @@ public partial class App : Application
     /// <summary>The audio delay for the current speakers or headphones. Set once the app has launched.</summary>
     internal AudioDelayController AudioDelay => _audioDelay ?? throw new InvalidOperationException("The app hasn't launched yet.");
 
+    /// <summary>The check for a newer release. Set once the app has launched.</summary>
+    internal UpdateChecker Updates => _updates ?? throw new InvalidOperationException("The app hasn't launched yet.");
+
     /// <summary>False while Windows refuses the stored hotkey because another app has it.</summary>
     internal bool HotkeyRegistered { get; private set; } = true;
 
@@ -87,6 +91,10 @@ public partial class App : Application
         _hotkeyWindow.HotkeyPressed += () => OpenVisualizer(TriggerSource.Hotkey);
         _hotkeyWindow.ThemeChanged += () => _trayIcon?.RefreshIcon();
         ApplyHotkey();
+
+        // Before the tray icon, whose flyout shows the row.
+        _updates = new UpdateChecker(_dispatcher, _settings, debug.PretendUpdate);
+        _updates.Start();
 
         _trayIcon = new TrayIcon(this);
 

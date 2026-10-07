@@ -14,7 +14,7 @@ namespace IdleViz.App;
 
 /// <summary>
 /// The small flyout a left-click on the tray icon opens: a Settings row, the open hotkey for
-/// information, and one row per warning. It closes when it loses focus or on Esc, like the
+/// information, and one row per warning, and a row for a newer release. It closes when it loses focus or on Esc, like the
 /// Windows volume flyout.
 /// </summary>
 public sealed partial class FlyoutWindow : Window
@@ -42,7 +42,13 @@ public sealed partial class FlyoutWindow : Window
         // The warnings are checked again each time too. The answers come a moment later.
         ShowWarnings();
         _app.Warnings.Changed += OnWarningsChanged;
-        Closed += (_, _) => _app.Warnings.Changed -= OnWarningsChanged;
+        ShowUpdate();
+        _app.Updates.Changed += OnUpdateChanged;
+        Closed += (_, _) =>
+        {
+            _app.Warnings.Changed -= OnWarningsChanged;
+            _app.Updates.Changed -= OnUpdateChanged;
+        };
         _app.RecheckWarnings();
 
         Activated += (_, e) =>
@@ -106,13 +112,47 @@ public sealed partial class FlyoutWindow : Window
         }
     }
 
-    private Button WarningRow(Warning warning)
+    private void OnUpdateChanged()
+    {
+        if (_closing)
+        {
+            return;
+        }
+
+        ShowUpdate();
+        Place();
+    }
+
+    private void ShowUpdate()
+    {
+        UpdateRows.Children.Clear();
+        if (_app.Updates.Available is { } version)
+        {
+            UpdateRows.Children.Add(Row(
+                $"Version {UpdateCheck.Label(version)} is available",
+                "Get it on GitHub \u203A",
+                "\uE896", // Download
+                (Brush)Application.Current.Resources["AccentTextFillColorPrimaryBrush"],
+                UpdateChecker.OpenReleasePage));
+        }
+    }
+
+    private Button WarningRow(Warning warning) =>
+        Row(
+            warning.Title,
+            "Show details \u203A",
+            "\uE7BA", // Warning
+            new SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0xF5, 0xB8, 0x00)),
+            () => _app.ShowWarning(warning));
+
+    // A row with an icon, a title and a second line that says what a click does. The click closes the flyout first.
+    private Button Row(string title, string action, string glyph, Brush color, Action onClick)
     {
         var text = new StackPanel();
-        text.Children.Add(new TextBlock { Text = warning.Title, TextWrapping = TextWrapping.Wrap });
+        text.Children.Add(new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap });
         text.Children.Add(new TextBlock
         {
-            Text = "Show details \u203A",
+            Text = action,
             Style = (Style)Application.Current.Resources["CaptionTextBlockStyle"],
             Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
         });
@@ -120,11 +160,11 @@ public sealed partial class FlyoutWindow : Window
         var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
         content.Children.Add(new FontIcon
         {
-            Glyph = "\uE7BA", // Warning
+            Glyph = glyph,
             FontSize = 16,
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(0, 2, 0, 0),
-            Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(0xFF, 0xF5, 0xB8, 0x00)),
+            Foreground = color,
         });
         content.Children.Add(text);
 
@@ -136,11 +176,11 @@ public sealed partial class FlyoutWindow : Window
             HorizontalContentAlignment = HorizontalAlignment.Left,
             CornerRadius = new CornerRadius(4),
         };
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(row, warning.Title);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(row, title);
         row.Click += (_, _) =>
         {
             CloseOnce();
-            _app.ShowWarning(warning);
+            onClick();
         };
         return row;
     }

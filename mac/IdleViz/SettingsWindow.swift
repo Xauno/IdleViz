@@ -9,14 +9,16 @@ import SwiftUI
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let presets: PresetController
     private let audioDelay: AudioDelayController
+    private let updates: UpdateChecker
     private let openNow: () -> Void
     private var window: NSWindow?
     private static let width = 340.0
     private static let height = 640.0
 
-    init(presets: PresetController, audioDelay: AudioDelayController, openNow: @escaping () -> Void) {
+    init(presets: PresetController, audioDelay: AudioDelayController, updates: UpdateChecker, openNow: @escaping () -> Void) {
         self.presets = presets
         self.audioDelay = audioDelay
+        self.updates = updates
         self.openNow = openNow
     }
 
@@ -31,7 +33,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow {
-        let view = SettingsView(presets: presets, audioDelay: audioDelay, openNow: openNow)
+        let view = SettingsView(presets: presets, audioDelay: audioDelay, updates: updates, openNow: openNow)
         let hosting = NSHostingController(rootView: view)
         hosting.sizingOptions = []
         var height = Self.height
@@ -103,6 +105,7 @@ enum FoldedRows {
 struct SettingsView: View {
     @Bindable var presets: PresetController
     @Bindable var audioDelay: AudioDelayController
+    var updates: UpdateChecker
     let openNow: () -> Void
     @AppStorage(OverlaySetting.key) private var showOverlay = true
     @AppStorage(BrightnessSetting.key) private var brightness = BrightnessSetting.defaultValue
@@ -122,6 +125,7 @@ struct SettingsView: View {
             }
             Section("Opening") {
                 OpeningControls()
+                UpdateCheckRow(updates: updates)
             }
             Section("Look") {
                 LabeledContent("Brightness") {
@@ -166,7 +170,7 @@ struct SettingsView: View {
 }
 
 /// The Opening section: when the visualizer starts by itself, how long it keeps the screen awake,
-/// the hotkey, and whether input closes it.
+/// the hotkey, whether input closes it, and launch at login.
 private struct OpeningControls: View {
     @AppStorage(IdleTimeoutSetting.key) private var idleTimeout = IdleTimeoutSetting.defaultMinutes
     @AppStorage(KeepAwakeSetting.key) private var keepAwake = KeepAwakeSetting.defaultMinutes
@@ -233,5 +237,39 @@ private struct OpeningControls: View {
         let defaults = UserDefaults.standard
         if defaults.object(forKey: BatteryTimesSetting.idleTimeoutKey) == nil { idleTimeoutBattery = idleTimeout }
         if defaults.object(forKey: BatteryTimesSetting.keepAwakeKey) == nil { keepAwakeBattery = keepAwake }
+    }
+}
+
+/// The "Check for updates" row in settings: the switch, what the last check found, and a button
+/// that checks at once.
+private struct UpdateCheckRow: View {
+    var updates: UpdateChecker
+    @AppStorage(UpdateCheck.enabledKey) private var enabled = true
+
+    var body: some View {
+        LabeledContent {
+            HStack(spacing: 8) {
+                Button("Check now") { updates.checkNow() }
+                    .controlSize(.small)
+                    .disabled(!enabled || updates.result == .checking)
+                Toggle("Check for updates", isOn: $enabled).labelsHidden().toggleStyle(.switch)
+            }
+        } label: {
+            Text("Check for updates")
+            Text(status)
+        }
+    }
+
+    private var status: String {
+        let installed = updates.installed?.description ?? "unknown"
+        if !enabled { return "This is version \(installed)" }
+        switch updates.result {
+        case .checking: return "Checking…"
+        case .failed: return "Couldn't reach GitHub"
+        case .upToDate: return "Version \(installed) is the latest"
+        case nil:
+            if let version = updates.available { return "Version \(version.description) is available" }
+            return "Once a day. This is version \(installed)"
+        }
     }
 }

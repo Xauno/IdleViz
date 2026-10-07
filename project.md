@@ -442,6 +442,7 @@ mac/
    ├─ PresetLibrary.swift        # scan/watch custom preset folder, import, send list to page
    ├─ FolderWatcher.swift        # FSEvents wrapper
    ├─ MilkConverter.swift        # hidden page that converts .milk files
+   ├─ UpdateChecker.swift        # asks GitHub once a day for the latest release
    ├─ IdleVizApp.swift           # the app's entry point
    ├─ IdleWatcher.swift          # fires the idle trigger, scheduled by IdleScheduler
    ├─ Displays.swift             # the connected displays as they are right now
@@ -453,6 +454,18 @@ mac/
    └─ IdleViz.entitlements       # hardened runtime + apple-events + audio-input, no sandbox
 design/reference/                # Spotify TV app reference photo (gitignored, local only)
 ```
+
+## Update notice
+
+Both apps tell the user about a newer release; neither installs it. Built after the Windows port, the same way on both.
+
+- Once a day the app asks `https://api.github.com/repos/Xauno/IdleViz/releases/latest` and compares the tag (`v0.1.2`) with its own version. A tag that isn't plain numbers, a draft or a prerelease is ignored. The time of the last answer and the version it named are stored (`updateLastCheck`, `updateLatestVersion`), so a restart neither asks again nor loses the row. A failed check is tried again an hour later.
+- A newer version puts a row in the menu-bar popup (tray flyout on Windows): "Version 0.1.2 is available", which opens `https://github.com/Xauno/IdleViz/releases/latest` in the browser. The address is fixed in the app, so nothing in GitHub's answer decides which page opens.
+- The icon doesn't change. Yellow means something is wrong, and an update isn't.
+- **Check for updates** in settings, under **Opening**, is on by default (`checkForUpdates`). Under it: the installed version and what the last check found. **Check now** asks at once. Turned off, the app makes no request and the row goes.
+- **Why only a notice.** Installing by itself would need Sparkle on the Mac and an updater on Windows, and on the Mac every ad hoc signed build loses its permissions (see "The disk image" below), so an update that installs itself would bring the permission prompts back without the user having chosen to update. That changes only with a Developer ID, which is a non-goal.
+- The logic that needs no screen is in `UpdateCheck` (`mac/Sources/IdleVizCore/UpdateCheck.swift`, `windows/IdleViz.Core/UpdateCheck.cs`), tested on both. `UpdateChecker` in each app does the request and the timing.
+- For trying it: `-IdleVizFakeUpdate 9.9.9` on the Mac and `--pretend-update` on Windows, both in Debug builds only.
 
 ## Later
 

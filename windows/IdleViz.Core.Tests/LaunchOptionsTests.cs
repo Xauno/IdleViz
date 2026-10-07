@@ -20,8 +20,9 @@ public class LaunchOptionsTests
     [Fact]
     public void ReadsTheDebugSwitches()
     {
-        var options = LaunchOptions.Parse(["--no-dismiss", "--SHOW-SETTINGS", "--open-at-launch", "--show-flyout", "--show-menu", "--hang-page", "--detect-delay", "--pretend-battery", "--pretend-warning"]);
+        var options = LaunchOptions.Parse(["--no-dismiss", "--SHOW-SETTINGS", "--open-at-launch", "--show-flyout", "--show-menu", "--hang-page", "--detect-delay", "--pretend-battery", "--pretend-warning", "--pretend-update"]);
         Assert.True(options.PretendWarning);
+        Assert.True(options.PretendUpdate);
         Assert.True(options.PretendBattery);
         Assert.True(options.DetectDelay);
         Assert.True(options.ShowFlyout);
