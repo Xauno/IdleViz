@@ -25,6 +25,8 @@ internal sealed class UpdateChecker
     private readonly bool _pretend;
     private bool _checking;
 
+    /// <param name="dispatcher">The UI thread's queue, for the timer.</param>
+    /// <param name="settings">The settings file, which holds the switch and what the last check found.</param>
     /// <param name="pretend">Offer <see cref="UpdateCheck.PretendVersion"/> whatever GitHub says, and only ask it from "Check now" (the debug switch).</param>
     public UpdateChecker(DispatcherQueue dispatcher, SettingsStore settings, bool pretend)
     {
