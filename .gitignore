@@ -16,5 +16,6 @@ Config/Local.xcconfig
 bin/
 obj/
 windows/artifacts/
+/artifacts/
 *.user
 .vs/

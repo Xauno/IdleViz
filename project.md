@@ -26,7 +26,7 @@ A menu-bar app that opens a fullscreen music visualizer with a Spotify now-playi
 | Ad in or between podcasts     | Yes    | None                                      |
 | Playing on another device (Spotify Connect) | Yes | Same as the rows above. The visuals get silence and drift slowly. |
 
-**Non-goals:** other players (Apple Music, browsers), Spotify's Web API (no login/OAuth/Premium dependency), a `.saver` bundle, third-party visualizer apps (Synesthesia etc.), and distribution to other people. The app is for personal use: no notarization, Developer ID or auto-updates. If that ever changes, the app name must not contain "Spotify" (Spotify's brand rules).
+**Non-goals:** other players (Apple Music, browsers), Spotify's Web API (no login/OAuth/Premium dependency), a `.saver` bundle, third-party visualizer apps (Synesthesia etc.), and anything that needs the paid Apple Developer Program: no Developer ID, notarization or auto-updates. Other people can get the app as an unsigned disk image (see "The disk image" under "Brought over from the Windows app"). The app name must not contain "Spotify" (Spotify's brand rules).
 
 ---
 
@@ -525,6 +525,13 @@ Not steps of the build order: the Windows port got these first, and the Mac foll
   - The preview opens the visualizer as **Open now** does, from the sheet. It ends when the fade-out starts or the open is refused, as on Windows.
   - The rows of the Single mode picker and of both sheets are filtered by `PresetSettings.matching`.
   - Debug builds take `-IdleVizPreview "bundled:…"`, which previews that preset a moment after launch.
+
+- **The disk image.** The Windows app has a setup wizard; the owner chose a disk image for the Mac, published unsigned on version tags. `installer/build-dmg.sh` builds the Release app for Apple silicon and Intel, signs it ad hoc, and has `dmgbuild` (a Python package, installed into `.build/dmg-venv`) make `artifacts/IdleViz.dmg` with the app, a shortcut to Applications and the window layout in `installer/dmg-settings.py`. `installer/test-dmg.sh` mounts it and checks the contents, the signature, both chip types and the version.
+  - `dmgbuild` writes the window's layout file itself. The usual tools script Finder to arrange the window, which needs a logged-in desktop and doesn't work in CI.
+  - Ad hoc means signed with no certificate. macOS blocks the first open until it is allowed under Privacy & Security, and it ties the permissions to the exact build, so they are asked again after every update. `IdleViz.command` still builds a copy signed with your own certificate.
+  - The app got an icon for this (`AppIcon.icns`, the Windows icon's design on Apple's icon grid); it had none. `installer/make-assets.swift` draws it and the window's background.
+  - The background is one 600 × 400 picture in mid grey. Finder ignored a 2x version (a two-size TIFF and a 144 dpi PNG both came out double size on macOS 26), and it writes the icons' names in black or white by the system's appearance whatever is behind them.
+  - `MARKETING_VERSION` went from 0.1.0 to 0.1.1 to match the Windows app. The release workflow fails unless the tag matches both.
 
 ## Requirements
 
