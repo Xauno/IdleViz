@@ -3,13 +3,13 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { isPreset } from "../IdleViz/web/visualizer-state.js";
+import { isPreset } from "../web/visualizer-state.js";
 
 // The vendored converter has to work with no network: its WebAssembly is inside the file.
 // This package is an ES module package, so the browser bundle is loaded from a .cjs copy.
 const root = resolve(import.meta.dirname, "..");
 const copy = join(mkdtempSync(join(tmpdir(), "idleviz-converter-")), "converter.cjs");
-copyFileSync(resolve(root, "IdleViz", "web", "vendor", "milkdrop-preset-converter.min.js"), copy);
+copyFileSync(resolve(root, "web", "vendor", "milkdrop-preset-converter.min.js"), copy);
 const converter = createRequire(import.meta.url)(copy);
 const sample = readFileSync(resolve(root, "tests", "fixtures", "sample.milk"), "utf8");
 

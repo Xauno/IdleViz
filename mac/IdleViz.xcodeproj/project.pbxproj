@@ -9,19 +9,21 @@
 /* Begin PBXBuildFile section */
 		1D0000000000000000000301 /* IdleVizCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1D0000000000000000000401 /* IdleVizCore */; };
 		1D0000000000000000000302 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 1D0000000000000000000402 /* KeyboardShortcuts */; };
+		1D0000000000000000000303 /* web in Resources */ = {isa = PBXBuildFile; fileRef = 1D0000000000000000000103 /* web */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		1D0000000000000000000101 /* IdleViz.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IdleViz.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1D0000000000000000000102 /* IdleViz.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = IdleViz.xcconfig; sourceTree = "<group>"; };
+		1D0000000000000000000103 /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; name = web; path = ../web; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		1D0000000000000000000601 /* Exceptions for "IdleViz" folder in "IdleViz" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				App/IdleViz.entitlements,
-				App/Info.plist,
+				IdleViz.entitlements,
+				Info.plist,
 			);
 			target = 1D0000000000000000000701 /* IdleViz */;
 		};
@@ -34,7 +36,6 @@
 				1D0000000000000000000601 /* Exceptions for "IdleViz" folder in "IdleViz" target */,
 			);
 			explicitFolders = (
-				web,
 			);
 			path = IdleViz;
 			sourceTree = "<group>";
@@ -58,6 +59,7 @@
 			isa = PBXGroup;
 			children = (
 				1D0000000000000000000201 /* IdleViz */,
+				1D0000000000000000000103 /* web */,
 				1D0000000000000000000002 /* Config */,
 				1D0000000000000000000003 /* Products */,
 			);
@@ -149,6 +151,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1D0000000000000000000303 /* web in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -206,7 +209,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1D0000000000000000000102 /* IdleViz.xcconfig */;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = IdleViz/App/IdleViz.entitlements;
+				CODE_SIGN_ENTITLEMENTS = IdleViz/IdleViz.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -214,7 +217,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = IdleViz/App/Info.plist;
+				INFOPLIST_FILE = IdleViz/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -230,7 +233,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1D0000000000000000000102 /* IdleViz.xcconfig */;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = IdleViz/App/IdleViz.entitlements;
+				CODE_SIGN_ENTITLEMENTS = IdleViz/IdleViz.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -238,7 +241,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = IdleViz/App/Info.plist;
+				INFOPLIST_FILE = IdleViz/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

@@ -1,8 +1,8 @@
 // Draws the Mac app icon and the disk image's background, and writes them where the build expects them:
-//   IdleViz/App/AppIcon.icns   the menu-bar waveform, white on a dark rounded square (the Windows icon's design)
+//   IdleViz/AppIcon.icns   the menu-bar waveform, white on a dark rounded square (the Windows icon's design)
 //   installer/background.png   the window behind the two icons in IdleViz.dmg
 // Both files are committed; run this again only to change the design:
-//   swift installer/make-assets.swift
+//   cd mac && swift installer/make-assets.swift
 import AppKit
 
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -75,7 +75,7 @@ for points in [16, 32, 128, 256, 512] {
         try png(width: pixels, height: pixels) { drawIcon($0, size: CGFloat(pixels)) }.write(to: iconset.appendingPathComponent(name))
     }
 }
-try run("/usr/bin/iconutil", ["-c", "icns", iconset.path, "-o", root.appendingPathComponent("IdleViz/App/AppIcon.icns").path])
+try run("/usr/bin/iconutil", ["-c", "icns", iconset.path, "-o", root.appendingPathComponent("IdleViz/AppIcon.icns").path])
 
 // MARK: Disk image background
 
@@ -119,4 +119,4 @@ func drawBackground(_ context: CGContext) {
 // One picture at 1x. Finder shows a background pixel for point and ignores a 2x version (tried on
 // macOS 26 with a two-size TIFF and with a 144 dpi PNG: both came out twice the size of the window).
 try png(width: 600, height: 400, draw: drawBackground).write(to: root.appendingPathComponent("installer/background.png"))
-print("Wrote IdleViz/App/AppIcon.icns and installer/background.png")
+print("Wrote IdleViz/AppIcon.icns and installer/background.png")

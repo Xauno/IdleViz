@@ -40,6 +40,9 @@ jobs:
     name: Swift (lint, test, build app and disk image)
     runs-on: macos-26
     timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mac
     steps:
       - uses: actions/checkout@v7
 
@@ -58,7 +61,7 @@ jobs:
       - name: Test package
         run: swift test
 
-      # CI has no signing certificate. Local builds sign with the team in Config/Local.xcconfig.
+      # CI has no signing certificate. Local builds sign with the team in mac/Config/Local.xcconfig.
       - name: Build app
         run: >
           xcodebuild build

@@ -1,11 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  SLOW_FRAME_MS,
-  SLOW_SECONDS,
-  checkPlugin,
-  createRunner,
-  describeError,
-} from "../IdleViz/web/plugin-runner-core.js";
+import { SLOW_FRAME_MS, SLOW_SECONDS, checkPlugin, createRunner, describeError } from "../web/plugin-runner-core.js";
 
 /** A clock the test moves by hand. */
 function makeClock() {
@@ -153,7 +147,7 @@ describe("createRunner", () => {
   it("runs the bundled Aurora plugin the way the frame does", async () => {
     const { createFakeCanvas } = await import("./helpers/fake-gl.js");
     vi.stubGlobal("window", { devicePixelRatio: 2 });
-    const plugin = checkPlugin(await import("../IdleViz/web/visuals/aurora.js"));
+    const plugin = checkPlugin(await import("../web/visuals/aurora.js"));
     const { canvas, liveResources } = createFakeCanvas();
     plugin.init(canvas);
     const report = vi.fn();

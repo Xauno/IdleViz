@@ -6,7 +6,7 @@ import { createAudio, createFakeCanvas } from "./helpers/fake-gl.js";
 
 // Every visualizer plugin must satisfy the contract in docs/custom-visualizer.md.
 const root = resolve(import.meta.dirname, "..");
-const visualsDir = join(root, "IdleViz", "web", "visuals");
+const visualsDir = join(root, "web", "visuals");
 const pluginFiles = readdirSync(visualsDir)
   .filter((f) => f.endsWith(".js"))
   .map((f) => join(visualsDir, f));

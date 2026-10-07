@@ -13,7 +13,7 @@ These files are copied unchanged from npm so the app builds without a Node step.
 
 The four packs hold 455 presets, 395 after dropping names that appear in more than one pack.
 
-The converter turns original Milkdrop `.milk` presets into Butterchurn's format. It is one file with its WebAssembly built in, so it runs offline. Only `converter.html` loads it, not the visualizer page. If its version changes, change `MilkConversion.converterVersion` in `Sources/IdleVizCore/CustomPresets.swift` too, so cached conversions are redone.
+The converter turns original Milkdrop `.milk` presets into Butterchurn's format. It is one file with its WebAssembly built in, so it runs offline. Only `converter.html` loads it, not the visualizer page. If its version changes, change `MilkConversion.converterVersion` in `mac/Sources/IdleVizCore/CustomPresets.swift` too, so cached conversions are redone.
 
 ## Updating
 

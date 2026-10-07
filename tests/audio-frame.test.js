@@ -6,7 +6,7 @@ import {
   SAMPLE_COUNT,
   createAudioState,
   decodeAudioFrame,
-} from "../IdleViz/web/audio-frame.js";
+} from "../web/audio-frame.js";
 
 /** Packs a frame the way AudioFrame.swift does. */
 function pack({ sequence = 1, sampleRate = 48000, bass = 0, mid = 0, treble = 0, rms = 0, fill } = {}) {
