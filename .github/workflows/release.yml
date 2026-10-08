@@ -47,7 +47,7 @@ jobs:
       - name: Test installer
         run: ./installer/test-installer.ps1
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: windows-setup
           path: windows/artifacts/IdleViz-Setup.exe
@@ -79,7 +79,7 @@ jobs:
       - name: Test disk image
         run: installer/test-dmg.sh "$VERSION"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: mac-disk-image
           path: mac/artifacts/IdleViz.dmg
