@@ -5,10 +5,12 @@ import SwiftUI
 /// the slider, Detect and the manual delay test folded into its row.
 struct AudioDelayControls: View {
     @Bindable var audioDelay: AudioDelayController
+    @AppStorage(ResponseSpeedSetting.key) private var responseSpeed = ResponseSpeedSetting.defaultValue.rawValue
     @State private var showTest = false
     @State private var isOpen = FoldedRows.startOpen
 
     var body: some View {
+        responseSpeedRow
         FoldedRow(isOpen: $isOpen) {
             // Under its label, so the slider runs the width of the row: 250 steps need the room.
             VStack(alignment: .leading, spacing: 6) {
@@ -53,6 +55,16 @@ struct AudioDelayControls: View {
                 Text("Audio delay")
                 Text("For \(audioDelay.deviceName)").lineLimit(1)
             }
+        }
+    }
+
+    /// Experimental. Sits with the delay since both are about the visuals feeling on the beat.
+    private var responseSpeedRow: some View {
+        Picker(selection: $responseSpeed) {
+            ForEach(ResponseSpeed.allCases, id: \.rawValue) { Text($0.label).tag($0.rawValue) }
+        } label: {
+            Text("Response speed (experimental)")
+            Text("How fast plugin visuals jump on a hit. Presets aren't affected")
         }
     }
 }

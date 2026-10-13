@@ -293,6 +293,13 @@ The only visualizer is **Butterchurn** (WebGL port of Milkdrop), chosen because 
   - If Spotify quits, plays on another device, or the track is an ad or podcast with no audio source, the frame is silence (zeros), not a fallback to anything else.
   - Test: play other audio (a YouTube tab, system sounds) while Spotify is paused and confirm the visualizer stays flat.
 
+### Response speed (Mac, experimental)
+
+- A global setting, `responseSpeed`: `normal`, `snappy` or `instant`, in **Audio sync** above **Audio delay**. It is the attack of the 64 bands: 0.7, 0.9 and 1 of the way to a higher level each frame (the release stays 0.12). Normal is the old behaviour and the default.
+- It only changes `bands`, `bass`, `mid` and `treble`, which plugins read. Butterchurn presets get the raw waveform bytes and run their own FFT and smoothing, so they are untouched. The row says so.
+- Why not a negative audio delay: the visuals can't run ahead of audio the app only receives once it is playing, so on built-in speakers (sound about 40 ms ahead of the tap's hand-over) no time shift helps. A faster attack makes the peak land nearer the hit instead. On Bluetooth and AirPlay, setting the delay a little under the measured value already gives the same early feel.
+- `ResponseSpeed` and `ResponseSpeedSetting` are in `IdleVizCore/ResponseSpeed.swift`; `AudioPump` hands the setting to `AudioAnalyzer` at start-up and whenever the defaults change. Planned for Windows: see [docs/roadmap.md](docs/roadmap.md).
+
 ### Audio delay
 The tap hears Spotify's audio before it reaches the speakers. With built-in speakers the gap is tiny, but Bluetooth adds about 150–300 ms and AirPlay about 2 s, so the visuals run ahead of the sound.
 
@@ -414,7 +421,7 @@ mac/
 ├─ IdleViz.command               # build Release, install to /Applications, open
 ├─ installer/                    # build-dmg.sh, test-dmg.sh, dmg-settings.py, make-assets.swift
 ├─ Package.swift                 # IdleVizCore package (testable logic)
-├─ Sources/IdleVizCore/          # open rules, idle/skip rules, dismiss rules, like and skip keys, keep-awake + battery timing, fade times, permission states, brightness and overlay settings, Spotify parsing, content type, FFT/bands, delay detection
+├─ Sources/IdleVizCore/          # open rules, idle/skip rules, dismiss rules, like and skip keys, keep-awake + battery timing, fade times, permission states, brightness and overlay settings, Spotify parsing, content type, FFT/bands, response speed, delay detection
 ├─ Tests/IdleVizCoreTests/       # XCTest, runs in CI with swift test
 └─ IdleViz/
    ├─ AppDelegate.swift          # wires everything together at launch, open rules

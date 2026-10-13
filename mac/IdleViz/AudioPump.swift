@@ -21,6 +21,7 @@ final class AudioPump {
     private var lastLevels = (rms: Float(0), bass: Float(0))
     private var delayLine = DelayLine<Data>()
     private var tapping = false
+    private var settingsObserver: NSObjectProtocol?
 
     /// How long each frame waits before it goes to the page, so the visuals match what the speakers play.
     var delay: TimeInterval = 0
@@ -34,6 +35,17 @@ final class AudioPump {
     var mayTap: () -> Bool = { true }
     /// Called when the tap starts or stops looking like it has no permission.
     var onSuspected: ((Bool) -> Void)?
+
+    init() {
+        analyzer.responseSpeed = ResponseSpeedSetting.value(in: .standard)
+        settingsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.analyzer.responseSpeed = ResponseSpeedSetting.value(in: .standard)
+            }
+        }
+    }
 
     func start() {
         guard timer == nil else { return }

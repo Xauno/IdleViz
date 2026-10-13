@@ -29,7 +29,7 @@ It is not a real screensaver, just a fullscreen window on top of everything. It 
 - **Now playing.** Album art, title, artist and progress, styled after the Spotify TV app. No Spotify login and no web API.
 - **395 presets.** Butterchurn (WebGL Milkdrop) presets, shuffled with a blend between them, or one fixed preset. Favorites, a blocklist, and keys to like, skip and block while it's showing.
 - **Your own visuals.** Drop Butterchurn `.json`, Milkdrop `.milk` or custom `.js` plugin files into the presets folder. Plugins run in a sandbox.
-- **Audio sync.** A delay for Bluetooth and network speakers, saved per device and measured with the microphone or by ear.
+- **Audio sync.** A delay for Bluetooth and network speakers, saved per device and measured with the microphone or by ear. On the Mac, an experimental **Response speed** makes plugin visuals peak sooner on a hit.
 - **More than one display.** The same visualizer on each display, or one picture extended across them.
 - **Keeps the screen awake.** Up to a limit you set, then it fades out and the computer sleeps as usual. Separate times on battery.
 - **Update notice.** Tells you when a newer release is out. It downloads and installs nothing.
