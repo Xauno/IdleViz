@@ -44,4 +44,6 @@ Each step was one pull request. Features added to both apps after these steps, s
 
 ## Planned
 
-Nothing new is planned. What is left is to check more than one display on the Mac with a real second display; the list is in [docs/mac-todo.md](mac-todo.md).
+What is left is to check more than one display on the Mac with a real second display; the list is in [docs/mac-todo.md](mac-todo.md).
+
+**Response speed on Windows.** The Mac app has an experimental **Response speed** setting (**Normal**, **Snappy**, **Instant**) under **Audio sync**. It is one number, the attack of the 64 bands, so the Windows version is one PR: a `ResponseSpeed` type and its setting key in `IdleViz.Core` (the same three attacks, 0.7, 0.9 and 1, and the same tests), the attack in the analyzer taking it instead of a constant, a picker above **Audio delay** in `SettingsWindow.xaml`, the audio pump reading the setting when it changes, then the same changes to the README and [docs/usage.md](usage.md), with a new `settings-windows.png`.

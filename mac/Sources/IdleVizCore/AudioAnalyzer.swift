@@ -7,8 +7,7 @@ public struct AudioAnalyzer {
     /// Band levels map this range of decibels to 0...1. A full-scale sine is 0 dB.
     static let floorDecibels: Float = -65
     static let rangeDecibels: Float = 55
-    /// How far a band moves towards a higher and a lower value each frame: fast attack, slow release.
-    static let attack: Float = 0.7
+    /// How far a band moves towards a lower value each frame: slow release. The attack comes from `responseSpeed`.
     static let release: Float = 0.12
     static let lowestHz = 40.0
     static let highestHz = 16_000.0
@@ -19,6 +18,9 @@ public struct AudioAnalyzer {
     private var gainControl = AutoGain()
     private var bands = [Float](repeating: 0, count: AudioFrame.bandCount)
     private var sequence: UInt32 = 0
+
+    /// How fast a band follows a rising level. Only the bands and `bass`, `mid` and `treble` change.
+    public var responseSpeed = ResponseSpeedSetting.defaultValue
 
     public init() {
         window = vDSP.window(ofType: Float.self, usingSequence: .hanningDenormalized, count: count, isHalfWindow: false)
@@ -80,7 +82,7 @@ public struct AudioAnalyzer {
             let decibels = 20 * log10(max(magnitude, 1e-9))
             let level = min(max((decibels - Self.floorDecibels) / Self.rangeDecibels, 0), 1)
             let previous = bands[band]
-            let next = previous + (level - previous) * (level > previous ? Self.attack : Self.release)
+            let next = previous + (level - previous) * (level > previous ? responseSpeed.attack : Self.release)
             // Snap to zero so silence becomes exact silence instead of fading forever.
             bands[band] = next < 0.0005 ? 0 : next
         }
